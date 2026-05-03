@@ -3806,7 +3806,7 @@ let _dragging=false,_dragX0=0;
 let _spaceDown=false,_panning=false,_panX0=0,_panZoom0=[0,1];
 let _tmCx=null,_tmCy=null;
 const LAP_COLORS=['#4a9aef','#22c55e','#f59e0b','#a855f7'];
-const REF_COL='#777777';
+const REF_COL='#444444';
 const W=1000;
 const $=id=>document.getElementById(id);
 function fmtLap(s){if(!s)return'—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
@@ -3885,7 +3885,7 @@ function buildDelta(lapS,refS,N=500){
   }
   return out;
 }
-function deltaSVG(delta,H=44){
+function deltaSVG(delta,H=32){
   const zY=H/2;
   const maxA=Math.max(...delta.map(d=>Math.abs(d.d)),0.001);
   const sc=(H/2-4)/maxA;
@@ -3962,8 +3962,9 @@ function speedSVG(){
         const ss=sl[m.i];if(!ss)return;
         const x=parseFloat(sX(ss).toFixed(1));
         const y=H-((ss.speed_mph-mn)/yr*H);
-        c+=`<polygon points="${x},${(y+10).toFixed(1)} ${(x-4).toFixed(1)},${(y+18).toFixed(1)} ${(x+4).toFixed(1)},${(y+18).toFixed(1)}" fill="${col}" opacity=".75"/>
-        <text x="${x}" y="${(y+30).toFixed(1)}" fill="${col}" font-size="17" text-anchor="middle" font-family="monospace" opacity=".8">${Math.round(ss.speed_mph)}</text>`;
+        // Triangle tip points down to the minimum; base sits 10px above
+        c+=`<polygon points="${x},${y.toFixed(1)} ${(x-5).toFixed(1)},${(y-10).toFixed(1)} ${(x+5).toFixed(1)},${(y-10).toFixed(1)}" fill="${col}" opacity=".8"/>
+        <text x="${x}" y="${(y-13).toFixed(1)}" fill="${col}" font-size="14" text-anchor="middle" font-family="monospace" opacity=".9">${Math.round(ss.speed_mph)}</text>`;
       });
     }
   });
@@ -3973,7 +3974,7 @@ function throttleSVG(){
   const H=80;
   const y50=(H-50/100*H).toFixed(1),y70=(H-70/100*H).toFixed(1);
   let c=`${secLine(1/3,H)}${secLine(2/3,H)}
-    <rect x="0" y="${y70}" width="${W}" height="${(parseFloat(y50)-parseFloat(y70)).toFixed(1)}" fill="#f59e0b0b"/>`;
+    <rect x="0" y="${y70}" width="${W}" height="${(parseFloat(y50)-parseFloat(y70)).toFixed(1)}" fill="#f59e0b1f"/>`;
   if(_refSamples)c+=`<path d="${linePts(_refSamples,'throttle_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".5"/>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
@@ -4024,7 +4025,7 @@ function steerSVG(){
   const allS=Object.values(_lapSamples).filter(Boolean);
   const[mn,mx]=autoRange(allS,'steer');
   const zeroY=(H-((0-mn)/(mx-mn||1))*H).toFixed(1);
-  let c=`<line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="#1e1e1e" stroke-width="1"/>
+  let c=`<line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="#222" stroke-width="1"/>
     ${secLine(1/3,H)}${secLine(2/3,H)}`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
@@ -4042,14 +4043,14 @@ function slipSVG(){
     <line x1="0" y1="${y10}" x2="${W}" y2="${y10}" stroke="#22c55e1a" stroke-width="1"/>
     <line x1="0" y1="${y30}" x2="${W}" y2="${y30}" stroke="#f59e0b1a" stroke-width="1"/>
     ${secLine(1/3,H)}${secLine(2/3,H)}
-    <text x="6" y="${H-4}" fill="#22c55e33" font-size="16" font-family="monospace">Optimal</text>
-    <text x="6" y="${(parseFloat(y10)-5).toFixed(1)}" fill="#f59e0b33" font-size="16" font-family="monospace">Managed</text>
-    <text x="6" y="${(parseFloat(y30)-5).toFixed(1)}" fill="#ef444433" font-size="16" font-family="monospace">Excess</text>`;
+    <text x="${W-4}" y="${H-4}" fill="#22c55e" font-size="10" text-anchor="end" font-family="monospace">Optimal</text>
+    <text x="${W-4}" y="${((parseFloat(y30)+parseFloat(y10))/2+5).toFixed(1)}" fill="#f59e0b" font-size="10" text-anchor="end" font-family="monospace">Managed</text>
+    <text x="${W-4}" y="${(parseFloat(y30)/2+5).toFixed(1)}" fill="#ef4444" font-size="10" text-anchor="end" font-family="monospace">Excess</text>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.35;
     c+=`<path d="${linePts(s,'slip_rl',H,0,mx)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?2:1.5}" opacity="${op}"/>`;
-    c+=`<path d="${linePts(s,'slip_rr',H,0,mx)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?1.5:1}" stroke-dasharray="5,3" opacity="${op*.7}"/>`;
+    c+=`<path d="${linePts(s,'slip_rr',H,0,mx)}" fill="none" stroke="#93c5fd" stroke-width="${ln===_primaryLap?1.5:1}" stroke-dasharray="5,3" opacity="${op*.7}"/>`;
   });
   return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">${c}</svg>`;
 }
@@ -4087,23 +4088,37 @@ function secTime(samples,lo,hi){
 }
 // ── Sector header ─────────────────────────────────────────────────────────
 function renderSectorHdr(){
-  const laps=[..._selectedLaps.map(ln=>({ln,s:_lapSamples[ln],col:LAP_COLORS[_selectedLaps.indexOf(ln)],lbl:'L'+ln}))];
-  if(_refSamples)laps.push({ln:'ref',s:_refSamples,col:REF_COL,lbl:'Ref'});
+  const lapEntries=_selectedLaps.map(ln=>({ln,s:_lapSamples[ln],col:LAP_COLORS[_selectedLaps.indexOf(ln)],lbl:'L'+ln,isRef:false}));
+  const hasRef=!!_refSamples;
   const secs=[[0,1/3,'S1'],[1/3,2/3,'S2'],[2/3,1,'S3']];
-  const times=secs.map(([lo,hi,nm])=>{
-    const ts=laps.map(l=>secTime(l.s,lo,hi));
+  const refTimes=hasRef?secs.map(([lo,hi])=>secTime(_refSamples,lo,hi)):null;
+  const lapTimes=secs.map(([lo,hi,nm])=>{
+    const ts=lapEntries.map(l=>secTime(l.s,lo,hi));
     const best=Math.min(...ts.filter(t=>t!=null));
     return{nm,ts,best};
   });
   let html=`<div class="s-hdr-row"><span class="s-row-lbl"></span>`;
-  laps.forEach(l=>html+=`<span class="s-cell-hd" style="color:${l.col}">${l.lbl}</span>`);
+  lapEntries.forEach(l=>html+=`<span class="s-cell-hd" style="color:${l.col}">${l.lbl}</span>`);
+  if(hasRef)html+=`<span class="s-cell-hd" style="color:${REF_COL}">DELTA</span>`;
   html+='</div>';
-  times.forEach(({nm,ts,best})=>{
+  lapTimes.forEach(({nm,ts,best},si)=>{
     html+=`<div class="s-hdr-row"><span class="s-row-lbl">${nm}</span>`;
     ts.forEach((t,i)=>{
       const isBest=t!=null&&Math.abs(t-best)<0.001;
-      html+=`<span class="s-cell${isBest?' best':''}" style="color:${laps[i].col}">${t!=null?t.toFixed(3):'—'}</span>`;
+      html+=`<span class="s-cell${isBest?' best':''}" style="color:${lapEntries[i].col}">${t!=null?t.toFixed(3):'—'}</span>`;
     });
+    if(hasRef){
+      const rt=refTimes?refTimes[si]:null;
+      const pt=lapEntries.length>0?ts[0]:null;
+      if(rt!=null&&pt!=null){
+        const d=pt-rt;
+        const sign=d<0?'−':'+';
+        const cls=d<0?'delta-neg':'delta-pos';
+        html+=`<span class="s-cell ${cls}">${sign}${Math.abs(d).toFixed(3)}</span>`;
+      }else{
+        html+=`<span class="s-cell" style="color:${REF_COL}">—</span>`;
+      }
+    }
     html+='</div>';
   });
   $('sector-hdr').innerHTML=html;
@@ -4145,6 +4160,7 @@ function renderLapSummaries(){
 function renderTrackMap(){
   const s=_lapSamples[_primaryLap];
   if(!s||!s.some(ss=>ss.px!=null)){$('track-map-wrap').style.display='none';return;}
+  if(!s.some(ss=>Math.abs(ss.px??0)>0.1||Math.abs(ss.py??0)>0.1||Math.abs(ss.pz??0)>0.1)){$('track-map-wrap').style.display='none';return;}
   $('track-map-wrap').style.display='';
   const hasPz=s.some(ss=>ss.pz!=null);
   const xz=hasPz?ss=>ss.pz:ss=>ss.py??0;
@@ -4191,8 +4207,8 @@ function renderAll(){
   if(_refSamples&&_lapSamples[_primaryLap]){
     deltaHtml=deltaSVG(buildDelta(_lapSamples[_primaryLap],_refSamples));
   }else{
-    deltaHtml=`<svg viewBox="0 0 ${W} 44" preserveAspectRatio="none" width="100%" height="44">
-      <text x="${W/2}" y="27" text-anchor="middle" fill="#282828" font-size="22" font-family="monospace">Select a reference to see delta</text></svg>`;
+    deltaHtml=`<svg viewBox="0 0 ${W} 32" preserveAspectRatio="none" width="100%" height="32">
+      <text x="${W/2}" y="20" text-anchor="middle" fill="#282828" font-size="18" font-family="monospace">Select a reference to see delta</text></svg>`;
   }
   setPanel('panel-delta','DELTA — cumulative time vs reference  (green=faster · red=slower)',deltaHtml,true);
   setPanel('panel-speed','SPEED mph — ▽ corner minimum speed',speedSVG(),$('ch-speed').checked);
@@ -4317,18 +4333,23 @@ function setXMode(m){
 // ── Lap selector ──────────────────────────────────────────────────────────
 function renderLapList(){
   const best=_sess.best_lap_time_s;
+  const partialThresh=best?best*0.6:0;
   $('lap-list').innerHTML=_laps.filter(l=>l.lap_time_s&&l.lap_number>0).map(l=>{
     const ci=_selectedLaps.indexOf(l.lap_number);
     const checked=ci>=0;
     const col=checked?LAP_COLORS[ci]:'#444';
     const isBest=best&&Math.abs(l.lap_time_s-best)<0.001;
+    const isPartial=partialThresh>0&&l.lap_time_s<partialThresh;
     return`<label class="lap-item">
       <input type="checkbox" ${checked?'checked':''} onchange="onLapToggle(${l.lap_number},this.checked)">
       <span class="lap-swatch" style="background:${col}"></span>
-      Lap ${l.lap_number}${isBest?' <span class="lap-best-badge">★</span>':''}
+      Lap ${l.lap_number}${isBest?' <span class="lap-best-badge">★</span>':''}${isPartial?' <span style="font-size:.6rem;color:#555">(partial)</span>':''}
       <span class="lap-time-s">${fmtLap(l.lap_time_s)}</span>
     </label>`;
   }).join('');
+  // Exclude partial laps from ref selector
+  const refSel=$('ref-sel');
+  if(refSel&&refSel.options[1])refSel.options[1].disabled=!!(partialThresh>0&&best&&best<partialThresh);
 }
 async function onLapToggle(lapN,checked){
   if(checked){
