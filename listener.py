@@ -2808,37 +2808,40 @@ a{color:inherit;text-decoration:none}
   color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:.05em;
   padding:10px 20px 10px 0;cursor:pointer;white-space:nowrap;margin-bottom:-1px;
   transition:color .15s,border-color .15s}
-.gtab:hover{color:#aaa}
-.gtab.active{color:var(--color-text-primary);border-bottom-color:var(--color-text-primary)}
-.gtab .cnt{font-size:.72rem;color:#444;margin-left:6px;font-weight:400}
-.gtab.active .cnt{color:#888}
+.gtab:hover{color:var(--color-text-secondary)}
+.gtab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
+.gtab .cnt{font-size:var(--text-xs);color:var(--color-text-dim);margin-left:5px;font-weight:var(--fw-normal)}
+.gtab.active .cnt{color:var(--color-text-muted)}
 /* ── KPI Cards ─────────────────────────────────────────────── */
-.kpi-row{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px;margin-bottom:20px;scrollbar-width:none}
+.kpi-row{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px;margin-bottom:var(--space-6);scrollbar-width:none}
 .kpi-row::-webkit-scrollbar{display:none}
-.kpi{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:18px 20px;min-width:160px;flex:1}
-.kpi-label{font-size:.72rem;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
-.kpi-val{font-size:2.2rem;font-weight:900;line-height:1;margin-bottom:8px}
-.kpi-sub{font-size:.72rem;color:#666;letter-spacing:.5px}
+.kpi{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);min-width:160px;min-height:120px;flex:1;display:flex;flex-direction:column;justify-content:space-between}
+.kpi-label{font-size:var(--text-sm);color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
+.kpi-val{font-size:var(--text-2xl);font-weight:var(--fw-black);line-height:1;margin-bottom:6px}
+.kpi-val.dash{font-size:var(--text-xl);color:var(--color-text-dim);font-weight:var(--fw-normal)}
+.kpi-sub{font-size:var(--text-xs);color:var(--color-text-dim);letter-spacing:.03em}
 .kpi-val.blue{color:var(--color-blue)}
 .kpi-val.green{color:var(--color-green)}
 .kpi-val.amber{color:var(--color-amber)}
 .kpi-val.red{color:var(--color-red)}
 .kpi-val.muted{color:var(--color-text-muted)}
 /* ── Trend Spark ────────────────────────────────────────────── */
-.trend-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:20px}
+.trend-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-6);min-height:100px;display:flex;align-items:center;gap:20px}
 .trend-meta{min-width:130px}
-.trend-label{font-size:.72rem;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
-.trend-direction{font-size:1.1rem;font-weight:700}
+.trend-label{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
+.trend-direction{font-size:var(--text-md);font-weight:var(--fw-bold)}
 .trend-direction.up{color:var(--color-green)}
 .trend-direction.dn{color:var(--color-red)}
 .trend-direction.fl{color:var(--color-text-muted)}
+.trend-empty{font-size:var(--text-sm);color:var(--color-text-muted);text-align:center;flex:1}
+.trend-empty small{display:block;font-size:var(--text-xs);color:var(--color-text-dim);margin-top:4px}
 .trend-spark{flex:1;height:44px;min-width:0}
 .trend-spark svg{width:100%;height:100%}
 /* ── Form Card ──────────────────────────────────────────────── */
-.form-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:20px 24px;margin-bottom:20px;display:flex;gap:32px;flex-wrap:wrap}
+.form-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-6);min-height:100px;display:flex;gap:32px;flex-wrap:wrap}
 .form-left{min-width:180px}
-.form-sect-label{font-size:.72rem;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
-.form-trend{font-size:1.05rem;font-weight:700;margin-bottom:6px}
+.form-sect-label{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
+.form-trend{font-size:var(--text-md);font-weight:var(--fw-bold);margin-bottom:6px}
 .form-trend.up{color:var(--color-green)}
 .form-trend.dn{color:var(--color-red)}
 .form-trend.fl{color:var(--color-text-muted)}
@@ -2847,38 +2850,41 @@ a{color:inherit;text-decoration:none}
 .form-right{flex:1;min-width:260px}
 .form-filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .filter-group{display:flex;gap:4px}
-.ftog{font-size:.68rem;letter-spacing:1px;text-transform:uppercase;padding:5px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);cursor:pointer;color:var(--color-text-muted);background:none;font-family:var(--font-mono);transition:all .15s}
+.ftog{font-size:var(--text-xs);letter-spacing:1px;text-transform:uppercase;padding:5px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);cursor:pointer;color:var(--color-text-muted);background:none;font-family:var(--font-mono);transition:all .15s}
 .ftog.on{border-color:var(--color-surface-2);color:var(--color-text-primary);background:var(--color-surface)}
 .form-chart{display:flex;align-items:flex-end;gap:4px;height:72px}
+.form-empty{font-size:var(--text-sm);color:var(--color-text-muted);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:6px;text-align:center}
+.form-empty small{font-size:var(--text-xs);color:var(--color-text-dim)}
 .bar{flex:1;min-width:10px;border-radius:3px 3px 0 0;transition:opacity .2s;cursor:default;position:relative}
 .bar:hover .bar-tip{display:block}
 .bar-tip{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:4px 8px;font-size:var(--text-xs);color:var(--color-text-primary);white-space:nowrap;z-index:5}
 /* ── Pills row ──────────────────────────────────────────────── */
-.pills-section{margin-bottom:20px}
-.pills-label{font-size:.72rem;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px}
+.pills-section{margin-bottom:var(--space-6)}
+.pills-label{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
 .pills-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
 .pills-row::-webkit-scrollbar{display:none}
-.pill{background:var(--color-surface);border:1px solid var(--color-border);border-radius:20px;padding:9px 18px;white-space:nowrap;cursor:pointer;transition:border-color .15s}
-.pill:hover{border-color:#333}
-.pill-circuit{font-size:.68rem;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
-.pill-time{font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--color-amber)}
+.pill{background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:20px;padding:9px 18px;white-space:nowrap;cursor:pointer;transition:border-color .15s}
+.pill:hover{border-color:var(--color-text-dim)}
+.pill-circuit{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.pill-time{font-size:var(--text-lg);font-weight:var(--fw-bold);color:var(--color-accent)}
 /* ── Circuit Table ──────────────────────────────────────────── */
-.table-section{margin-bottom:24px}
-.table-label{font-size:.72rem;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px}
+.table-section{margin-bottom:var(--space-6)}
+.table-label{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
 .ctable{width:100%;border-collapse:collapse}
-.ctable th{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:1.5px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--color-border-subtle)}
-.ctable td{padding:13px 14px;font-size:var(--text-sm);border-top:1px solid var(--color-border-subtle)}
-.ctable tr{cursor:pointer;transition:background .12s}
-.ctable tr:hover td{background:var(--color-surface)}
-.ctable .td-track{color:var(--color-text-primary);font-weight:var(--fw-bold)}
-.ctable .td-num{color:var(--color-text-secondary);font-variant-numeric:tabular-nums}
-.ctable .td-blue{color:var(--color-blue);font-weight:var(--fw-bold);font-variant-numeric:tabular-nums}
-.ctable .td-amber{color:var(--color-amber);font-variant-numeric:tabular-nums}
-.ctable .td-trend-up{color:var(--color-green)}
-.ctable .td-trend-dn{color:var(--color-red)}
-.ctable .td-trend-fl{color:var(--color-text-muted)}
+.ctable th{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;padding:var(--space-3) 14px;text-align:left;border-bottom:1px solid var(--color-border)}
+.ctable td{padding:var(--space-3) 14px;font-size:var(--text-md);border-bottom:1px solid var(--color-border-subtle);min-height:48px}
+.ctable tbody tr{cursor:pointer;transition:background .12s}
+.ctable tbody tr:hover td{background:var(--color-surface)}
+.ctable .td-track{color:var(--color-text-primary);font-weight:var(--fw-medium);font-size:var(--text-md)}
+.ctable .td-num{color:var(--color-text-secondary);font-variant-numeric:tabular-nums;font-size:var(--text-md)}
+.ctable .td-blue{color:var(--color-blue);font-variant-numeric:tabular-nums;font-size:var(--text-md)}
+.ctable .td-blue.dim{color:var(--color-text-dim)}
+.ctable .td-amber{color:var(--color-accent);font-variant-numeric:tabular-nums;font-size:var(--text-md)}
+.ctable .td-trend-up{color:var(--color-green);font-size:14px}
+.ctable .td-trend-dn{color:var(--color-red);font-size:14px}
+.ctable .td-trend-fl{color:var(--color-text-muted);font-size:14px}
 /* ── Game Cards ─────────────────────────────────────────────── */
-.games-section{margin-bottom:24px}
+.games-section{margin-bottom:var(--space-6)}
 .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .gc{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:20px 22px;cursor:pointer;transition:border-color .15s}
 .gc:hover{border-color:var(--color-border);background:var(--color-surface-2)}
@@ -2894,8 +2900,8 @@ a{color:inherit;text-decoration:none}
 .gc-last{font-size:var(--text-xs);color:var(--color-text-muted);border-top:1px solid var(--color-border-subtle);padding-top:10px;margin-top:4px}
 .gc-spark{height:28px;margin-bottom:10px}
 /* ── Recent Feed ────────────────────────────────────────────── */
-.recent-section{margin-bottom:24px}
-.recent-label{font-size:.72rem;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px}
+.recent-section{margin-bottom:var(--space-6)}
+.recent-label{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
 .recent-row{display:flex;align-items:center;gap:14px;padding:12px 14px;border-top:1px solid var(--color-border-subtle);cursor:pointer;transition:background .12s;border-radius:var(--radius-sm)}
 .recent-row:hover{background:var(--color-surface)}
 .recent-badge{font-size:var(--text-xs);font-weight:var(--fw-bold);letter-spacing:1.5px;text-transform:uppercase;padding:4px 9px;border-radius:var(--radius-sm);border:1px solid;white-space:nowrap}
@@ -2984,14 +2990,14 @@ a{color:inherit;text-decoration:none}
           <button class="ftog" data-val="20">Last 20</button>
         </div>
       </div>
-      <div class="form-chart" id="form-chart"><span style="color:#333;font-size:.78rem">No race data</span></div>
+      <div class="form-chart" id="form-chart"><div class="form-empty">No race data<small>Finish position data needed — check session race_type classification.</small></div></div>
     </div>
   </div>
 
   <!-- Best Laps Pills -->
   <div class="pills-section">
     <div class="pills-label">Best Laps by Circuit</div>
-    <div class="pills-row" id="pills-row"><span style="color:#333;font-size:.78rem">—</span></div>
+    <div class="pills-row" id="pills-row"></div>
   </div>
 
   <!-- Circuit Table -->
@@ -3001,20 +3007,20 @@ a{color:inherit;text-decoration:none}
       <thead><tr>
         <th>Circuit</th><th>Sessions</th><th>Avg Finish</th><th>Best Lap</th><th>Trend</th>
       </tr></thead>
-      <tbody id="circuit-tbody"><tr><td colspan="5" style="color:#333;padding:20px 14px">—</td></tr></tbody>
+      <tbody id="circuit-tbody"></tbody>
     </table>
   </div>
 
   <!-- Game Cards -->
   <div class="games-section" id="games-section">
-    <div class="table-label" style="margin-bottom:12px">By Game</div>
-    <div class="games-grid" id="games-grid"><div style="color:#333;padding:20px">—</div></div>
+    <div class="table-label" style="margin-bottom:8px">By Game</div>
+    <div class="games-grid" id="games-grid"></div>
   </div>
 
   <!-- Recent Sessions -->
   <div class="recent-section">
     <div class="recent-label">Recent Sessions</div>
-    <div id="recent-feed"><div style="color:#333;padding:20px">—</div></div>
+    <div id="recent-feed"></div>
   </div>
 
 </div>
@@ -3043,19 +3049,20 @@ function setTab(btn){
 }
 
 // ── KPI cards ─────────────────────────────────────────────────
+function setKV(id,val){const el=document.getElementById(id);if(val==null||val==='—'){el.textContent='—';el.classList.add('dash');}else{el.textContent=val;el.classList.remove('dash');}}
 async function loadKPIs(){
   let k={};
   try{k=await fetch('/sessions/career').then(r=>r.json());}catch(e){}
   const t=k.total_sessions||0,rc=k.real_count||0,ai=k.ai_count||0;
-  document.getElementById('kv-total').textContent=t||'0';
+  setKV('kv-total',t||'0');
   document.getElementById('ks-total').textContent=t?(rc+' real · '+ai+' AI'):'';
   const af=k.avg_finish_real;
-  document.getElementById('kv-finish').textContent=af!=null?'P'+p1(af):'—';
+  setKV('kv-finish',af!=null?'P'+p1(af):null);
   const pg=k.avg_pos_gained;
-  document.getElementById('kv-gained').textContent=pg!=null?(pg>=0?'+':'')+p1(pg):'—';
-  document.getElementById('kv-win').textContent=k.win_rate!=null?p1(k.win_rate,0)+'%':'—';
-  document.getElementById('kv-podium').textContent=k.podium_rate!=null?p1(k.podium_rate,0)+'%':'—';
-  document.getElementById('kv-laps').textContent=k.total_laps||'0';
+  setKV('kv-gained',pg!=null?(pg>=0?'+':'')+p1(pg):null);
+  setKV('kv-win',k.win_rate!=null?p1(k.win_rate,0)+'%':null);
+  setKV('kv-podium',k.podium_rate!=null?p1(k.podium_rate,0)+'%':null);
+  setKV('kv-laps',k.total_laps||'0');
   document.getElementById('ks-circuits').textContent=(k.circuit_count||0)+' circuits';
 }
 
@@ -3082,8 +3089,8 @@ function renderTrendSpark(){
   const dir=document.getElementById('trend-dir');
   const withPos=data.filter(s=>s.finish_pos!=null);
   if(withPos.length<2){
-    el.innerHTML='<svg viewBox="0 0 400 44" preserveAspectRatio="none"><line x1="0" y1="22" x2="400" y2="22" stroke="#1e1e1e" stroke-width="1.5"/></svg>';
-    dir.textContent='—';dir.className='trend-direction fl';
+    el.innerHTML='<div class="trend-empty">No race data<small>Finish position data needed — check session race_type classification.</small></div>';
+    dir.textContent='';dir.className='trend-direction fl';
     return;
   }
   const pcts=withPos.map(s=>posToPercentile(s.finish_pos));
@@ -3114,7 +3121,7 @@ function renderForm(){
   const data=_allFormData.filter(s=>!_game||s.game===_game);
   const sliced=data.slice(-_last);
   const el=document.getElementById('form-chart');
-  if(!sliced.length){el.innerHTML='<span style="color:#333;font-size:.78rem">No race data</span>';updateFormMeta([]);return;}
+  if(!sliced.length){el.innerHTML='<div class="form-empty">No race data<small>Finish position data needed — check session race_type classification.</small></div>';updateFormMeta([]);return;}
   el.innerHTML=sliced.map(s=>{
     const pct=posToPercentile(s.finish_pos);
     const h=pct!=null?Math.round(pct+20):0;
@@ -3137,7 +3144,7 @@ function updateFormMeta(data){
   const pctEl=document.getElementById('form-pct');
   const noteEl=document.getElementById('form-note');
   const withPos=data.filter(s=>s.finish_pos!=null);
-  if(!withPos.length){el.textContent='—';el.className='form-trend fl';pctEl.textContent='';noteEl.textContent='';return;}
+  if(!withPos.length){el.textContent='';el.className='form-trend fl';pctEl.textContent='';noteEl.textContent='';return;}
   const pcts=withPos.map(s=>posToPercentile(s.finish_pos));
   const avg=pcts.reduce((a,b)=>a+b,0)/pcts.length;
   const half=Math.floor(pcts.length/2);
@@ -3177,23 +3184,27 @@ function renderTracks(){
   pr.innerHTML=withLap.length?withLap.map(t=>{
     const esc=encodeURIComponent(t.track);
     const gp=_game?('&game='+encodeURIComponent(_game)):'';
+    const label=t.track==='unknown'?'Unknown Track':t.track;
     return`<div class="pill" onclick="location.href='/sessions/track?name=${esc}${gp}'">
-      <div class="pill-circuit">${t.track}</div>
+      <div class="pill-circuit">${label}</div>
       <div class="pill-time">${fmtLap(t.best_lap_time_s)}</div>
     </div>`;
-  }).join(''):'<span style="color:#333;font-size:.78rem">No lap data yet</span>';
+  }).join(''):'<span style="font-size:var(--text-sm);color:var(--color-text-muted)">No lap data yet</span>';
   // table
   const tbody=document.getElementById('circuit-tbody');
-  if(!tracks.length){tbody.innerHTML='<tr><td colspan="5" style="color:#333;padding:20px 14px">No sessions yet</td></tr>';return;}
+  if(!tracks.length){tbody.innerHTML='<tr><td colspan="5" style="color:var(--color-text-muted);font-size:var(--text-sm);padding:20px 14px">No sessions yet</td></tr>';return;}
   tbody.innerHTML=tracks.map(t=>{
     const trend=t.trend==='up'?'<span class="td-trend-up">▲</span>':t.trend==='dn'?'<span class="td-trend-dn">▼</span>':'<span class="td-trend-fl">—</span>';
     const esc=encodeURIComponent(t.track);
     const gp=_game?('&game='+encodeURIComponent(_game)):'';
+    const label=t.track==='unknown'?'Unknown Track':t.track;
+    const avgFinish=t.avg_finish!=null?`<span class="td-blue">${t.avg_finish}</span>`:`<span class="td-blue dim">—</span>`;
+    const bestLap=t.best_lap_time_s?`<span class="td-amber">${fmtLap(t.best_lap_time_s)}</span>`:`<span style="color:var(--color-text-dim)">—</span>`;
     return`<tr onclick="location.href='/sessions/track?name=${esc}${gp}'">
-      <td class="td-track">${t.track}</td>
+      <td class="td-track">${label}</td>
       <td class="td-num">${t.session_count}</td>
-      <td class="td-blue">—</td>
-      <td class="td-amber">${fmtLap(t.best_lap_time_s)}</td>
+      <td>${avgFinish}</td>
+      <td>${bestLap}</td>
       <td>${trend}</td>
     </tr>`;
   }).join('');
@@ -3213,7 +3224,7 @@ function sparkSVG(vals){
 }
 function renderGames(games){
   const grid=document.getElementById('games-grid');
-  if(!games.length){grid.innerHTML='<div style="color:#333;padding:20px">No sessions</div>';return;}
+  if(!games.length){grid.innerHTML='<div style="color:var(--color-text-muted);font-size:var(--text-sm);padding:20px">No sessions</div>';return;}
   grid.innerHTML=games.map(g=>{
     const label=GL[g.game]||g.game;
     const desc=GD[g.game]||'';
@@ -3243,7 +3254,7 @@ function renderRecent(){
   const sessions=_allRecent.filter(s=>!_game||s.game===_game||
     (_game==='forza_motorsport'&&s.game==='forza_horizon_5'));
   const feed=document.getElementById('recent-feed');
-  if(!sessions.length){feed.innerHTML='<div style="color:#333;padding:20px">No sessions yet</div>';return;}
+  if(!sessions.length){feed.innerHTML='<div style="color:var(--color-text-muted);font-size:var(--text-sm);padding:20px">No sessions yet</div>';return;}
   feed.innerHTML=sessions.map(s=>{
     const gameKey=s.game==='forza_motorsport'||s.game==='forza_horizon_5'?'forza':s.game||'?';
     const label=(GL[s.game]||s.game||'?').toUpperCase();
