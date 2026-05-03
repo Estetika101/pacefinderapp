@@ -882,6 +882,10 @@ class Session:
         grid_pos  = self._race_positions[0]  if self._race_positions and self.session_type == "race" else None
         finish_pos = self._race_positions[-1] if self._race_positions and self.session_type == "race" else None
 
+        # Classify race_type from position history (overrides any existing value)
+        valid_laps = len([l for l in self.completed_laps if l.lap_time_s and l.lap_time_s > 0])
+        self.race_type = _classify_race_type(self._race_positions, valid_laps)
+
         session_data = {
             "session_id":       self.session_id,
             "game":             self.game,
@@ -4993,6 +4997,7 @@ def _db_init():
         finally:
             conn.close()
     _db_migrate()
+    _db_backfill_race_types()
 
 def _db_migrate():
     """Import existing session JSON files not yet in the database. Idempotent."""
@@ -5050,6 +5055,68 @@ def _db_migrate():
             conn.close()
     if imported:
         log.info(f"SQLite: migrated {imported} session(s) from JSON files")
+
+
+def _classify_race_type(positions: list, lap_count: int) -> Optional[str]:
+    """
+    Derive race_type from sampled race positions and completed lap count.
+
+    'real'       — position changed at least once (human opponents present)
+    'time_trial' — lap count <= 3 and position never changed (solo / practice)
+    'ai'         — more than 3 laps and position was always 1 (led wire-to-wire, AI grid)
+    None         — not enough data to classify
+    """
+    if not positions:
+        return "time_trial" if lap_count <= 3 else None
+    unique = set(positions)
+    if len(unique) > 1:
+        return "real"
+    # Position constant throughout
+    if lap_count <= 3:
+        return "time_trial"
+    if next(iter(unique)) == 1:
+        return "ai"
+    return None
+
+
+def _db_backfill_race_types():
+    """
+    One-time migration: classify sessions whose race_type is NULL using
+    the grid_pos / finish_pos / lap_count stored at session close.
+    Idempotent — only touches rows where race_type IS NULL.
+    """
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            rows = conn.execute(
+                "SELECT session_id, grid_pos, finish_pos, lap_count "
+                "FROM sessions WHERE race_type IS NULL"
+            ).fetchall()
+            if not rows:
+                return
+            updates = []
+            for row in rows:
+                sid, grid_pos, finish_pos, lap_count = (
+                    row["session_id"], row["grid_pos"],
+                    row["finish_pos"], row["lap_count"] or 0,
+                )
+                # Reconstruct a minimal position list from the stored first/last positions
+                if grid_pos is not None and finish_pos is not None:
+                    positions = [grid_pos, finish_pos]
+                else:
+                    positions = []
+                rt = _classify_race_type(positions, lap_count)
+                if rt is not None:
+                    updates.append((rt, sid))
+            if updates:
+                conn.executemany(
+                    "UPDATE sessions SET race_type=? WHERE session_id=?", updates
+                )
+                conn.commit()
+                log.info(f"SQLite: backfilled race_type for {len(updates)} session(s)")
+        finally:
+            conn.close()
+
 
 def _db_write_session(session_data: dict):
     """Insert/replace a session and its lap summaries."""
