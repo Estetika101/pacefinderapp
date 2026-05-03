@@ -3691,7 +3691,7 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 .panel-svg-wrap{position:relative;overflow:hidden;border:1px solid var(--border-sub);border-radius:2px;background:var(--bg-raised);cursor:crosshair}
 .panel-svg-wrap.panning{cursor:grab}
 .chart-zoom-ctrl{position:absolute;top:4px;right:4px;display:flex;gap:3px;z-index:10;pointer-events:auto}
-.czc-btn{background:rgba(20,20,28,.75);border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:inherit;font-size:var(--text-xs);padding:2px 7px;border-radius:var(--radius-sm);cursor:pointer;line-height:1.5;backdrop-filter:blur(4px)}
+.czc-btn{background:rgba(20,20,28,.75);border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:inherit;font-size:calc(var(--text-xs) * 1.3);padding:2px 7px;border-radius:var(--radius-sm);cursor:pointer;line-height:1.5;backdrop-filter:blur(4px)}
 .czc-btn:hover{border-color:var(--n-300);color:var(--text)}
 .panel-svg-wrap svg{display:block;width:100%}
 .px-line{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.16);pointer-events:none;display:none}
