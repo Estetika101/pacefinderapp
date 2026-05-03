@@ -1261,9 +1261,9 @@ _CSS_TOKENS = """
   --color-border: #1e1e1e;
   --color-border-subtle: #141414;
   --color-text-primary: #ffffff;
-  --color-text-secondary: #888888;
-  --color-text-muted: #555555;
-  --color-text-dim: #333333;
+  --color-text-secondary: lightgrey;
+  --color-text-muted: lightgrey;
+  --color-text-dim: lightgrey;
   --color-accent: #e8b84b;
   --color-green: #4ade80;
   --color-red: #f87171;
