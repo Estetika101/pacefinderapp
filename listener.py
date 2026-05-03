@@ -2804,10 +2804,10 @@ a{color:inherit;text-decoration:none}
 /* ── Game Tabs ──────────────────────────────────────────────── */
 .gtab-bar{display:flex;gap:0;margin-bottom:var(--space-6);border-bottom:1px solid var(--color-border);overflow-x:auto;scrollbar-width:none}
 .gtab-bar::-webkit-scrollbar{display:none}
-.gtab{background:none;border:none;border-bottom:2px solid transparent;
-  color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--text-sm);letter-spacing:.05em;
+.gtab{display:inline-block;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--color-text-muted);font-family:var(--font-mono);font-size:calc(var(--text-sm) * 1.4);letter-spacing:.05em;
   padding:10px 20px 10px 0;cursor:pointer;white-space:nowrap;margin-bottom:-1px;
-  transition:color .15s,border-color .15s}
+  transition:color .15s,border-color .15s;text-decoration:none}
 .gtab:hover{color:var(--color-text-secondary)}
 .gtab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
 .gtab .cnt{font-size:var(--text-xs);color:var(--color-text-dim);margin-left:5px;font-weight:var(--fw-normal)}
@@ -2943,11 +2943,11 @@ a{color:inherit;text-decoration:none}
 <div class="page">
 
   <!-- Game Tabs -->
-  <div class="gtab-bar" id="gtab-bar">
-    <button class="gtab active" data-game="" onclick="setTab(this)">All Sessions<span class="cnt" id="cnt-all"></span></button>
-    <button class="gtab" data-game="forza_motorsport" onclick="setTab(this)">Forza<span class="cnt" id="cnt-forza"></span></button>
-    <button class="gtab" data-game="acc" onclick="setTab(this)">ACC<span class="cnt" id="cnt-acc"></span></button>
-    <button class="gtab" data-game="f1" onclick="setTab(this)">F1<span class="cnt" id="cnt-f1"></span></button>
+  <div class="gtab-bar">
+    <a class="gtab active" href="/sessions">All Sessions<span class="cnt" id="cnt-all"></span></a>
+    <a class="gtab" href="/sessions/game?name=forza_motorsport">Forza<span class="cnt" id="cnt-forza"></span></a>
+    <a class="gtab" href="/sessions/game?name=acc">ACC<span class="cnt" id="cnt-acc"></span></a>
+    <a class="gtab" href="/sessions/game?name=f1">F1<span class="cnt" id="cnt-f1"></span></a>
   </div>
 
   <!-- KPI row -->
@@ -3032,21 +3032,8 @@ function fmtDate(iso){if(!iso)return'—';return new Date(iso).toLocaleDateStrin
 function fmtRel(iso){if(!iso)return'';const d=new Date(iso),n=Date.now(),s=Math.floor((n-d)/1000);if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
 function p1(v,d=1){return v==null?null:parseFloat(v.toFixed(d));}
 
-let _type='real',_last=10,_game='';
+let _type='real',_last=10;
 let _allTracks=[],_allRecent=[],_allFormData=[];
-
-// ── Tab switching ─────────────────────────────────────────────
-function setTab(btn){
-  document.querySelectorAll('.gtab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  _game=btn.dataset.game;
-  const showGames=!_game;
-  document.getElementById('games-section').style.display=showGames?'':'none';
-  renderTracks();
-  renderRecent();
-  renderForm();
-  renderTrendSpark();
-}
 
 // ── KPI cards ─────────────────────────────────────────────────
 function setKV(id,val){const el=document.getElementById(id);if(val==null||val==='—'){el.textContent='—';el.classList.add('dash');}else{el.textContent=val;el.classList.remove('dash');}}
@@ -3084,7 +3071,7 @@ async function loadTabCounts(){
 function posToPercentile(fp){if(fp==null)return null;return Math.max(5,Math.min(100,Math.round(100-(fp-1)*6)));}
 
 function renderTrendSpark(){
-  const data=_allFormData.filter(s=>!_game||s.game===_game);
+  const data=_allFormData;
   const el=document.getElementById('trend-spark');
   const dir=document.getElementById('trend-dir');
   const withPos=data.filter(s=>s.finish_pos!=null);
@@ -3118,7 +3105,7 @@ function renderTrendSpark(){
 
 // ── Form chart ────────────────────────────────────────────────
 function renderForm(){
-  const data=_allFormData.filter(s=>!_game||s.game===_game);
+  const data=_allFormData;
   const sliced=data.slice(-_last);
   const el=document.getElementById('form-chart');
   if(!sliced.length){el.innerHTML='<div class="form-empty">No race data<small>Finish position data needed — check session race_type classification.</small></div>';updateFormMeta([]);return;}
@@ -3177,15 +3164,14 @@ async function loadTracks(){
   renderTracks();
 }
 function renderTracks(){
-  const tracks=_allTracks.filter(t=>!_game||t.game===_game||!t.game);
+  const tracks=_allTracks;
   // pills
   const pr=document.getElementById('pills-row');
   const withLap=tracks.filter(t=>t.best_lap_time_s);
   pr.innerHTML=withLap.length?withLap.map(t=>{
     const esc=encodeURIComponent(t.track);
-    const gp=_game?('&game='+encodeURIComponent(_game)):'';
     const label=t.track==='unknown'?'Unknown Track':t.track;
-    return`<div class="pill" onclick="location.href='/sessions/track?name=${esc}${gp}'">
+    return`<div class="pill" onclick="location.href='/sessions/track?name=${esc}'">
       <div class="pill-circuit">${label}</div>
       <div class="pill-time">${fmtLap(t.best_lap_time_s)}</div>
     </div>`;
@@ -3196,11 +3182,10 @@ function renderTracks(){
   tbody.innerHTML=tracks.map(t=>{
     const trend=t.trend==='up'?'<span class="td-trend-up">▲</span>':t.trend==='dn'?'<span class="td-trend-dn">▼</span>':'<span class="td-trend-fl">—</span>';
     const esc=encodeURIComponent(t.track);
-    const gp=_game?('&game='+encodeURIComponent(_game)):'';
     const label=t.track==='unknown'?'Unknown Track':t.track;
     const avgFinish=t.avg_finish!=null?`<span class="td-blue">${t.avg_finish}</span>`:`<span class="td-blue dim">—</span>`;
     const bestLap=t.best_lap_time_s?`<span class="td-amber">${fmtLap(t.best_lap_time_s)}</span>`:`<span style="color:var(--color-text-dim)">—</span>`;
-    return`<tr onclick="location.href='/sessions/track?name=${esc}${gp}'">
+    return`<tr onclick="location.href='/sessions/track?name=${esc}'">
       <td class="td-track">${label}</td>
       <td class="td-num">${t.session_count}</td>
       <td>${avgFinish}</td>
@@ -3251,8 +3236,7 @@ async function loadRecent(){
   renderRecent();
 }
 function renderRecent(){
-  const sessions=_allRecent.filter(s=>!_game||s.game===_game||
-    (_game==='forza_motorsport'&&s.game==='forza_horizon_5'));
+  const sessions=_allRecent;
   const feed=document.getElementById('recent-feed');
   if(!sessions.length){feed.innerHTML='<div style="color:var(--color-text-muted);font-size:var(--text-sm);padding:20px">No sessions yet</div>';return;}
   feed.innerHTML=sessions.map(s=>{
@@ -3306,12 +3290,20 @@ a{color:inherit;text-decoration:none}
 .tb-nav a{font-size:var(--text-xs);color:var(--color-text-secondary);letter-spacing:1px;text-transform:uppercase}
 .tb-nav a:hover{color:var(--color-text-primary)}
 .tb-nav a.cur{color:var(--color-text-primary);border-bottom:1px solid var(--color-text-secondary)}
-.breadcrumb{font-size:var(--text-xs);color:var(--color-text-secondary);padding:10px var(--space-4);border-bottom:1px solid var(--color-border-subtle)}
-.breadcrumb a{color:var(--n-400)}.breadcrumb a:hover{color:var(--n-200)}
-.page{padding:var(--sp-6)}
-.page-hdr{display:flex;align-items:baseline;gap:var(--sp-4);margin-bottom:var(--sp-6)}
-.page-hdr h2{font-size:1.1rem;color:var(--text);letter-spacing:2px;text-transform:uppercase}
-.count{font-size:.78rem;color:var(--n-300)}
+.gtab-bar{display:flex;gap:0;border-bottom:1px solid var(--color-border);overflow-x:auto;scrollbar-width:none;padding:0 var(--space-4);background:var(--color-bg)}
+.gtab-bar::-webkit-scrollbar{display:none}
+.gtab{display:inline-block;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--color-text-muted);font-family:var(--font-mono);font-size:calc(var(--text-sm) * 1.4);letter-spacing:.05em;
+  padding:10px 20px 10px 0;cursor:pointer;white-space:nowrap;margin-bottom:-1px;
+  transition:color .15s,border-color .15s;text-decoration:none}
+.gtab:hover{color:var(--color-text-secondary)}
+.gtab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
+.gtab .cnt{font-size:var(--text-xs);color:var(--color-text-dim);margin-left:5px;font-weight:var(--fw-normal)}
+.gtab.active .cnt{color:var(--color-text-muted)}
+.page{padding:var(--space-4) var(--space-4) 60px;max-width:1400px;margin:0 auto}
+.page-hdr{display:flex;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-4)}
+.page-hdr h2{font-size:var(--text-md);color:var(--color-text-primary);letter-spacing:2px;text-transform:uppercase}
+.count{font-size:var(--text-xs);color:var(--color-text-muted)}
 .tracks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:var(--sp-3)}
 .tc{background:var(--color-surface);border:1px solid var(--color-border);padding:18px var(--space-4);cursor:pointer;transition:border-color .15s}
 .tc:hover{border-color:var(--color-border);background:var(--color-surface-2)}
@@ -3337,7 +3329,12 @@ a{color:inherit;text-decoration:none}
   </nav>
 </div>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
-<div class="breadcrumb"><a href="/sessions">Sessions</a> &rsaquo; <span id="bc-game">Tracks</span></div>
+<div class="gtab-bar" id="gtab-bar">
+  <a class="gtab" href="/sessions" id="tab-all">All Sessions<span class="cnt" id="cnt-all"></span></a>
+  <a class="gtab" href="/sessions/game?name=forza_motorsport" id="tab-forza">Forza<span class="cnt" id="cnt-forza"></span></a>
+  <a class="gtab" href="/sessions/game?name=acc" id="tab-acc">ACC<span class="cnt" id="cnt-acc"></span></a>
+  <a class="gtab" href="/sessions/game?name=f1" id="tab-f1">F1<span class="cnt" id="cnt-f1"></span></a>
+</div>
 <div class="page">
   <div class="page-hdr">
     <h2 id="page-title">Tracks</h2>
@@ -3351,10 +3348,22 @@ function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%6
 function fmtDate(iso){if(!iso)return '—';return new Date(iso).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 const _game=new URLSearchParams(location.search).get('name')||'';
+// ── Tab active state + counts ─────────────────────────────────
+const tabMap={'forza_motorsport':'tab-forza','acc':'tab-acc','f1':'tab-f1'};
+if(_game&&tabMap[_game]){document.getElementById(tabMap[_game]).classList.add('active');}
+else{document.getElementById('tab-all').classList.add('active');}
+(async()=>{
+  let games=[];try{games=await fetch('/sessions/games').then(r=>r.json());}catch(e){}
+  let all=0;
+  games.forEach(g=>{const n=g.session_count||0;all+=n;
+    const m={'forza_motorsport':'cnt-forza','acc':'cnt-acc','f1':'cnt-f1'}[g.game];
+    if(m){const el=document.getElementById(m);if(el&&n)el.textContent='('+n+')';}
+  });
+  const ca=document.getElementById('cnt-all');if(ca&&all)ca.textContent='('+all+')';
+})();
 let _tracks=[];
 async function init(){
   const label=GAME_LABELS[_game]||_game||'All';
-  document.getElementById('bc-game').textContent=label;
   document.getElementById('page-title').textContent=label+' Tracks';
   document.title='Pacefinder · '+label;
   const url='/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'');
