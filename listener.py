@@ -5939,6 +5939,40 @@ def _classify_race_type(positions: list, lap_count: int) -> Optional[str]:
     return None
 
 
+def _db_backfill_track_names():
+    """
+    For sessions that were stored as 'Track #<N>' or 'unknown' but have a
+    track_ordinal that now resolves in FORZA_TRACKS, update the track name.
+    Idempotent — only touches rows that still have the placeholder value.
+    Does NOT overwrite names that were manually confirmed by the user.
+    """
+    if not FORZA_TRACKS:
+        return
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            rows = conn.execute(
+                "SELECT session_id, track, track_ordinal FROM sessions "
+                "WHERE track_ordinal IS NOT NULL "
+                "AND (track = 'unknown' OR track LIKE 'Track #%')"
+            ).fetchall()
+            if not rows:
+                return
+            updates = []
+            for row in rows:
+                name = FORZA_TRACKS.get(row["track_ordinal"])
+                if name:
+                    updates.append((name, row["session_id"]))
+            if updates:
+                conn.executemany(
+                    "UPDATE sessions SET track=? WHERE session_id=?", updates
+                )
+                conn.commit()
+                log.info(f"Backfilled track names for {len(updates)} session(s)")
+        finally:
+            conn.close()
+
+
 def _db_backfill_race_types():
     """
     Classify sessions whose race_type is NULL.
@@ -7525,6 +7559,7 @@ async def main(demo_mode: bool = False):
     ensure_storage()
     _db_init()
     _load_forza_reference_data()
+    _db_backfill_track_names()
     threading.Thread(target=_backfill_lap_samples, daemon=True).start()
     log.info("Pacefinder listener starting%s...", " [DEMO MODE]" if demo_mode else "")
 
