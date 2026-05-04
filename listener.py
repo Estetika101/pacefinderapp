@@ -277,7 +277,7 @@ def parse_forza(data: bytes) -> Optional[dict]:
             parsed["tire_wear_rr"]  = values[len(FM_FIELDS) + 3]
             ord_val                 = values[len(FM_FIELDS) + 4]
             parsed["track_ordinal"] = ord_val
-            track_name = FORZA_TRACKS.get(ord_val)
+            track_name = _effective_tracks().get(ord_val)
             if ord_val and track_name is None and ord_val not in _unknown_ordinals_seen:
                 _unknown_ordinals_seen.add(ord_val)
                 log.warning(f"Unknown FH5 track ordinal {ord_val} — add to FORZA_TRACKS once identified")
@@ -732,6 +732,7 @@ class Session:
 
         self.race_type = None  # set post-session via /sessions/update
         self._race_positions: list[int] = []  # sampled positions for session type inference
+        self.track_ordinal: Optional[int] = None  # raw ordinal for learned track mapping
 
         self.last_activity = time.time()  # updated only when driver input is detected
 
@@ -787,6 +788,8 @@ class Session:
         # Update track/car metadata
         if parsed.get("track", "unknown") != "unknown":
             self.track = parsed["track"]
+        if parsed.get("track_ordinal") is not None and self.track_ordinal is None:
+            self.track_ordinal = parsed["track_ordinal"]
         if parsed.get("session_type", "unknown") != "unknown":
             self.session_type = parsed["session_type"]
         if "car_ordinal" in parsed and self.car == "unknown":
@@ -900,6 +903,7 @@ class Session:
             "laps":             laps_summary,
             "grid_pos":         grid_pos,
             "finish_pos":       finish_pos,
+            "track_ordinal":    self.track_ordinal,
         }
 
         _db_write_session(session_data)
@@ -1598,6 +1602,14 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .fo-save:hover{background:#16a34a}
 .fo-skip{background:none;border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:inherit;font-size:var(--text-sm);padding:9px 20px;border-radius:var(--radius-sm);cursor:pointer}
 .fo-skip:hover{border-color:var(--color-text-secondary);color:var(--n-100)}
+.fo-input{width:100%;background:var(--color-bg);border:1px solid var(--color-border);color:var(--color-text-primary);font-family:inherit;font-size:var(--text-sm);padding:8px 12px;border-radius:var(--radius-sm);transition:border-color .1s}
+.fo-input:focus{outline:none;border-color:var(--color-text-secondary)}
+select.fo-input{cursor:pointer}
+.fo-stats{display:flex;gap:var(--space-4);margin-top:10px}
+.fo-stat-item{flex:1}
+.fo-stat-v{font-size:var(--text-md);font-weight:var(--fw-black);color:var(--color-text-primary)}
+.fo-stat-l{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.game-badge{font-size:.6rem;background:var(--accent-bg);border:1px solid var(--accent-bd);color:var(--color-amber);padding:1px 7px;border-radius:3px;letter-spacing:1px;text-transform:uppercase;margin-left:8px;vertical-align:middle}
 /* finish race button */
 .bot-finish{background:var(--color-green);color:var(--color-bg);border:none;font-family:inherit;font-size:var(--text-xs);font-weight:var(--fw-bold);padding:4px 14px;border-radius:2px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;display:none}
 .bot-finish:hover{background:#16a34a}
@@ -1779,19 +1791,30 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 <div id="fo">
   <div class="fo-box">
     <div class="fo-head">
-      <div class="fo-title" id="fo-title">Session Complete</div>
+      <div class="fo-title" id="fo-title">Session Complete <span class="game-badge" id="fo-game-badge" style="display:none"></span></div>
       <div class="fo-sub" id="fo-sub">—</div>
+      <div class="fo-stats" id="fo-stats" style="display:none">
+        <div class="fo-stat-item"><div class="fo-stat-v" id="fo-stat-laps">—</div><div class="fo-stat-l">Laps</div></div>
+        <div class="fo-stat-item"><div class="fo-stat-v" id="fo-stat-best">—</div><div class="fo-stat-l">Best Lap</div></div>
+      </div>
     </div>
     <div class="fo-body">
       <div class="fo-section">
+        <div class="fo-lbl">Track</div>
+        <select class="fo-input" id="fo-track">
+          <option value="">— Unknown —</option>
+        </select>
+      </div>
+      <div class="fo-section">
+        <div class="fo-lbl">Car</div>
+        <input class="fo-input" id="fo-car" type="text" placeholder="Car name or ordinal" />
+      </div>
+      <div class="fo-section">
         <div class="fo-lbl">Session Type</div>
         <div class="type-chips">
-          <button class="type-chip" data-val="practice" onclick="selType(this)">Practice</button>
+          <button class="type-chip" data-val="real" onclick="selType(this)">Real Race</button>
+          <button class="type-chip" data-val="ai" onclick="selType(this)">AI Race</button>
           <button class="type-chip" data-val="time_trial" onclick="selType(this)">Time Trial</button>
-          <button class="type-chip" data-val="qualifying" onclick="selType(this)">Qualifying</button>
-          <button class="type-chip" data-val="race_ai" onclick="selType(this)">Race vs AI</button>
-          <button class="type-chip" data-val="race_online" onclick="selType(this)">Online Race</button>
-          <button class="type-chip" data-val="hot_lap" onclick="selType(this)">Hot Lap</button>
         </div>
       </div>
       <div class="fo-section">
@@ -1813,6 +1836,9 @@ let _maxRpm=8500,_dbgEs=null,_dbgOpen=false,_bestLap=null;
 let state_sid=null;
 const _dbgLines=[];
 const _flashTimers={};
+// Check ?edit=<sid> on load — open confirm modal for that session
+const _editSid=new URLSearchParams(location.search).get('edit');
+if(_editSid) setTimeout(()=>openFinish(_editSid),600);
 
 function flash(id){
   const el=$(id); if(!el)return;
@@ -1877,6 +1903,13 @@ es.onmessage=e=>{
   // track session id and show/hide finish button
   if(d.session_id) state_sid = d.session_id;
   $('btn-finish').style.display = (recv||ended) ? 'inline-block' : 'none';
+
+  // Auto-open confirm modal 5s after race_ended
+  if(ended&&!$('fo').classList.contains('open')){
+    if(!_foAutoTimer) _foAutoTimer=setTimeout(()=>{_foAutoTimer=null;openFinish();},5000);
+  } else if(!ended&&_foAutoTimer){
+    clearTimeout(_foAutoTimer);_foAutoTimer=null;
+  }
 
   // gear
   const g=d.gear;
@@ -2001,43 +2034,88 @@ function clearDebug(){_dbgLines.length=0;$('dbg-log').innerHTML='';}
 
 // ── Finish Race overlay ───────────────────────────────────────────────────────
 let _foSid=null, _foRaceType=null, _foDropLast=false, _foLaps=[], _foClosed=false;
+let _foTrackOrdinal=null, _foAutoTimer=null;
 
 function selType(el){
-  document.querySelectorAll('.type-chip').forEach(c=>c.classList.remove('sel'));
+  document.querySelectorAll('#fo .type-chip').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
   _foRaceType=el.dataset.val;
 }
 
-async function openFinish(){
-  // Close session immediately if still active
-  const sid = state_sid || null;
-  await fetch('/finish',{method:'POST'});
-  // Wait a tick for state to update
-  await new Promise(r=>setTimeout(r,400));
-  // Find the session we just closed — get from /status
-  const st = await fetch('/status').then(r=>r.json());
-  _foSid = sid || st.session_id;
-  _foRaceType = null;
-  _foDropLast = false;
-  _foClosed = false;
+async function openFinish(editSid){
+  if(_foAutoTimer){clearTimeout(_foAutoTimer);_foAutoTimer=null;}
 
-  if(!_foSid){ alert('No active session to finish.'); return; }
+  let sid = editSid || null;
+  if(!editSid){
+    // Close active session
+    const res = await fetch('/finish',{method:'POST'});
+    const closed = await res.json().catch(()=>({}));
+    if(closed.closed&&closed.closed.length) sid=closed.closed[0];
+    if(!sid){
+      await new Promise(r=>setTimeout(r,400));
+      const st = await fetch('/status').then(r=>r.json());
+      sid = state_sid || st.session_id;
+    }
+  }
+  _foSid=sid; _foRaceType=null; _foDropLast=false; _foClosed=false; _foTrackOrdinal=null;
+  if(!_foSid) return;
 
-  // Load session + laps
   try {
-    const d = await fetch('/sessions/session/data?id='+encodeURIComponent(_foSid)).then(r=>r.json());
-    const cur = d.session;
-    if(!cur){ closeFinish(); return; }
-    _foSid = cur.session_id;
-    _foLaps = d.laps || [];
+    // Load session metadata + track list
+    const cd = await fetch('/sessions/confirm-data?id='+encodeURIComponent(_foSid)).then(r=>r.json());
+    const cur = cd.session;
+    if(!cur) return;
+    _foSid = cur.session_id||_foSid;
+    _foTrackOrdinal = cd.track_ordinal;
 
-    $('fo-title').textContent = cur.track&&cur.track!=='unknown' ? cur.track : 'Session Complete';
-    $('fo-sub').textContent = (cur.game||'').replace(/_/g,' ') + (cur.started_at?' · '+new Date(cur.started_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'');
+    // Load laps
+    const ld = await fetch('/sessions/session/data?id='+encodeURIComponent(_foSid)).then(r=>r.json()).catch(()=>({}));
+    _foLaps = ld.laps||[];
 
-    // Pre-select race_type if already set
+    // Header
+    const track = cur.track&&cur.track!=='unknown' ? cur.track : null;
+    $('fo-title').textContent = track||'Session Complete';
+    const badge=$('fo-game-badge');
+    if(cur.game){badge.textContent=(cur.game||'').replace(/_/g,' ').toUpperCase();badge.style.display='inline';}
+    else badge.style.display='none';
+    $('fo-sub').textContent = cur.started_at
+      ? new Date(cur.started_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+      : '—';
+
+    // Stats row
+    const validLaps=_foLaps.filter(l=>l.lap_time_s);
+    if(validLaps.length){
+      const best=Math.min(...validLaps.map(l=>l.lap_time_s));
+      $('fo-stat-laps').textContent=validLaps.length;
+      $('fo-stat-best').textContent=fmt(best);
+      $('fo-stats').style.display='flex';
+    } else {
+      $('fo-stats').style.display='none';
+    }
+
+    // Track dropdown
+    const sel=$('fo-track');
+    sel.innerHTML='<option value="">— Unknown —</option>';
+    (cd.track_list||[]).forEach(t=>{
+      const o=document.createElement('option');
+      o.value=t;o.textContent=t;
+      if(t===cur.track)o.selected=true;
+      sel.appendChild(o);
+    });
+    // If track is an unidentified ordinal, add as a selectable option too
+    if(cur.track&&cur.track.startsWith('Track #')&&!sel.value){
+      const o=document.createElement('option');
+      o.value=cur.track;o.textContent=cur.track+' (unidentified)';o.selected=true;
+      sel.insertBefore(o,sel.options[1]);
+    }
+
+    // Car input
+    $('fo-car').value=cur.car&&cur.car!=='unknown'?cur.car:'';
+
+    // Pre-select race_type
     if(cur.race_type){
-      const chip = document.querySelector(`.type-chip[data-val="${cur.race_type}"]`);
-      if(chip){ selType(chip); }
+      const chip=document.querySelector(`#fo .type-chip[data-val="${cur.race_type}"]`);
+      if(chip) selType(chip);
     }
     renderFoLaps();
   } catch(e){ console.error(e); return; }
@@ -2046,17 +2124,18 @@ async function openFinish(){
 }
 
 function renderFoLaps(){
-  const best = _foClosed ? null : Math.min(..._foLaps.filter(l=>l.lap_time_s).map(l=>l.lap_time_s));
-  const lastIdx = _foLaps.length - 1;
-  $('fo-laps').innerHTML = _foLaps.map((lap,i)=>{
-    const t = lap.lap_time_s;
-    const isLast = i===lastIdx;
-    const isBest = t && t===best;
-    const isPartial = isLast && (!t || _foDropLast);
-    const timeStr = t ? fmt(t) : 'partial';
-    const delBtn = isLast
-      ? `<button class="fo-lap-del${_foDropLast?' undone':''}" onclick="toggleDropLast()">${_foDropLast?'Restore':'Delete'}</button>`
-      : '';
+  const validTimes=_foLaps.filter(l=>l.lap_time_s).map(l=>l.lap_time_s);
+  const best=validTimes.length?Math.min(...validTimes):null;
+  const lastIdx=_foLaps.length-1;
+  $('fo-laps').innerHTML=_foLaps.map((lap,i)=>{
+    const t=lap.lap_time_s;
+    const isLast=i===lastIdx;
+    const isBest=t&&t===best;
+    const isPartial=isLast&&(!t||_foDropLast);
+    const timeStr=t?fmt(t):'partial';
+    const delBtn=isLast
+      ?`<button class="fo-lap-del${_foDropLast?' undone':''}" onclick="toggleDropLast()">${_foDropLast?'Restore':'Delete'}</button>`
+      :'';
     return `<div class="fo-lap${isPartial?' partial':''}">
       <span class="fo-lap-num">L${lap.lap_number}</span>
       <span class="fo-lap-time${isBest&&!_foDropLast?' best':''}">${timeStr}</span>
@@ -2067,21 +2146,30 @@ function renderFoLaps(){
 }
 
 function toggleDropLast(){
-  _foDropLast = !_foDropLast;
+  _foDropLast=!_foDropLast;
   renderFoLaps();
 }
 
 async function saveFinish(){
   if(!_foSid) return;
-  const body = { id: _foSid };
-  if(_foRaceType) body.race_type = _foRaceType;
-  if(_foDropLast) body.drop_last_lap = true;
+  const body={id:_foSid};
+  if(_foRaceType) body.race_type=_foRaceType;
+  if(_foDropLast) body.drop_last_lap=true;
+  const selTrack=$('fo-track').value;
+  if(selTrack&&!selTrack.startsWith('Track #')) body.track=selTrack;
+  const carVal=$('fo-car').value.trim();
+  if(carVal) body.car=carVal;
+  // Learn the ordinal if user identified an unknown track
+  if(_foTrackOrdinal&&selTrack&&!selTrack.startsWith('Track #')){
+    body.learned_ordinal={ordinal:_foTrackOrdinal,game:'forza_motorsport',track_name:selTrack};
+  }
   await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   closeFinish();
 }
 
 function closeFinish(){
   $('fo').classList.remove('open');
+  if(_foAutoTimer){clearTimeout(_foAutoTimer);_foAutoTimer=null;}
 }
 </script>
 </body>
@@ -4535,6 +4623,7 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
   <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
   <span class="type-chip" id="hdr-type" style="display:none"></span>
   <a id="tele-link" href="#" style="font-size:var(--text-xs);color:var(--accent-bd2);border:1px solid var(--accent-bd);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Telemetry &rarr;</a>
+  <a id="edit-sess-btn" href="#" style="font-size:var(--text-xs);color:var(--color-text-secondary);border:1px solid var(--color-border);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Edit</a>
 </div>
 <div class="section">
   <div class="section-lbl">Lap Times</div>
@@ -4635,6 +4724,8 @@ function renderHeader(){
   if(game)teleHref+='&game='+encodeURIComponent(game);
   if(track&&track!=='Unknown Track')teleHref+='&track='+encodeURIComponent(track);
   teleLink.href=teleHref;teleLink.style.display='';
+  const editBtn=document.getElementById('edit-sess-btn');
+  editBtn.href='/?edit='+encodeURIComponent(_id);editBtn.style.display='';
 }
 function renderLaps(){
   const best=_sess.best_lap_time_s;
@@ -4980,6 +5071,13 @@ def _db_init():
                     created_at    TEXT,
                     PRIMARY KEY (session_id, lap_number)
                 );
+                CREATE TABLE IF NOT EXISTS learned_track_ordinals (
+                    ordinal     INTEGER NOT NULL,
+                    game        TEXT    NOT NULL,
+                    track_name  TEXT    NOT NULL,
+                    created_at  TEXT,
+                    PRIMARY KEY (ordinal, game)
+                );
                 CREATE INDEX IF NOT EXISTS idx_laps_session  ON laps(session_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_track ON sessions(track);
                 CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(started_at);
@@ -4988,7 +5086,7 @@ def _db_init():
             """)
             conn.commit()
             # Add columns introduced after initial schema — safe to re-run
-            for col, defn in [("grid_pos", "INTEGER"), ("finish_pos", "INTEGER")]:
+            for col, defn in [("grid_pos", "INTEGER"), ("finish_pos", "INTEGER"), ("track_ordinal", "INTEGER")]:
                 try:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {defn}")
                     conn.commit()
@@ -5055,6 +5153,49 @@ def _db_migrate():
             conn.close()
     if imported:
         log.info(f"SQLite: migrated {imported} session(s) from JSON files")
+
+
+# Cache of learned track ordinals — invalidated when a new one is written
+_learned_ordinals_cache: Optional[dict] = None
+
+
+def _load_learned_track_ordinals() -> dict:
+    """Return {ordinal: track_name} from the learned_track_ordinals table."""
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            rows = conn.execute(
+                "SELECT ordinal, track_name FROM learned_track_ordinals"
+            ).fetchall()
+            return {row["ordinal"]: row["track_name"] for row in rows}
+        finally:
+            conn.close()
+
+
+def _db_write_learned_ordinal(ordinal: int, game: str, track_name: str):
+    global _learned_ordinals_cache
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO learned_track_ordinals (ordinal, game, track_name, created_at) "
+                "VALUES (?,?,?,?)",
+                (ordinal, game, track_name, datetime.now().isoformat()),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    _learned_ordinals_cache = None  # invalidate
+
+
+def _effective_tracks() -> dict:
+    """Return merged {ordinal: track_name} combining FORZA_TRACKS and learned ordinals."""
+    global _learned_ordinals_cache
+    if _learned_ordinals_cache is None:
+        _learned_ordinals_cache = _load_learned_track_ordinals()
+    result = dict(FORZA_TRACKS)
+    result.update(_learned_ordinals_cache)
+    return result
 
 
 def _classify_race_type(positions: list, lap_count: int) -> Optional[str]:
@@ -5129,8 +5270,8 @@ def _db_write_session(session_data: dict):
                 INSERT OR REPLACE INTO sessions
                 (session_id,game,track,car,session_type,race_type,
                  started_at,ended_at,packet_count,best_lap_time_s,lap_count,
-                 grid_pos,finish_pos)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 grid_pos,finish_pos,track_ordinal)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (sid,
                   session_data.get("game"), session_data.get("track"),
                   session_data.get("car"), session_data.get("session_type"),
@@ -5138,7 +5279,8 @@ def _db_write_session(session_data: dict):
                   session_data.get("started_at"), session_data.get("ended_at"),
                   session_data.get("packet_count", 0), session_data.get("best_lap_time_s"),
                   len(laps),
-                  session_data.get("grid_pos"), session_data.get("finish_pos")))
+                  session_data.get("grid_pos"), session_data.get("finish_pos"),
+                  session_data.get("track_ordinal")))
             conn.execute("DELETE FROM laps WHERE session_id=?", (sid,))
             for lap in laps:
                 conn.execute("""
@@ -6128,6 +6270,35 @@ async def handle_status(reader, writer):
             else:
                 writer.write(_http_response("200 OK", "application/json", b'{"tip":null}'))
 
+        elif path == "/sessions/confirm-data":
+            qs = {k: urllib.parse.unquote_plus(v)
+                  for pair in query_string.split("&") if "=" in pair
+                  for k, v in [pair.split("=", 1)]}
+            sid = qs.get("id", "")
+            with _db_lock:
+                conn = _db_connect()
+                try:
+                    cd_row = conn.execute(
+                        "SELECT session_id,game,track,car,session_type,race_type,"
+                        "started_at,ended_at,best_lap_time_s,lap_count,track_ordinal "
+                        "FROM sessions WHERE session_id=?", (sid,)
+                    ).fetchone()
+                finally:
+                    conn.close()
+            if not cd_row:
+                writer.write(_http_response("404 Not Found", "application/json",
+                                            json.dumps({"error": "Session not found"}).encode()))
+            else:
+                cd_dict = dict(cd_row)
+                all_tracks = _effective_tracks()
+                # Build sorted unique track name list (known tracks + any sessions track names)
+                track_names = sorted(set(all_tracks.values()))
+                writer.write(_http_response("200 OK", "application/json", json.dumps({
+                    "session":       cd_dict,
+                    "track_list":    track_names,
+                    "track_ordinal": cd_dict.get("track_ordinal"),
+                }).encode()))
+
         elif path == "/sessions/session/data":
             qs = {k: urllib.parse.unquote_plus(v)
                   for pair in query_string.split("&") if "=" in pair
@@ -6336,6 +6507,26 @@ async def handle_status(reader, writer):
                     if "race_type" in body_data:
                         session_data["race_type"] = body_data["race_type"]
 
+                    # Update track name
+                    if "track" in body_data:
+                        session_data["track"] = body_data["track"]
+
+                    # Update car
+                    if "car" in body_data:
+                        session_data["car"] = body_data["car"]
+
+                    # Learn a new track ordinal mapping
+                    if "learned_ordinal" in body_data:
+                        lo = body_data["learned_ordinal"]
+                        try:
+                            _db_write_learned_ordinal(
+                                int(lo["ordinal"]),
+                                lo.get("game", "forza_motorsport"),
+                                str(lo["track_name"]),
+                            )
+                        except (KeyError, TypeError, ValueError):
+                            pass
+
                     # Drop last lap
                     if body_data.get("drop_last_lap") and session_data.get("laps"):
                         session_data["laps"] = session_data["laps"][:-1]
@@ -6357,6 +6548,10 @@ async def handle_status(reader, writer):
                     db_kwargs = {}
                     if "race_type" in body_data:
                         db_kwargs["race_type"] = body_data["race_type"]
+                    if "track" in body_data:
+                        db_kwargs["track"] = body_data["track"]
+                    if "car" in body_data:
+                        db_kwargs["car"] = body_data["car"]
                     if db_kwargs:
                         _db_update_session(sid, **db_kwargs)
                     if body_data.get("drop_last_lap"):
