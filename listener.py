@@ -207,6 +207,8 @@ FORZA_TRACKS = {
     114: "Grand Oak Raceway",
     115: "Hakone Circuit",
     116: "Kyalami Grand Prix Circuit",
+    530: "Spa Full Circuit",
+    1630: "Grand Oak National Circuit",
 }
 
 # Ordinals seen in live packets but not in FORZA_TRACKS — logged once each
@@ -1586,7 +1588,7 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 #fo.open{display:flex}
 .fo-box{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);width:min(520px,95vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
 .fo-head{padding:var(--sp-5) var(--space-6) 14px;border-bottom:1px solid var(--color-border-subtle)}
-.fo-title{font-size:var(--text-lg);font-weight:var(--fw-black);color:var(--color-text-primary);letter-spacing:-1px;margin-bottom:var(--space-1)}
+.fo-title-row{display:flex;align-items:center;gap:8px;margin-bottom:var(--space-1)}.fo-title{font-size:var(--text-lg);font-weight:var(--fw-black);color:var(--color-text-primary);letter-spacing:-1px}
 .fo-sub{font-size:var(--text-sm);color:var(--color-text-secondary)}
 .fo-body{flex:1;overflow-y:auto;padding:var(--sp-5) var(--space-6)}
 .fo-section{margin-bottom:var(--sp-5)}
@@ -1799,7 +1801,7 @@ select.fo-input{cursor:pointer}
 <div id="fo">
   <div class="fo-box">
     <div class="fo-head">
-      <div class="fo-title" id="fo-title">Session Complete <span class="game-badge" id="fo-game-badge" style="display:none"></span></div>
+      <div class="fo-title-row"><div class="fo-title" id="fo-title">Session Complete</div><span class="game-badge" id="fo-game-badge" style="display:none"></span></div>
       <div class="fo-sub" id="fo-sub">—</div>
       <div class="fo-stats" id="fo-stats" style="display:none">
         <div class="fo-stat-item"><div class="fo-stat-v" id="fo-stat-laps">—</div><div class="fo-stat-l">Laps</div></div>
