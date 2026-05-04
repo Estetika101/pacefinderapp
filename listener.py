@@ -733,6 +733,8 @@ class Session:
         self.race_type = None  # set post-session via /sessions/update
         self._race_positions: list[int] = []  # sampled positions for session type inference
         self.track_ordinal: Optional[int] = None  # raw ordinal for learned track mapping
+        self.car_class: Optional[int] = None   # 0=D 1=C 2=B 3=A 4=S1 5=S2 6=X
+        self.car_pi: Optional[int] = None      # performance index (100–999)
 
         self.last_activity = time.time()  # updated only when driver input is detected
 
@@ -790,6 +792,10 @@ class Session:
             self.track = parsed["track"]
         if parsed.get("track_ordinal") is not None and self.track_ordinal is None:
             self.track_ordinal = parsed["track_ordinal"]
+        if parsed.get("car_class") is not None and self.car_class is None:
+            self.car_class = int(parsed["car_class"])
+        if parsed.get("car_performance_index") is not None and self.car_pi is None:
+            self.car_pi = int(parsed["car_performance_index"])
         if parsed.get("session_type", "unknown") != "unknown":
             self.session_type = parsed["session_type"]
         if "car_ordinal" in parsed and self.car == "unknown":
@@ -904,6 +910,8 @@ class Session:
             "grid_pos":         grid_pos,
             "finish_pos":       finish_pos,
             "track_ordinal":    self.track_ordinal,
+            "car_class":        self.car_class,
+            "car_pi":           self.car_pi,
         }
 
         _db_write_session(session_data)
@@ -3392,21 +3400,37 @@ a{color:inherit;text-decoration:none}
 .gtab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
 .gtab .cnt{font-size:var(--text-xs);color:var(--color-text-dim);margin-left:5px;font-weight:var(--fw-normal)}
 .gtab.active .cnt{color:var(--color-text-muted)}
-.page{padding:var(--space-4) var(--space-4) 60px;max-width:1400px;margin:0 auto}
+.page{padding:var(--space-4) var(--space-4) 60px;max-width:1100px;margin:0 auto}
 .page-hdr{display:flex;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-4)}
 .page-hdr h2{font-size:var(--text-md);color:var(--color-text-primary);letter-spacing:2px;text-transform:uppercase}
 .count{font-size:var(--text-xs);color:var(--color-text-muted)}
-.tracks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:var(--sp-3)}
-.tc{background:var(--color-surface);border:1px solid var(--color-border);padding:18px var(--space-4);cursor:pointer;transition:border-color .15s}
-.tc:hover{border-color:var(--color-border);background:var(--color-surface-2)}
-.tc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--sp-3)}
-.tc-name{font-size:1rem;color:var(--text);font-weight:bold;line-height:1.3;flex:1;margin-right:10px}
-.trend-up{color:var(--accent-soft);font-size:1.1rem}.trend-dn{color:var(--danger);font-size:1.1rem}.trend-fl{color:var(--n-500);font-size:1.1rem}
-.tc-stats{display:flex;gap:var(--sp-5);margin-bottom:10px}
-.tc-stat .v{font-size:var(--text-md);font-weight:var(--fw-black);color:var(--color-text-primary)}
-.tc-stat .l{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1px;margin-top:1px}
-.tc-tip{font-size:.78rem;color:var(--accent-bd2);line-height:1.4;border-top:1px solid var(--border-sub);padding-top:var(--sp-2);margin-top:var(--sp-1);display:none}
-.tc-tip.on{display:block}
+/* ── Track list ── */
+.tracks-list{border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden}
+.tl-row{display:flex;align-items:center;height:72px;border-bottom:1px solid var(--color-border-subtle);cursor:pointer;transition:background .12s,border-left .12s;border-left:2px solid transparent;padding:0 16px 0 14px;gap:16px}
+.tl-row:last-child{border-bottom:none}
+.tl-row:hover{background:var(--color-surface);border-left-color:var(--color-accent)}
+.tl-row.no-lap{opacity:.45}
+.tl-left{flex:0 0 40%;min-width:0;overflow:hidden}
+.tl-name{font-size:var(--text-md);font-weight:var(--fw-bold);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-meta{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-center{flex:0 0 35%;display:flex;align-items:center;gap:8px}
+.tl-spark{flex:0 0 180px;height:40px}
+.tl-spark svg{display:block}
+.tl-arrow{font-size:.8rem;flex-shrink:0}
+.tl-right{flex:0 0 25%;text-align:right}
+.tl-best{font-size:var(--text-xl);font-weight:var(--fw-black);color:var(--color-accent);font-variant-numeric:tabular-nums;line-height:1}
+.tl-finish{font-size:var(--text-xs);color:var(--color-blue);margin-top:4px}
+/* ── Car class badges ── */
+.cc{font-size:.58rem;font-weight:var(--fw-bold);padding:1px 5px;border-radius:3px;letter-spacing:.5px;vertical-align:middle;margin-right:4px}
+.cc-X{background:#ef444415;color:#ef4444;border:1px solid #ef444440}
+.cc-S2{background:#a855f715;color:#a855f7;border:1px solid #a855f740}
+.cc-S1{background:#f59e0b15;color:#f59e0b;border:1px solid #f59e0b40}
+.cc-A{background:#3b82f615;color:#3b82f6;border:1px solid #3b82f640}
+.cc-B{background:#22c55e15;color:#22c55e;border:1px solid #22c55e40}
+.cc-C{background:#64748b15;color:#94a3b8;border:1px solid #64748b40}
+.cc-D{background:#33333350;color:#888;border:1px solid #44444460}
+.cc-R{background:#06b6d415;color:#06b6d4;border:1px solid #06b6d440}
+.cc-P{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf640}
 .empty-state{color:var(--n-500);font-size:.85rem;padding:48px var(--sp-6);text-align:center}
 </style>
 </head>
@@ -3432,18 +3456,42 @@ a{color:inherit;text-decoration:none}
     <h2 id="page-title">Tracks</h2>
     <span class="count" id="count"></span>
   </div>
-  <div class="tracks-grid" id="grid"><div class="empty-state">Loading&hellip;</div></div>
+  <div class="tracks-list" id="list"><div class="empty-state">Loading&hellip;</div></div>
 </div>
 <script>
 const GAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
+const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDate(iso){if(!iso)return '—';return new Date(iso).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function classBadge(cls){if(cls==null)return'';const n=CLASS_NAMES[cls]||'?';return`<span class="cc cc-${n}">${n}</span>`;}
+function sparkSVG(vals){
+  const v=(vals||[]).filter(t=>t>0);
+  if(!v.length)return'';
+  const W=180,H=40,p=3;
+  const mn=Math.min(...v),mx=Math.max(...v),rng=mx-mn||0.001;
+  if(v.length===1){
+    return`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <circle cx="${W/2}" cy="${H/2}" r="3" fill="var(--color-accent)" opacity=".9"/>
+    </svg>`;
+  }
+  const xs=v.map((_,i)=>p+(W-p*2)*i/(v.length-1));
+  const ys=v.map(t=>H-p-(H-p*2)*(mx-t)/rng);
+  const pts=xs.map((x,i)=>x.toFixed(1)+','+ys[i].toFixed(1)).join(' ');
+  const fillPts=`${xs[0].toFixed(1)},${H} ${pts} ${xs[xs.length-1].toFixed(1)},${H}`;
+  return`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--color-accent)" stop-opacity=".25"/>
+      <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0"/>
+    </linearGradient></defs>
+    <polygon points="${fillPts}" fill="url(#sg)"/>
+    <polyline points="${pts}" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
+  </svg>`;
+}
 const _game=new URLSearchParams(location.search).get('name')||'';
-// ── Tab active state + counts ─────────────────────────────────
 const tabMap={'forza_motorsport':'tab-forza','acc':'tab-acc','f1':'tab-f1'};
-if(_game&&tabMap[_game]){document.getElementById(tabMap[_game]).classList.add('active');}
-else{document.getElementById('tab-all').classList.add('active');}
+if(_game&&tabMap[_game])document.getElementById(tabMap[_game]).classList.add('active');
+else document.getElementById('tab-all').classList.add('active');
 (async()=>{
   let games=[];try{games=await fetch('/sessions/games').then(r=>r.json());}catch(e){}
   let all=0;
@@ -3460,35 +3508,42 @@ async function init(){
   document.title='Pacefinder · '+label;
   const url='/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'');
   try{_tracks=await fetch(url).then(r=>r.json());}catch(e){_tracks=[];}
-  const grid=document.getElementById('grid');
+  const list=document.getElementById('list');
   document.getElementById('count').textContent=_tracks.length+' track'+(_tracks.length!==1?'s':'');
-  if(!_tracks.length){grid.innerHTML='<div class="empty-state">No sessions recorded yet</div>';return;}
-  grid.innerHTML=_tracks.map((t,i)=>{
-    const arrow=t.trend==='up'?'<span class="trend-up">▲</span>':t.trend==='dn'?'<span class="trend-dn">▼</span>':'<span class="trend-fl">—</span>';
-    return `<div class="tc" data-i="${i}">
-      <div class="tc-top"><div class="tc-name">${t.track==='unknown'?'Unknown Track':esc(t.track)}</div>${arrow}</div>
-      <div class="tc-stats">
-        <div class="tc-stat"><div class="v">${fmtLap(t.best_lap_time_s)}</div><div class="l">Best Lap</div></div>
-        <div class="tc-stat"><div class="v">${t.session_count}</div><div class="l">Sessions</div></div>
-        <div class="tc-stat"><div class="v">${fmtDate(t.last_raced)}</div><div class="l">Last Raced</div></div>
+  if(!_tracks.length){list.innerHTML='<div class="empty-state">No sessions recorded yet</div>';return;}
+  // Tracks with best lap first, then no-lap tracks at bottom
+  const withLap=_tracks.filter(t=>t.best_lap_time_s);
+  const noLap=_tracks.filter(t=>!t.best_lap_time_s);
+  list.innerHTML=[...withLap,...noLap].map((t,i)=>{
+    const label=t.track==='unknown'?'Unknown Track':esc(t.track);
+    const hasLap=!!t.best_lap_time_s;
+    const badge=classBadge(t.best_car_class);
+    const carLabel=t.best_car&&t.best_car!=='unknown'?esc(t.best_car):'';
+    const metaParts=[];
+    if(t.session_count)metaParts.push(t.session_count+(t.session_count===1?' session':' sessions'));
+    if(t.last_raced)metaParts.push(fmtDate(t.last_raced));
+    const meta=metaParts.join(' · ');
+    const carMeta=(badge||carLabel)?`<span style="display:block;margin-top:2px">${badge}${carLabel}</span>`:'';
+    const spark=hasLap?sparkSVG(t.spark_laps||[]):'';
+    const trendArrow=hasLap?(t.trend==='up'?'<span class="tl-arrow" style="color:var(--color-green)">▲</span>':t.trend==='dn'?'<span class="tl-arrow" style="color:var(--color-red)">▼</span>':'<span class="tl-arrow" style="color:var(--color-text-dim)">—</span>'):'';
+    const bestLap=hasLap?fmtLap(t.best_lap_time_s):'—';
+    const avgFinish=t.avg_finish!=null?`<div class="tl-finish">P${t.avg_finish} avg finish</div>`:'';
+    const href=`/sessions/track?name=${encodeURIComponent(t.track)}${_game?'&game='+encodeURIComponent(_game):''}`;
+    return`<div class="tl-row${hasLap?'':' no-lap'}" onclick="location.href='${href}'">
+      <div class="tl-left">
+        <div class="tl-name">${label}</div>
+        <div class="tl-meta">${meta}${carMeta}</div>
       </div>
-      <div class="tc-tip" id="tip${i}"></div>
+      <div class="tl-center">
+        <div class="tl-spark">${spark}</div>
+        ${trendArrow}
+      </div>
+      <div class="tl-right">
+        <div class="tl-best">${bestLap}</div>
+        ${avgFinish}
+      </div>
     </div>`;
   }).join('');
-  document.querySelectorAll('.tc').forEach((el,i)=>{
-    el.addEventListener('click',()=>{
-      let url='/sessions/track?name='+encodeURIComponent(_tracks[i].track);
-      if(_game) url+='&game='+encodeURIComponent(_game);
-      location.href=url;
-    });
-    if(_tracks[i].track!=='unknown') loadTip(_tracks[i].track,i);
-  });
-}
-async function loadTip(track,i){
-  try{
-    const d=await fetch('/sessions/track/tip?name='+encodeURIComponent(track)).then(r=>r.json());
-    if(d&&d.tip){const el=document.getElementById('tip'+i);if(el){el.textContent=d.tip;el.classList.add('on');}}
-  }catch(e){}
 }
 init();
 </script>
@@ -3513,8 +3568,38 @@ a{color:inherit;text-decoration:none}
 .tb-nav a{font-size:var(--text-xs);color:var(--color-text-secondary);letter-spacing:1px;text-transform:uppercase}
 .tb-nav a:hover{color:var(--color-text-primary)}
 .tb-nav a.cur{color:var(--color-text-primary);border-bottom:1px solid var(--color-text-secondary)}
+.gtab-bar{display:flex;gap:0;border-bottom:1px solid var(--color-border);overflow-x:auto;scrollbar-width:none;padding:0 var(--space-4);background:var(--color-bg)}
+.gtab-bar::-webkit-scrollbar{display:none}
+.gtab{display:inline-block;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--color-text-muted);font-family:var(--font-mono);font-size:calc(var(--text-sm) * 1.4);letter-spacing:.05em;
+  padding:10px 20px 10px 0;cursor:pointer;white-space:nowrap;margin-bottom:-1px;
+  transition:color .15s,border-color .15s;text-decoration:none}
+.gtab:hover{color:var(--color-text-secondary)}
+.gtab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
+.gtab .cnt{font-size:var(--text-xs);color:var(--color-text-dim);margin-left:5px;font-weight:var(--fw-normal)}
+.gtab.active .cnt{color:var(--color-text-muted)}
 .breadcrumb{font-size:var(--text-xs);color:var(--color-text-secondary);padding:10px var(--space-4);border-bottom:1px solid var(--color-border-subtle)}
 .breadcrumb a{color:var(--n-400)}.breadcrumb a:hover{color:var(--n-200)}
+/* ── Layout with left rail ── */
+.layout{display:flex;min-height:calc(100vh - 100px)}
+.left-rail{width:200px;flex-shrink:0;border-right:1px solid var(--color-border);overflow-y:auto;position:sticky;top:100px;max-height:calc(100vh - 100px)}
+.lr-section-lbl{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;padding:12px 14px 6px}
+.lr-item{display:block;padding:8px 14px;cursor:pointer;border-left:2px solid transparent;transition:background .12s,border-color .12s;text-decoration:none;color:inherit}
+.lr-item:hover{background:var(--color-surface)}
+.lr-item.active{border-left-color:var(--color-accent);background:var(--color-surface)}
+.lr-name{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lr-sub{font-size:.65rem;color:var(--color-text-muted);margin-top:2px}
+.main-content{flex:1;min-width:0}
+@media(max-width:700px){
+  .left-rail{display:none}
+  .lr-pills{display:flex!important}
+}
+.lr-pills{display:none;overflow-x:auto;scrollbar-width:none;gap:8px;padding:8px var(--space-4);border-bottom:1px solid var(--color-border-subtle)}
+.lr-pills::-webkit-scrollbar{display:none}
+.lr-pill{font-size:var(--text-xs);padding:5px 12px;border:1px solid var(--color-border);border-radius:20px;white-space:nowrap;cursor:pointer;color:var(--color-text-secondary);background:none;font-family:inherit;transition:border-color .12s}
+.lr-pill:hover{border-color:var(--color-text-muted)}
+.lr-pill.active{border-color:var(--color-accent);color:var(--color-accent)}
+/* ── Track header ── */
 .track-hdr{padding:var(--sp-5) var(--sp-6);border-bottom:1px solid var(--border-sub);display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-6)}
 .track-name{font-size:1.4rem;font-weight:900;color:var(--text);letter-spacing:1px;flex:1}
 .hdr-stat{text-align:center}
@@ -3559,34 +3644,50 @@ td.date-col{color:var(--text)}
   </nav>
 </div>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
-<div class="breadcrumb"><a href="/sessions">Sessions</a> &rsaquo; <a href="#" id="bc-game"></a> <span id="bc-sep" style="display:none"> &rsaquo; </span><span id="bc-track">Track</span></div>
-<div class="track-hdr">
-  <div class="track-name" id="hdr-name">Loading&hellip;</div>
-  <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
-  <div class="hdr-stat"><div class="v" id="hdr-count">&mdash;</div><div class="l">Sessions</div></div>
-  <div class="hdr-stat"><div class="v" id="hdr-trend">&mdash;</div><div class="l">Trend</div></div>
+<div class="gtab-bar" id="gtab-bar">
+  <a class="gtab" href="/sessions" id="tab-all">All Sessions<span class="cnt" id="cnt-all"></span></a>
+  <a class="gtab" href="#" id="tab-forza">Forza<span class="cnt" id="cnt-forza"></span></a>
+  <a class="gtab" href="#" id="tab-acc">ACC<span class="cnt" id="cnt-acc"></span></a>
+  <a class="gtab" href="#" id="tab-f1">F1<span class="cnt" id="cnt-f1"></span></a>
 </div>
-<div class="track-tip-bar" id="tip-bar">
-  <span id="tip-text"></span>
-  <button class="tip-gen" id="tip-btn" onclick="generateTip()">Generate AI tip</button>
-</div>
-<div class="ref-card" id="ref-card">
-  <div class="ref-card-lbl" id="ref-card-title">References</div>
-  <div class="ref-rows" id="ref-rows"></div>
-  <div class="ref-gap" id="ref-gap" style="display:none">
-    <span>Gap to theoretical</span>
-    <span class="ref-gap-val" id="ref-gap-val"></span>
+<div class="breadcrumb"><a href="/sessions">Sessions</a> &rsaquo; <a href="#" id="bc-game" style="display:none"></a><span id="bc-sep" style="display:none"> &rsaquo; </span><span id="bc-track">Track</span></div>
+<div class="lr-pills" id="lr-pills"></div>
+<div class="layout">
+  <nav class="left-rail" id="left-rail">
+    <div class="lr-section-lbl">Circuits</div>
+    <div id="lr-items"></div>
+  </nav>
+  <div class="main-content">
+    <div class="track-hdr">
+      <div class="track-name" id="hdr-name">Loading&hellip;</div>
+      <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
+      <div class="hdr-stat"><div class="v" id="hdr-count">&mdash;</div><div class="l">Sessions</div></div>
+      <div class="hdr-stat"><div class="v" id="hdr-trend">&mdash;</div><div class="l">Trend</div></div>
+    </div>
+    <div class="track-tip-bar" id="tip-bar">
+      <span id="tip-text"></span>
+      <button class="tip-gen" id="tip-btn" onclick="generateTip()">Generate AI tip</button>
+    </div>
+    <div class="ref-card" id="ref-card">
+      <div class="ref-card-lbl" id="ref-card-title">References</div>
+      <div class="ref-rows" id="ref-rows"></div>
+      <div class="ref-gap" id="ref-gap" style="display:none">
+        <span>Gap to theoretical</span>
+        <span class="ref-gap-val" id="ref-gap-val"></span>
+      </div>
+    </div>
+    <div class="page">
+      <table id="sess-table" style="display:none">
+        <thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Pace</th></tr></thead>
+        <tbody id="sess-tbody"></tbody>
+      </table>
+      <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
+    </div>
   </div>
 </div>
-<div class="page">
-  <table id="sess-table" style="display:none">
-    <thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Pace</th></tr></thead>
-    <tbody id="sess-tbody"></tbody>
-  </table>
-  <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
-</div>
 <script>
-const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap'};
+const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Real Race',ai:'AI Race'};
+const GAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function spark(times){
@@ -3602,26 +3703,71 @@ function spark(times){
 }
 const _track=new URLSearchParams(location.search).get('name')||'';
 const _game=new URLSearchParams(location.search).get('game')||'';
-const GAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
-let _sessions=[];
+let _sessions=[], _allTracks=[];
+
+// ── Game tab setup ────────────────────────────────────────────
+(async()=>{
+  // Tab game navigation — same track in that game if sessions exist, else game tracks index
+  async function gameTabHref(g){
+    if(!_track)return'/sessions/game?name='+encodeURIComponent(g);
+    try{
+      const d=await fetch('/sessions/track/data?name='+encodeURIComponent(_track)+'&game='+encodeURIComponent(g)).then(r=>r.json());
+      if(d&&d.length)return'/sessions/track?name='+encodeURIComponent(_track)+'&game='+encodeURIComponent(g);
+    }catch(e){}
+    return'/sessions/game?name='+encodeURIComponent(g);
+  }
+  const games=['forza_motorsport','acc','f1'];
+  const ids=['tab-forza','tab-acc','tab-f1'];
+  games.forEach(async(g,i)=>{document.getElementById(ids[i]).href=await gameTabHref(g);});
+  // Active tab
+  if(_game){const m={'forza_motorsport':'tab-forza','acc':'tab-acc','f1':'tab-f1'}[_game];if(m)document.getElementById(m).classList.add('active');}
+  else document.getElementById('tab-all').classList.add('active');
+  // Tab counts
+  let gs=[];try{gs=await fetch('/sessions/games').then(r=>r.json());}catch(e){}
+  let all=0;gs.forEach(g=>{const n=g.session_count||0;all+=n;
+    const m={'forza_motorsport':'cnt-forza','acc':'cnt-acc','f1':'cnt-f1'}[g.game];
+    if(m){const el=document.getElementById(m);if(el&&n)el.textContent='('+n+')';}
+  });
+  const ca=document.getElementById('cnt-all');if(ca&&all)ca.textContent='('+all+')';
+})();
+
 async function init(){
   if(!_track){location.href='/sessions';return;}
   document.getElementById('bc-track').textContent=_track;
   document.title='Pacefinder · '+_track;
   const bcGame=document.getElementById('bc-game');
   const bcSep=document.getElementById('bc-sep');
-  if(_game&&bcGame){
-    bcGame.textContent=GAME_LABELS[_game]||_game;
-    bcGame.href='/sessions/game?name='+encodeURIComponent(_game);
-    if(bcSep)bcSep.style.display='';
-  }
+  if(_game&&bcGame){bcGame.textContent=GAME_LABELS[_game]||_game;bcGame.href='/sessions/game?name='+encodeURIComponent(_game);bcGame.style.display='';if(bcSep)bcSep.style.display='';}
   const dataUrl='/sessions/track/data?name='+encodeURIComponent(_track)+(_game?'&game='+encodeURIComponent(_game):'');
   try{_sessions=await fetch(dataUrl).then(r=>r.json());}catch(e){_sessions=[];}
+  // Load left rail circuit list
+  try{_allTracks=await fetch('/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'')).then(r=>r.json());}catch(e){_allTracks=[];}
+  renderLeftRail();
   renderHeader();
   renderTable();
   loadTip();
   loadReferences();
 }
+
+function renderLeftRail(){
+  const items=document.getElementById('lr-items');
+  const pills=document.getElementById('lr-pills');
+  items.innerHTML=_allTracks.map(t=>{
+    const label=t.track==='unknown'?'Unknown':t.track;
+    const active=t.track===_track;
+    const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
+    return`<a class="lr-item${active?' active':''}" href="${href}">
+      <div class="lr-name">${label}</div>
+      <div class="lr-sub">${t.session_count} session${t.session_count===1?'':'s'}</div>
+    </a>`;
+  }).join('');
+  pills.innerHTML=_allTracks.map(t=>{
+    const active=t.track===_track;
+    const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
+    return`<a class="lr-pill${active?' active':''}" href="${href}">${t.track==='unknown'?'Unknown':t.track}</a>`;
+  }).join('');
+}
+
 function renderHeader(){
   document.getElementById('hdr-name').textContent=_track;
   const allBest=_sessions.map(s=>s.best_lap_time_s).filter(v=>v);
@@ -3629,10 +3775,7 @@ function renderHeader(){
   document.getElementById('hdr-count').textContent=_sessions.length;
   const last3=_sessions.slice(0,3).map(s=>s.best_lap_time_s).filter(v=>v);
   let trendHtml='—';
-  if(last3.length>=2){
-    const d=last3[0]-last3[1];
-    trendHtml=d<-0.5?'<span style="color:var(--color-green)">▲ Improving</span>':d>0.5?'<span style="color:var(--color-red)">▼ Declining</span>':'<span style="color:var(--color-text-muted)">Stable</span>';
-  }
+  if(last3.length>=2){const d=last3[0]-last3[1];trendHtml=d<-0.5?'<span style="color:var(--color-green)">▲ Improving</span>':d>0.5?'<span style="color:var(--color-red)">▼ Declining</span>':'<span style="color:var(--color-text-muted)">Stable</span>';}
   document.getElementById('hdr-trend').innerHTML=trendHtml;
 }
 function renderTable(){
@@ -3668,57 +3811,23 @@ async function loadReferences(){
     if(!d.best_lap&&!d.theoretical)return;
     const card=document.getElementById('ref-card');
     const rows=document.getElementById('ref-rows');
-    const title=document.getElementById('ref-card-title');
-    title.textContent=(_track.toUpperCase()||'TRACK')+' References';
+    document.getElementById('ref-card-title').textContent=(_track.toUpperCase()||'TRACK')+' References';
     let html='';
-    if(d.best_lap){
-      const bl=d.best_lap;
-      html+=`<div class="ref-row">
-        <span class="ref-row-type">Best Lap</span>
-        <span class="ref-row-time green">${fmtLap(bl.lap_time_s)}</span>
-        <span class="ref-row-meta">${bl.session_date}&nbsp;&nbsp;Lap ${bl.lap_number}</span>
-      </div>`;
-    }
-    if(d.theoretical){
-      const th=d.theoretical;
-      html+=`<div class="ref-row">
-        <span class="ref-row-type">Theoretical</span>
-        <span class="ref-row-time">${fmtLap(th.theoretical_best_s)}</span>
-        <span class="ref-row-meta"></span>
-      </div>
-      <div class="ref-sectors">S1 ${th.s1_s!=null?th.s1_s.toFixed(3)+'s':'—'} ${th.s1_session_date||''} &nbsp;·&nbsp;
-        S2 ${th.s2_s!=null?th.s2_s.toFixed(3)+'s':'—'} ${th.s2_session_date||''} &nbsp;·&nbsp;
-        S3 ${th.s3_s!=null?th.s3_s.toFixed(3)+'s':'—'} ${th.s3_session_date||''}</div>`;
-      if(d.best_lap&&d.best_lap.lap_time_s&&th.theoretical_best_s){
-        const gap=d.best_lap.lap_time_s-th.theoretical_best_s;
-        if(gap>0.01){
-          document.getElementById('ref-gap-val').textContent='+'+gap.toFixed(3)+'s';
-          document.getElementById('ref-gap').style.display='flex';
-        }
-      }
-    }
-    rows.innerHTML=html;
-    card.classList.add('on');
+    if(d.best_lap){const bl=d.best_lap;html+=`<div class="ref-row"><span class="ref-row-type">Best Lap</span><span class="ref-row-time green">${fmtLap(bl.lap_time_s)}</span><span class="ref-row-meta">${bl.session_date}&nbsp;&nbsp;Lap ${bl.lap_number}</span></div>`;}
+    if(d.theoretical){const th=d.theoretical;html+=`<div class="ref-row"><span class="ref-row-type">Theoretical</span><span class="ref-row-time">${fmtLap(th.theoretical_best_s)}</span><span class="ref-row-meta"></span></div><div class="ref-sectors">S1 ${th.s1_s!=null?th.s1_s.toFixed(3)+'s':'—'} ${th.s1_session_date||''} &nbsp;·&nbsp; S2 ${th.s2_s!=null?th.s2_s.toFixed(3)+'s':'—'} ${th.s2_session_date||''} &nbsp;·&nbsp; S3 ${th.s3_s!=null?th.s3_s.toFixed(3)+'s':'—'} ${th.s3_session_date||''}</div>`;if(d.best_lap&&d.best_lap.lap_time_s&&th.theoretical_best_s){const gap=d.best_lap.lap_time_s-th.theoretical_best_s;if(gap>0.01){document.getElementById('ref-gap-val').textContent='+'+gap.toFixed(3)+'s';document.getElementById('ref-gap').style.display='flex';}}}
+    rows.innerHTML=html;card.classList.add('on');
   }catch(e){}
 }
 async function loadTip(){
   try{
     const d=await fetch('/sessions/track/tip?name='+encodeURIComponent(_track)).then(r=>r.json());
     document.getElementById('tip-bar').classList.add('on');
-    if(d&&d.tip){
-      document.getElementById('tip-text').textContent=d.tip;
-      document.getElementById('tip-btn').style.display='none';
-    }
+    if(d&&d.tip){document.getElementById('tip-text').textContent=d.tip;document.getElementById('tip-btn').style.display='none';}
   }catch(e){}
 }
 async function generateTip(){
-  const btn=document.getElementById('tip-btn');
-  btn.textContent='Generating…';btn.disabled=true;
-  try{
-    const d=await fetch('/sessions/track/tip?name='+encodeURIComponent(_track)+'&generate=true').then(r=>r.json());
-    if(d&&d.tip){document.getElementById('tip-text').textContent=d.tip;btn.style.display='none';}
-    else{btn.textContent='Generate AI tip';btn.disabled=false;}
-  }catch(e){btn.textContent='Error — retry';btn.disabled=false;}
+  const btn=document.getElementById('tip-btn');btn.textContent='Generating…';btn.disabled=true;
+  try{const d=await fetch('/sessions/track/tip?name='+encodeURIComponent(_track)+'&generate=true').then(r=>r.json());if(d&&d.tip){document.getElementById('tip-text').textContent=d.tip;btn.style.display='none';}else{btn.textContent='Generate AI tip';btn.disabled=false;}}catch(e){btn.textContent='Error — retry';btn.disabled=false;}
 }
 init();
 </script>
@@ -4549,6 +4658,47 @@ a{color:inherit;text-decoration:none}
 .tb-nav a.cur{color:var(--color-text-primary);border-bottom:1px solid var(--color-text-secondary)}
 .breadcrumb{font-size:var(--text-xs);color:var(--color-text-secondary);padding:10px var(--space-4);border-bottom:1px solid var(--color-border-subtle)}
 .breadcrumb a{color:var(--n-400)}.breadcrumb a:hover{color:var(--n-200)}
+/* ── Tab bar ── */
+.sess-tab-bar{display:flex;gap:0;border-bottom:1px solid var(--color-border);padding:0 var(--space-4);background:var(--color-bg)}
+.sess-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--text-sm);font-weight:var(--fw-normal);padding:10px 16px 10px 0;cursor:pointer;white-space:nowrap;margin-bottom:-1px;transition:color .15s,border-color .15s,font-weight .15s}
+.sess-tab:hover{color:var(--color-text-secondary)}
+.sess-tab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
+/* ── Layout with left rail ── */
+.layout{display:flex;min-height:calc(100vh - 150px)}
+.left-rail{width:200px;flex-shrink:0;border-right:1px solid var(--color-border);overflow-y:auto;position:sticky;top:50px;max-height:calc(100vh - 50px)}
+.lr-section-lbl{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;padding:12px 14px 6px}
+.lr-item{display:block;padding:8px 14px;cursor:pointer;border-left:2px solid transparent;transition:background .12s,border-color .12s;text-decoration:none;color:inherit}
+.lr-item:hover{background:var(--color-surface)}
+.lr-item.active{border-left-color:var(--color-accent);background:var(--color-surface)}
+.lr-name{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lr-sub{font-size:.65rem;color:var(--color-text-muted);margin-top:2px}
+.lr-divider{height:1px;background:var(--color-border);margin:8px 0}
+.lr-this{padding:10px 14px}
+.lr-this-lbl{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:8px}
+.lr-this-car{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-medium);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lr-this-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.main-content{flex:1;min-width:0}
+@media(max-width:700px){
+  .left-rail{display:none}
+  .lr-pills{display:flex!important}
+}
+.lr-pills{display:none;overflow-x:auto;scrollbar-width:none;gap:8px;padding:8px var(--space-4);border-bottom:1px solid var(--color-border-subtle)}
+.lr-pills::-webkit-scrollbar{display:none}
+.lr-pill{font-size:var(--text-xs);padding:5px 12px;border:1px solid var(--color-border);border-radius:20px;white-space:nowrap;cursor:pointer;color:var(--color-text-secondary);background:none;font-family:inherit;transition:border-color .12s;text-decoration:none}
+.lr-pill:hover{border-color:var(--color-text-muted)}
+.lr-pill.active{border-color:var(--color-accent);color:var(--color-accent)}
+/* ── Car class badges ── */
+.cc{font-size:.58rem;font-weight:var(--fw-bold);padding:1px 5px;border-radius:3px;letter-spacing:.5px}
+.cc-X{background:#ef444415;color:#ef4444;border:1px solid #ef444440}
+.cc-S2{background:#a855f715;color:#a855f7;border:1px solid #a855f740}
+.cc-S1{background:#f59e0b15;color:#f59e0b;border:1px solid #f59e0b40}
+.cc-A{background:#3b82f615;color:#3b82f6;border:1px solid #3b82f640}
+.cc-B{background:#22c55e15;color:#22c55e;border:1px solid #22c55e40}
+.cc-C{background:#64748b15;color:#94a3b8;border:1px solid #64748b40}
+.cc-D{background:#33333350;color:#888;border:1px solid #44444460}
+.cc-R{background:#06b6d415;color:#06b6d4;border:1px solid #06b6d440}
+.cc-P{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf640}
+/* ── Session header ── */
 .sess-hdr{padding:18px var(--space-6);border-bottom:1px solid var(--color-border-subtle);display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-6)}
 .sess-title{font-size:1.2rem;font-weight:900;color:var(--text);flex:1}
 .sess-sub{font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:3px}
@@ -4578,11 +4728,9 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .ai-err{color:var(--danger);font-size:.8rem;margin-top:var(--sp-3);display:none}
 .btn-cmp{background:none;border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:inherit;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-sm);cursor:pointer;letter-spacing:.5px;white-space:nowrap}
 .btn-cmp:hover{border-color:var(--n-300);color:var(--text)}
-.cmp-panel{margin:0 var(--sp-6) var(--sp-5);border:1px solid var(--surface-bd);border-radius:6px;background:var(--bg-raised);overflow:hidden}
+.cmp-panel{border:1px solid var(--surface-bd);border-radius:6px;background:var(--bg-raised);overflow:hidden;margin:var(--sp-4) var(--sp-5)}
 .cmp-hdr{display:flex;align-items:center;padding:10px var(--sp-5);border-bottom:1px solid var(--border-sub);gap:var(--sp-3)}
 .cmp-meta{font-size:.76rem;color:var(--n-200);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmp-close{background:none;border:none;color:var(--n-400);font-size:1rem;cursor:pointer;padding:0 4px;line-height:1}
-.cmp-close:hover{color:var(--text)}
 .cmp-ctrl{display:flex;align-items:center;gap:var(--sp-4);padding:8px var(--sp-5);border-bottom:1px solid var(--border-sub);flex-wrap:wrap}
 .cmp-sel{background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-family:inherit;font-size:.78rem;padding:4px 8px;border-radius:4px;max-width:280px}
 .cmp-togg{display:flex;gap:var(--sp-3);margin-left:auto;flex-wrap:wrap}
@@ -4594,6 +4742,7 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .chart-svg{display:block;width:100%;overflow:visible}
 #cmp-crosshair{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.2);pointer-events:none;display:none}
 #cmp-tooltip{position:absolute;top:4px;background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap}
+.tele-empty{padding:40px var(--sp-6);color:var(--color-text-muted);font-size:var(--text-sm);text-align:center}
 </style>
 </head>
 <body>
@@ -4614,88 +4763,165 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
   <a href="#" id="bc-track">Track</a> &rsaquo;
   <span id="bc-sess">Session</span>
 </div>
-<div class="sess-hdr">
-  <div>
-    <div class="sess-title" id="hdr-track">Loading&hellip;</div>
-    <div class="sess-sub" id="hdr-sub"></div>
-  </div>
-  <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
-  <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
-  <span class="type-chip" id="hdr-type" style="display:none"></span>
-  <a id="tele-link" href="#" style="font-size:var(--text-xs);color:var(--accent-bd2);border:1px solid var(--accent-bd);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Telemetry &rarr;</a>
-  <a id="edit-sess-btn" href="#" style="font-size:var(--text-xs);color:var(--color-text-secondary);border:1px solid var(--color-border);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Edit</a>
+<div class="sess-tab-bar">
+  <button class="sess-tab" id="st-overview" onclick="switchTab('overview')">Overview</button>
+  <button class="sess-tab" id="st-telemetry" onclick="switchTab('telemetry')">Telemetry</button>
 </div>
-<div class="section">
-  <div class="section-lbl">Lap Times</div>
-  <table>
-    <thead><tr>
-      <th>Lap</th>
-      <th>Time</th>
-      <th>Max Spd</th>
-      <th>Thr%</th>
-      <th>Brk%</th>
-      <th>Avg Slip</th>
-      <th>Peak Slip</th>
-      <th>Slip&gt;0.1%</th>
-      <th></th>
-    </tr></thead>
-    <tbody id="lap-tbody"></tbody>
-  </table>
-</div>
-<div class="ai-section">
-  <div class="ai-lbl">AI Coaching</div>
-  <div>
-    <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
-    <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
-    <span class="ai-meta" id="ai-meta"></span>
-  </div>
-  <div class="ai-body" id="ai-body"></div>
-  <div class="ai-err" id="ai-err"></div>
-</div>
-<div class="cmp-panel" id="cmp-panel" style="display:none">
-  <div class="cmp-hdr">
-    <span class="cmp-meta" id="cmp-meta">Loading&hellip;</span>
-    <button class="cmp-close" onclick="closeCompare()" title="Close">&times;</button>
-  </div>
-  <div class="cmp-ctrl">
-    <select class="cmp-sel" id="cmp-lap-sel" onchange="onLapSelChange()"></select>
-    <select class="cmp-sel" id="cmp-ref-sel" onchange="onRefSelChange()"></select>
-    <div class="cmp-togg">
-      <label class="cmp-tog"><input type="checkbox" id="tog-throttle" checked onchange="renderCharts()"> Throttle</label>
-      <label class="cmp-tog"><input type="checkbox" id="tog-brake" checked onchange="renderCharts()"> Brake</label>
-      <label class="cmp-tog"><input type="checkbox" id="tog-speed" checked onchange="renderCharts()"> Speed</label>
-      <label class="cmp-tog"><input type="checkbox" id="tog-slip" checked onchange="renderCharts()"> Slip RL</label>
+<div class="lr-pills" id="lr-pills"></div>
+
+<!-- Overview tab -->
+<div id="tab-overview">
+  <div class="sess-hdr">
+    <div>
+      <div class="sess-title" id="hdr-track">Loading&hellip;</div>
+      <div class="sess-sub" id="hdr-sub"></div>
     </div>
+    <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
+    <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
+    <span class="type-chip" id="hdr-type" style="display:none"></span>
+    <a id="edit-sess-btn" href="#" style="font-size:var(--text-xs);color:var(--color-text-secondary);border:1px solid var(--color-border);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Edit</a>
   </div>
-  <div class="cmp-charts-wrap" id="cmp-charts-wrap">
-    <div id="cmp-crosshair"></div>
-    <div id="cmp-tooltip"></div>
-    <div id="cmp-charts-inner"></div>
-    <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">
-      <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+  <div class="layout">
+    <nav class="left-rail" id="left-rail">
+      <div class="lr-section-lbl">Circuits</div>
+      <div id="lr-items"></div>
+      <div class="lr-divider"></div>
+      <div class="lr-this" id="lr-this" style="display:none">
+        <div class="lr-this-lbl">This Session</div>
+        <div class="lr-this-car" id="lr-car"></div>
+        <div class="lr-this-badges" id="lr-badges"></div>
+      </div>
+    </nav>
+    <div class="main-content">
+      <div class="section">
+        <div class="section-lbl">Lap Times</div>
+        <table>
+          <thead><tr>
+            <th>Lap</th><th>Time</th><th>Max Spd</th><th>Thr%</th><th>Brk%</th>
+            <th>Avg Slip</th><th>Peak Slip</th><th>Slip&gt;0.1%</th><th></th>
+          </tr></thead>
+          <tbody id="lap-tbody"></tbody>
+        </table>
+      </div>
+      <div class="ai-section">
+        <div class="ai-lbl">AI Coaching</div>
+        <div>
+          <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
+          <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
+          <span class="ai-meta" id="ai-meta"></span>
+        </div>
+        <div class="ai-body" id="ai-body"></div>
+        <div class="ai-err" id="ai-err"></div>
+      </div>
     </div>
   </div>
 </div>
+
+<!-- Telemetry tab -->
+<div id="tab-telemetry" style="display:none">
+  <div class="tele-empty" id="tele-empty">Select a lap in the Overview tab to load telemetry comparison.</div>
+  <div class="cmp-panel" id="cmp-panel" style="display:none">
+    <div class="cmp-hdr">
+      <span class="cmp-meta" id="cmp-meta">Loading&hellip;</span>
+    </div>
+    <div class="cmp-ctrl">
+      <select class="cmp-sel" id="cmp-lap-sel" onchange="onLapSelChange()"></select>
+      <select class="cmp-sel" id="cmp-ref-sel" onchange="onRefSelChange()"></select>
+      <div class="cmp-togg">
+        <label class="cmp-tog"><input type="checkbox" id="tog-throttle" checked onchange="renderCharts()"> Throttle</label>
+        <label class="cmp-tog"><input type="checkbox" id="tog-brake" checked onchange="renderCharts()"> Brake</label>
+        <label class="cmp-tog"><input type="checkbox" id="tog-speed" checked onchange="renderCharts()"> Speed</label>
+        <label class="cmp-tog"><input type="checkbox" id="tog-slip" checked onchange="renderCharts()"> Slip RL</label>
+      </div>
+    </div>
+    <div class="cmp-charts-wrap" id="cmp-charts-wrap">
+      <div id="cmp-crosshair"></div>
+      <div id="cmp-tooltip"></div>
+      <div id="cmp-charts-inner"></div>
+      <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">
+        <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap'};
+const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Real Race',ai:'AI Race'};
+const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
 function scls(v){return v>0.25?'crit':v>0.12?'warn':'';}
-const _id=new URLSearchParams(location.search).get('id')||'';
-const _sgame=new URLSearchParams(location.search).get('game')||'';
-const _strack=new URLSearchParams(location.search).get('track')||'';
+const _qs=new URLSearchParams(location.search);
+const _id=_qs.get('id')||'';
+const _sgame=_qs.get('game')||'';
+const _strack=_qs.get('track')||'';
+const _initTab=_qs.get('tab')||'overview';
 const SGAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
-let _sess=null,_laps=[];
+let _sess=null,_laps=[],_allTracks=[];
+
+// ── Tab switching ─────────────────────────────────────────────
+function switchTab(tab){
+  document.getElementById('tab-overview').style.display=tab==='overview'?'':'none';
+  document.getElementById('tab-telemetry').style.display=tab==='telemetry'?'':'none';
+  document.getElementById('st-overview').classList.toggle('active',tab==='overview');
+  document.getElementById('st-telemetry').classList.toggle('active',tab==='telemetry');
+  const url=new URL(location.href);url.searchParams.set('tab',tab);history.replaceState({},'',url);
+}
+
 async function init(){
   if(!_id){location.href='/sessions';return;}
   let d;
   try{d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());}
   catch(e){document.getElementById('hdr-track').textContent='Session not found';return;}
   _sess=d.session;_laps=d.laps||[];
+  // Load left rail circuit list
+  const game=_sgame||_sess.game||'';
+  try{_allTracks=await fetch('/sessions/tracks'+(game?'?game='+encodeURIComponent(game):'')).then(r=>r.json());}catch(e){_allTracks=[];}
   renderHeader();
+  renderLeftRail();
   renderLaps();
   renderAI();
+  switchTab(_initTab);
 }
+
+function renderLeftRail(){
+  const s=_sess;
+  const game=_sgame||s.game||'';
+  const trackName=s.track&&s.track!=='unknown'?s.track:(_strack||'');
+  const items=document.getElementById('lr-items');
+  const pills=document.getElementById('lr-pills');
+  items.innerHTML=_allTracks.map(t=>{
+    const active=t.track===trackName;
+    const href='/sessions/track?name='+encodeURIComponent(t.track)+(game?'&game='+encodeURIComponent(game):'');
+    return`<a class="lr-item${active?' active':''}" href="${href}">
+      <div class="lr-name">${t.track==='unknown'?'Unknown':t.track}</div>
+      <div class="lr-sub">${t.session_count} session${t.session_count===1?'':'s'}</div>
+    </a>`;
+  }).join('');
+  pills.innerHTML=_allTracks.map(t=>{
+    const active=t.track===trackName;
+    const href='/sessions/track?name='+encodeURIComponent(t.track)+(game?'&game='+encodeURIComponent(game):'');
+    return`<a class="lr-pill${active?' active':''}" href="${href}">${t.track==='unknown'?'Unknown':t.track}</a>`;
+  }).join('');
+  // THIS SESSION block
+  const carName=s.car&&s.car!=='unknown'?s.car:null;
+  const cls=s.car_class!=null?CLASS_NAMES[s.car_class]:null;
+  const pi=s.car_pi;
+  const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
+  const thisBlock=document.getElementById('lr-this');
+  const carEl=document.getElementById('lr-car');
+  const badgesEl=document.getElementById('lr-badges');
+  if(carName||cls||pi||effType){
+    thisBlock.style.display='';
+    carEl.textContent=carName||'Unknown Car';
+    let badges='';
+    if(cls)badges+=`<span class="cc cc-${cls}">${cls}</span>`;
+    if(pi)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">PI ${pi}</span>`;
+    if(effType)badges+=`<span class="type-chip" style="font-size:.55rem">${TYPE_LABELS[effType]||effType}</span>`;
+    badgesEl.innerHTML=badges;
+  }
+}
+
 function renderHeader(){
   const s=_sess;
   const track=s.track&&s.track!=='unknown'?s.track:(_strack||'Unknown Track');
@@ -4719,11 +4945,6 @@ function renderHeader(){
   document.getElementById('hdr-laps').textContent=_laps.length;
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   if(effType){const el=document.getElementById('hdr-type');el.textContent=TYPE_LABELS[effType]||effType;el.style.display='';}
-  const teleLink=document.getElementById('tele-link');
-  let teleHref='/sessions/telemetry?id='+encodeURIComponent(_id);
-  if(game)teleHref+='&game='+encodeURIComponent(game);
-  if(track&&track!=='Unknown Track')teleHref+='&track='+encodeURIComponent(track);
-  teleLink.href=teleHref;teleLink.style.display='';
   const editBtn=document.getElementById('edit-sess-btn');
   editBtn.href='/?edit='+encodeURIComponent(_id);editBtn.style.display='';
 }
@@ -4927,6 +5148,8 @@ function setupCrosshair(delta){
 
 async function openCompare(lapN){
   _cmpLapN=lapN;
+  switchTab('telemetry');
+  document.getElementById('tele-empty').style.display='none';
   document.getElementById('cmp-panel').style.display='block';
   document.getElementById('cmp-meta').textContent='Loading…';
   document.getElementById('cmp-charts-inner').innerHTML='';
@@ -4955,7 +5178,7 @@ async function openCompare(lapN){
   _cmpRefType=refSel.value||'best_lap';
 
   await _loadAndRender();
-  document.getElementById('cmp-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('cmp-panel').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 async function _loadAndRender(){
@@ -4986,7 +5209,11 @@ async function onRefSelChange(){
   _cmpRefType=document.getElementById('cmp-ref-sel').value;
   await _loadAndRender();
 }
-function closeCompare(){document.getElementById('cmp-panel').style.display='none';}
+function closeCompare(){
+  document.getElementById('cmp-panel').style.display='none';
+  document.getElementById('tele-empty').style.display='';
+  switchTab('overview');
+}
 // ── End lap comparison ─────────────────────────────────────────────────────
 init();
 </script>
@@ -5086,7 +5313,10 @@ def _db_init():
             """)
             conn.commit()
             # Add columns introduced after initial schema — safe to re-run
-            for col, defn in [("grid_pos", "INTEGER"), ("finish_pos", "INTEGER"), ("track_ordinal", "INTEGER")]:
+            for col, defn in [
+                ("grid_pos", "INTEGER"), ("finish_pos", "INTEGER"),
+                ("track_ordinal", "INTEGER"), ("car_class", "INTEGER"), ("car_pi", "INTEGER"),
+            ]:
                 try:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {defn}")
                     conn.commit()
@@ -5270,8 +5500,8 @@ def _db_write_session(session_data: dict):
                 INSERT OR REPLACE INTO sessions
                 (session_id,game,track,car,session_type,race_type,
                  started_at,ended_at,packet_count,best_lap_time_s,lap_count,
-                 grid_pos,finish_pos,track_ordinal)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 grid_pos,finish_pos,track_ordinal,car_class,car_pi)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (sid,
                   session_data.get("game"), session_data.get("track"),
                   session_data.get("car"), session_data.get("session_type"),
@@ -5280,7 +5510,8 @@ def _db_write_session(session_data: dict):
                   session_data.get("packet_count", 0), session_data.get("best_lap_time_s"),
                   len(laps),
                   session_data.get("grid_pos"), session_data.get("finish_pos"),
-                  session_data.get("track_ordinal")))
+                  session_data.get("track_ordinal"),
+                  session_data.get("car_class"), session_data.get("car_pi")))
             conn.execute("DELETE FROM laps WHERE session_id=?", (sid,))
             for lap in laps:
                 conn.execute("""
@@ -5438,22 +5669,39 @@ def _db_tracks_index(game: Optional[str] = None) -> list:
             result = []
             for row in rows:
                 r = dict(row)
-                trend_params = [r["track"]]
-                trend_extra = ""
-                if game:
-                    trend_extra = " AND game=?"
-                    trend_params.append(game)
-                last3 = conn.execute(f"""
-                    SELECT best_lap_time_s FROM sessions
-                    WHERE track=? AND best_lap_time_s IS NOT NULL{trend_extra}
-                    ORDER BY started_at DESC LIMIT 3
-                """, trend_params).fetchall()
+                extra_where = (" AND game=?" if game else "")
+                extra_params_base = [r["track"]] + (([game]) if game else [])
+                last3 = conn.execute(
+                    f"SELECT best_lap_time_s FROM sessions WHERE track=? AND best_lap_time_s IS NOT NULL{extra_where} ORDER BY started_at DESC LIMIT 3",
+                    extra_params_base,
+                ).fetchall()
                 times = [l[0] for l in last3]
                 if len(times) >= 2 and times[0] is not None and times[1] is not None:
                     diff = times[0] - times[1]
                     r["trend"] = "dn" if diff > 0.5 else ("up" if diff < -0.5 else "fl")
                 else:
                     r["trend"] = "fl"
+                # Spark: best lap per session, chronological oldest→newest (up to 20)
+                spark_rows = conn.execute(
+                    f"SELECT best_lap_time_s FROM sessions WHERE track=? AND best_lap_time_s IS NOT NULL{extra_where} ORDER BY started_at ASC LIMIT 20",
+                    extra_params_base,
+                ).fetchall()
+                r["spark_laps"] = [sr[0] for sr in spark_rows]
+                # Avg finish position (race sessions only)
+                finish_row = conn.execute(
+                    f"SELECT AVG(finish_pos) FROM sessions WHERE track=? AND finish_pos IS NOT NULL{extra_where}",
+                    extra_params_base,
+                ).fetchone()
+                avg_f = finish_row[0] if finish_row else None
+                r["avg_finish"] = round(avg_f, 1) if avg_f is not None else None
+                # Car from best-lap session
+                best_car_row = conn.execute(
+                    f"SELECT car, car_class, car_pi FROM sessions WHERE track=? AND best_lap_time_s=?{extra_where} ORDER BY started_at DESC LIMIT 1",
+                    [r["track"], r["best_lap_time_s"]] + (([game]) if game else []),
+                ).fetchone()
+                r["best_car"] = best_car_row["car"] if best_car_row else None
+                r["best_car_class"] = best_car_row["car_class"] if best_car_row else None
+                r["best_car_pi"] = best_car_row["car_pi"] if best_car_row else None
                 result.append(r)
             return result
         finally:
@@ -5472,7 +5720,7 @@ def _db_track_sessions(track: str, game: Optional[str] = None) -> list:
             rows = conn.execute(f"""
                 SELECT session_id,game,track,car,session_type,race_type,
                        started_at,ended_at,best_lap_time_s,lap_count,
-                       ai_analyzed_at,ai_model
+                       ai_analyzed_at,ai_model,car_class,car_pi,finish_pos,grid_pos
                 FROM sessions {where} ORDER BY started_at DESC
             """, params).fetchall()
             result = []
@@ -6309,7 +6557,8 @@ async def handle_status(reader, writer):
                 try:
                     sess_row = conn.execute(
                         "SELECT session_id,game,track,car,session_type,race_type,started_at,ended_at,"
-                        "best_lap_time_s,lap_count,ai_analysis,ai_analyzed_at,ai_model "
+                        "best_lap_time_s,lap_count,ai_analysis,ai_analyzed_at,ai_model,"
+                        "car_class,car_pi,finish_pos,grid_pos "
                         "FROM sessions WHERE session_id=?", (sid,)
                     ).fetchone()
                 finally:
