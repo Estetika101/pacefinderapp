@@ -166,52 +166,97 @@ def _get_local_ips() -> list:
 FM_PACKET_SIZE    = 311  # Forza Motorsport 2023 / FM7 Car Dash
 FM_PACKET_SIZE_FH = 331  # Forza Horizon 4 / 5 Car Dash (adds tire wear + track ordinal)
 
-# Forza track ordinals — shared across FM7, FM2023, FH4, FH5 (user-verified)
-FORZA_TRACKS = {
-    # FH5 confirmed ordinals
-    860: "Brands Hatch Grand Prix",
-    # Unconfirmed — carried from earlier research, may be wrong for FH5
+# Populated by _load_forza_reference_data() at startup.
+# Hardcoded fallbacks below are merged as lowest-priority baseline.
+FORZA_TRACKS: dict = {}   # ordinal (int) -> track name (str)
+FORZA_CARS:   dict = {}   # ordinal (int) -> {name, manufacturer, year}
+
+# Hardcoded fallbacks (pre-CSV, FH5-era research). CSV data overrides these.
+_FORZA_TRACKS_FALLBACK = {
+    860: "Brands Hatch Tor Grand Prix",
     0:   "Test Track Airfield",
     1:   "Test Track Airfield Drag",
-    3:   "Top Gear Full Circuit",
-    6:   "Yas Marina South Circuit",
-    7:   "Yas Marina North Circuit",
-    9:   "Yas Marina Corkscrew",
-    10:  "Yas Marina Full Circuit",
-    12:  "Yas Marina North Corkscrew",
-    16:  "Nürburgring Grand Prix",
-    18:  "Le Mans Old Mulsanne Circuit",
-    21:  "Le Mans Full Circuit",
-    23:  "Circuit de Spa-Francorchamps",
-    25:  "Sebring Full Circuit",
-    36:  "Road America West Route",
-    38:  "Road America East Route",
-    39:  "Road America Full Circuit",
-    41:  "Watkins Glen Short Circuit",
-    45:  "Watkins Glen Full Circuit",
-    48:  "Road Atlanta Full Circuit",
-    53:  "Silverstone Grand Prix",
-    55:  "Silverstone National",
-    60:  "Brands Hatch Grand Prix (unconfirmed)",
-    62:  "Brands Hatch Indy Circuit (unconfirmed)",
-    66:  "Laguna Seca Full Circuit",
-    68:  "Homestead-Miami Speedway",
-    73:  "Mugello Full Circuit",
-    76:  "Catalunya Grand Prix",
-    78:  "Catalunya National Circuit",
-    83:  "Lime Rock Full Circuit",
-    67:  "Maple Valley Full Circuit",
-    86:  "Maple Valley Full Circuit",
-    92:  "Maple Valley Short Circuit",
-    112: "Mid-Ohio Sports Car Course",
-    113: "Eaglerock Speedway",
-    114: "Grand Oak Raceway",
-    115: "Hakone Circuit",
-    116: "Kyalami Grand Prix Circuit",
-    530: "Spa Full Circuit",
-    990: "Virginia International Raceway Full",
-    1630: "Grand Oak National Circuit",
 }
+
+
+def _load_forza_reference_data() -> None:
+    """Parse data/fm8_tracks.csv and data/fm8_cars.csv into FORZA_TRACKS / FORZA_CARS.
+
+    Precedence (highest first):
+      1. learned_track_ordinals from SQLite
+      2. fm8_tracks.csv data
+      3. _FORZA_TRACKS_FALLBACK hardcoded dict
+    """
+    import csv as _csv
+
+    global FORZA_TRACKS, FORZA_CARS
+
+    # Start with hardcoded fallbacks
+    merged: dict = dict(_FORZA_TRACKS_FALLBACK)
+
+    data_dir = Path(__file__).parent / "data"
+
+    # ── Tracks CSV ────────────────────────────────────────────────────────────
+    tracks_csv = data_dir / "fm8_tracks.csv"
+    track_count = 0
+    if tracks_csv.exists():
+        try:
+            with tracks_csv.open(encoding="utf-8") as fh:
+                for row in _csv.reader(fh):
+                    if not row or row[0].startswith("#"):
+                        continue
+                    if len(row) < 5:
+                        continue
+                    try:
+                        ordinal   = int(row[0].strip())
+                        name_part = row[1].strip()
+                        layout    = row[4].strip()
+                        display   = f"{name_part} {layout}" if layout else name_part
+                        merged[ordinal] = display
+                        track_count += 1
+                    except (ValueError, IndexError):
+                        continue
+        except Exception as exc:
+            log.warning(f"Could not parse fm8_tracks.csv: {exc}")
+
+    # ── Cars CSV ─────────────────────────────────────────────────────────────
+    cars_csv = data_dir / "fm8_cars.csv"
+    car_count = 0
+    cars: dict = {}
+    if cars_csv.exists():
+        try:
+            with cars_csv.open(encoding="utf-8") as fh:
+                for row in _csv.reader(fh):
+                    if not row or row[0].startswith("#"):
+                        continue
+                    if len(row) < 3:
+                        continue
+                    try:
+                        ordinal = int(row[0].strip())
+                        year    = int(row[1].strip())
+                        make    = row[2].strip()
+                        model   = row[3].strip() if len(row) > 3 else ""
+                        if not make:
+                            continue
+                        full_name = f"{year} {make} {model}".strip()
+                        cars[ordinal] = {"name": full_name, "manufacturer": make, "year": year}
+                        car_count += 1
+                    except (ValueError, IndexError):
+                        continue
+        except Exception as exc:
+            log.warning(f"Could not parse fm8_cars.csv: {exc}")
+
+    FORZA_CARS = cars
+
+    # ── Merge learned DB ordinals (highest priority) ──────────────────────────
+    try:
+        learned = _load_learned_track_ordinals()
+        merged.update(learned)
+    except Exception:
+        pass  # DB may not be init yet on first call
+
+    FORZA_TRACKS = merged
+    log.info(f"Loaded {track_count} FM tracks, {car_count} FM cars from reference data")
 
 # Ordinals seen in live packets but not in FORZA_TRACKS — logged once each
 _unknown_ordinals_seen: set = set()
@@ -769,8 +814,10 @@ class Session:
         self.race_type = None  # set post-session via /sessions/update
         self._race_positions: list[int] = []  # sampled positions for session type inference
         self.track_ordinal: Optional[int] = None  # raw ordinal for learned track mapping
-        self.car_class: Optional[int] = None   # 0=D 1=C 2=B 3=A 4=S1 5=S2 6=X
-        self.car_pi: Optional[int] = None      # performance index (100–999)
+        self.car_class: Optional[int] = None        # 0=D 1=C 2=B 3=A 4=S1 5=S2 6=X
+        self.car_pi: Optional[int] = None           # performance index (100–999)
+        self.car_manufacturer: Optional[str] = None # e.g. "Porsche"
+        self.car_year: Optional[int] = None         # e.g. 1997
         self.weather_condition: Optional[str] = None
         self.track_temp_c: Optional[float] = None
         self.air_temp_c: Optional[float] = None
@@ -846,7 +893,14 @@ class Session:
         if parsed.get("session_type", "unknown") != "unknown":
             self.session_type = parsed["session_type"]
         if "car_ordinal" in parsed and self.car == "unknown":
-            self.car = str(parsed["car_ordinal"])
+            ordinal = parsed["car_ordinal"]
+            car_info = FORZA_CARS.get(ordinal)
+            if car_info:
+                self.car              = car_info["name"]
+                self.car_manufacturer = car_info["manufacturer"]
+                self.car_year         = car_info["year"]
+            else:
+                self.car = str(ordinal)
 
         # Sample race_position for session type inference at close()
         # F1: comes from merged LapData; Forza: from packet directly
@@ -959,6 +1013,8 @@ class Session:
             "track_ordinal":      self.track_ordinal,
             "car_class":          self.car_class,
             "car_pi":             self.car_pi,
+            "car_manufacturer":   self.car_manufacturer,
+            "car_year":           self.car_year,
             "weather_condition":  self.weather_condition,
             "track_temp_c":       self.track_temp_c,
             "air_temp_c":         self.air_temp_c,
@@ -5131,21 +5187,24 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .ai-err{color:var(--danger);font-size:.8rem;margin-top:var(--sp-3);display:none}
 .btn-cmp{background:none;border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:inherit;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-sm);cursor:pointer;letter-spacing:.5px;white-space:nowrap}
 .btn-cmp:hover{border-color:var(--n-300);color:var(--text)}
-.cmp-panel{border:1px solid var(--surface-bd);border-radius:6px;background:var(--bg-raised);overflow:hidden;margin:var(--sp-4) var(--sp-5)}
-.cmp-hdr{display:flex;align-items:center;padding:10px var(--sp-5);border-bottom:1px solid var(--border-sub);gap:var(--sp-3)}
-.cmp-meta{font-size:.76rem;color:var(--n-200);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmp-ctrl{display:flex;align-items:center;gap:var(--sp-4);padding:8px var(--sp-5);border-bottom:1px solid var(--border-sub);flex-wrap:wrap}
-.cmp-sel{background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-family:inherit;font-size:.78rem;padding:4px 8px;border-radius:4px;max-width:280px}
-.cmp-togg{display:flex;gap:var(--sp-3);margin-left:auto;flex-wrap:wrap}
-.cmp-tog{display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--n-200);cursor:pointer;user-select:none}
-.cmp-tog input{accent-color:var(--accent);width:11px;height:11px}
-.cmp-charts-wrap{position:relative;padding:var(--sp-3) var(--sp-5) var(--sp-2)}
 .chart-row{margin-bottom:6px}
 .chart-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px}
 .chart-svg{display:block;width:100%;overflow:visible}
-#cmp-crosshair{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.2);pointer-events:none;display:none}
-#cmp-tooltip{position:absolute;top:4px;background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap}
-.tele-empty{padding:40px var(--sp-6);color:var(--color-text-muted);font-size:var(--text-sm);text-align:center}
+.tele-layout{display:flex;min-height:420px}
+.tele-sidebar{width:190px;flex-shrink:0;border-right:1px solid var(--color-border);padding:10px 0;overflow-y:auto;max-height:calc(100vh - 120px);position:sticky;top:120px}
+.tele-content{flex:1;min-width:0;padding:var(--sp-4) var(--sp-5)}
+.tele-sec-hdr{font-size:.58rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.12em;padding:8px 14px 4px;margin-top:6px}
+.tele-lap-item{display:flex;align-items:center;gap:7px;padding:5px 14px;font-size:.72rem;color:var(--color-text-secondary);cursor:pointer;user-select:none}
+.tele-lap-item:hover{background:var(--color-surface)}
+.tele-lap-item input[type=checkbox]{accent-color:var(--color-accent);width:11px;height:11px;flex-shrink:0}
+.tele-lap-best{color:var(--accent-soft)!important}
+.tele-lap-time{color:var(--color-text-muted);font-size:.66rem;margin-left:auto}
+.tele-ref-sel{width:calc(100% - 28px);margin:2px 14px 0;background:var(--color-surface-2,var(--color-surface));border:1px solid var(--color-border);color:var(--color-text-primary);font-family:inherit;font-size:.7rem;padding:4px 7px;border-radius:4px}
+.tele-ch-item{display:flex;align-items:center;gap:7px;padding:4px 14px;font-size:.72rem;color:var(--color-text-secondary);cursor:pointer;user-select:none}
+.tele-ch-item input[type=checkbox]{accent-color:var(--color-accent);width:11px;height:11px;flex-shrink:0}
+.tele-xaxis{display:flex;margin:4px 14px 0;border:1px solid var(--color-border);border-radius:4px;overflow:hidden}
+.txa-btn{flex:1;background:none;border:none;color:var(--color-text-muted);font-family:inherit;font-size:.66rem;padding:4px 0;cursor:pointer;text-align:center;transition:background .12s,color .12s}
+.txa-btn.active{background:var(--color-surface);color:var(--color-text-primary)}
 </style>
 </head>
 <body>
@@ -5225,27 +5284,36 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 
 <!-- Telemetry tab -->
 <div id="tab-telemetry" style="display:none">
-  <div class="tele-empty" id="tele-empty">Select a lap in the Overview tab to load telemetry comparison.</div>
-  <div class="cmp-panel" id="cmp-panel" style="display:none">
-    <div class="cmp-hdr">
-      <span class="cmp-meta" id="cmp-meta">Loading&hellip;</span>
-    </div>
-    <div class="cmp-ctrl">
-      <select class="cmp-sel" id="cmp-lap-sel" onchange="onLapSelChange()"></select>
-      <select class="cmp-sel" id="cmp-ref-sel" onchange="onRefSelChange()"></select>
-      <div class="cmp-togg">
-        <label class="cmp-tog"><input type="checkbox" id="tog-throttle" checked onchange="renderCharts()"> Throttle</label>
-        <label class="cmp-tog"><input type="checkbox" id="tog-brake" checked onchange="renderCharts()"> Brake</label>
-        <label class="cmp-tog"><input type="checkbox" id="tog-speed" checked onchange="renderCharts()"> Speed</label>
-        <label class="cmp-tog"><input type="checkbox" id="tog-slip" checked onchange="renderCharts()"> Slip RL</label>
+  <div class="tele-layout">
+    <div class="tele-sidebar">
+      <div class="tele-sec-hdr">Laps</div>
+      <div id="tele-lap-list"></div>
+      <div class="tele-sec-hdr">Reference</div>
+      <select class="tele-ref-sel" id="tele-ref-sel" onchange="onTeleRefChange()">
+        <option value="">None</option>
+        <option value="best_lap" selected>My Best Lap</option>
+        <option value="theoretical">Theoretical Best</option>
+      </select>
+      <div class="tele-sec-hdr">Channels</div>
+      <label class="tele-ch-item"><input type="checkbox" id="tch-speed" checked onchange="renderTeleCharts()"> Speed</label>
+      <label class="tele-ch-item"><input type="checkbox" id="tch-throttle" checked onchange="renderTeleCharts()"> Throttle</label>
+      <label class="tele-ch-item"><input type="checkbox" id="tch-brake" checked onchange="renderTeleCharts()"> Brake</label>
+      <label class="tele-ch-item"><input type="checkbox" id="tch-gear" checked onchange="renderTeleCharts()"> Gear</label>
+      <label class="tele-ch-item"><input type="checkbox" id="tch-steering" checked onchange="renderTeleCharts()"> Steering</label>
+      <label class="tele-ch-item"><input type="checkbox" id="tch-slip" checked onchange="renderTeleCharts()"> Slip</label>
+      <label class="tele-ch-item"><input type="checkbox" id="tch-tyres" onchange="renderTeleCharts()"> Tyres</label>
+      <div class="tele-sec-hdr">X Axis</div>
+      <div class="tele-xaxis">
+        <button class="txa-btn active" id="txa-dist" onclick="setTeleXAxis('distance')">Distance</button>
+        <button class="txa-btn" id="txa-time" onclick="setTeleXAxis('time')">Time</button>
       </div>
     </div>
-    <div class="cmp-charts-wrap" id="cmp-charts-wrap">
-      <div id="cmp-crosshair"></div>
-      <div id="cmp-tooltip"></div>
-      <div id="cmp-charts-inner"></div>
-      <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">
-        <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+    <div class="tele-content">
+      <div id="tele-status" style="color:var(--color-text-muted);font-size:var(--text-sm);text-align:center;padding:60px 0"></div>
+      <div id="tele-charts-wrap" style="position:relative">
+        <div id="tele-crosshair" style="position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.18);pointer-events:none;display:none"></div>
+        <div id="tele-tooltip" style="position:absolute;top:4px;background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text-primary);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap;z-index:5"></div>
+        <div id="tele-charts-inner"></div>
       </div>
     </div>
   </div>
@@ -5266,12 +5334,14 @@ const SGAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
 let _sess=null,_laps=[],_allTracks=[];
 
 // ── Tab switching ─────────────────────────────────────────────
+let _teleInited=false;
 function switchTab(tab){
   document.getElementById('tab-overview').style.display=tab==='overview'?'':'none';
   document.getElementById('tab-telemetry').style.display=tab==='telemetry'?'':'none';
   document.getElementById('st-overview').classList.toggle('active',tab==='overview');
   document.getElementById('st-telemetry').classList.toggle('active',tab==='telemetry');
   const url=new URL(location.href);url.searchParams.set('tab',tab);history.replaceState({},'',url);
+  if(tab==='telemetry'&&!_teleInited){_teleInited=true;initTeleTab();}
 }
 
 async function init(){
@@ -5426,219 +5496,209 @@ async function runAnalysis(force){
     rbtn.disabled=false;if(!_sess.ai_analysis)rbtn.style.display='none';
   }
 }
-// ── Lap comparison ────────────────────────────────────────────────────────
-let _cmpLapN=null,_cmpRefType='best_lap',_refs=null;
-let _cmpLapSamples=null,_cmpRefSamples=null;
+// ── Telemetry tab (self-contained) ─────────────────────────────────────────
+const _TELE_COLORS=['#60a5fa','#f87171','#34d399','#fb923c'];
+let _teleSelLaps=new Set(); // Set<lapNumber>
+let _teleRefType='best_lap';
+let _teleRefs=null;
+let _teleLapData={};       // lapN -> samples[]|null
+let _teleRefSamples=null;
+let _teleXAxis='distance';
 
-function interpAt(samples,norm,field){
-  if(!samples||!samples.length)return 0;
-  let lo=0,hi=samples.length-1;
-  while(lo<hi-1){const mid=(lo+hi)>>1;if(samples[mid].distance_norm<=norm)lo=mid;else hi=mid;}
-  const a=samples[lo],b=samples[hi];
-  const dn=b.distance_norm-a.distance_norm;
-  if(dn<1e-9)return a[field]??0;
-  const f=(norm-a.distance_norm)/dn;
-  return (a[field]??0)+f*((b[field]??0)-(a[field]??0));
+function _teleBestLap(){
+  return _laps.reduce((b,l)=>(!l.lap_time_s||l.lap_number===0)?b:(!b||l.lap_time_s<b.lap_time_s?l:b),null);
 }
 
-function buildDelta(lapS,refS,N=400){
-  const out=[];
-  for(let i=0;i<=N;i++){
-    const norm=i/N;
-    out.push({norm,delta:interpAt(lapS,norm,'t')-interpAt(refS,norm,'t')});
+function renderTeleLapList(){
+  const best=_teleBestLap();
+  const valid=_laps.filter(l=>l.lap_number>0&&l.lap_time_s);
+  document.getElementById('tele-lap-list').innerHTML=valid.map(l=>{
+    const isBest=best&&l.lap_number===best.lap_number;
+    const chk=_teleSelLaps.has(l.lap_number)?'checked':'';
+    const colorIdx=[..._teleSelLaps].indexOf(l.lap_number);
+    const dot=colorIdx>=0?`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${_TELE_COLORS[colorIdx]};flex-shrink:0"></span>`:'<span style="display:inline-block;width:8px;height:8px;flex-shrink:0"></span>';
+    return`<label class="tele-lap-item">
+      <input type="checkbox" ${chk} onchange="onTeleLapToggle(${l.lap_number},this.checked)">
+      ${dot}
+      <span class="${isBest?'tele-lap-best':''}">Lap ${l.lap_number}${isBest?' ★':''}</span>
+      <span class="tele-lap-time">${fmtLap(l.lap_time_s)}</span>
+    </label>`;
+  }).join('');
+}
+
+async function initTeleTab(){
+  const best=_teleBestLap();
+  renderTeleLapList();
+  // Load reference metadata
+  if(!_teleRefs){
+    try{_teleRefs=await fetch('/sessions/references?track='+encodeURIComponent(_sess.track||'')+'&game='+encodeURIComponent(_sess.game||'')).then(r=>r.json());}
+    catch(e){_teleRefs={};}
   }
-  return out;
+  // Populate reference selector
+  const refSel=document.getElementById('tele-ref-sel');
+  refSel.innerHTML='<option value="">None</option>';
+  if(_teleRefs.best_lap)
+    refSel.innerHTML+=`<option value="best_lap">My Best Lap (${fmtLap(_teleRefs.best_lap.lap_time_s)})</option>`;
+  if(_teleRefs.theoretical)
+    refSel.innerHTML+=`<option value="theoretical">Theoretical Best (${fmtLap(_teleRefs.theoretical.theoretical_best_s)})</option>`;
+  refSel.value=(_teleRefs.best_lap||_teleRefs.theoretical)?_teleRefType:'';
+  _teleRefType=refSel.value;
+  // Auto-select best lap on first open
+  if(best&&_teleSelLaps.size===0){
+    _teleSelLaps.add(best.lap_number);
+    renderTeleLapList();
+  }
+  await loadTeleData();
 }
 
-function autoRange(a,b,field,pad=0.08){
+async function onTeleLapToggle(lapN,checked){
+  if(checked){
+    if(_teleSelLaps.size>=4){const f=_teleSelLaps.values().next().value;_teleSelLaps.delete(f);delete _teleLapData[f];}
+    _teleSelLaps.add(lapN);
+  }else{
+    _teleSelLaps.delete(lapN);
+    delete _teleLapData[lapN];
+  }
+  renderTeleLapList();
+  await loadTeleData();
+}
+
+async function onTeleRefChange(){
+  _teleRefType=document.getElementById('tele-ref-sel').value;
+  _teleRefSamples=null;
+  await loadTeleData();
+}
+
+function setTeleXAxis(axis){
+  _teleXAxis=axis;
+  document.getElementById('txa-dist').classList.toggle('active',axis==='distance');
+  document.getElementById('txa-time').classList.toggle('active',axis==='time');
+  renderTeleCharts();
+}
+
+async function loadTeleData(){
+  const st=document.getElementById('tele-status');
+  if(_teleSelLaps.size===0){
+    st.textContent='Select at least one lap.';st.style.display='';
+    document.getElementById('tele-charts-inner').innerHTML='';
+    return;
+  }
+  st.textContent='Loading…';st.style.display='';
+  // Fetch missing laps
+  const toLoad=[..._teleSelLaps].filter(n=>!Object.prototype.hasOwnProperty.call(_teleLapData,n));
+  if(toLoad.length){
+    await Promise.all(toLoad.map(async n=>{
+      try{const d=await fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_id)+'&lap='+n).then(r=>r.json());
+        _teleLapData[n]=d&&d.length?d:null;}
+      catch(e){_teleLapData[n]=null;}
+    }));
+  }
+  // Fetch reference
+  if(_teleRefType&&!_teleRefSamples){
+    try{const d=await fetch('/sessions/reference-samples?track='+encodeURIComponent(_sess.track||'')+'&type='+_teleRefType).then(r=>r.json());
+      _teleRefSamples=d&&d.length?d:null;}
+    catch(e){_teleRefSamples=null;}
+  }else if(!_teleRefType){_teleRefSamples=null;}
+  st.style.display='none';
+  renderTeleCharts();
+}
+
+function _teleXVal(s){return _teleXAxis==='distance'?s.distance_norm:(s.t??0);}
+function _teleXMax(){
+  if(_teleXAxis==='distance')return 1;
+  let mx=0;
+  for(const n of _teleSelLaps){const s=_teleLapData[n];if(s&&s.length)mx=Math.max(mx,s[s.length-1].t??0);}
+  if(_teleRefSamples&&_teleRefSamples.length)mx=Math.max(mx,_teleRefSamples[_teleRefSamples.length-1].t??0);
+  return mx||1;
+}
+function _teleAutoRange(field,lapNums,ref){
   let mn=Infinity,mx=-Infinity;
-  for(const s of [...a,...b]){const v=s[field]??0;if(v<mn)mn=v;if(v>mx)mx=v;}
-  if(!isFinite(mn)){mn=0;mx=1;}
-  if(mn===mx){mn-=1;mx+=1;}
-  const p=(mx-mn)*pad;
-  return[mn-p,mx+p];
+  for(const n of lapNums){const s=_teleLapData[n];if(!s)continue;for(const p of s){const v=p[field]??0;if(v<mn)mn=v;if(v>mx)mx=v;}}
+  if(ref)for(const p of ref){const v=p[field]??0;if(v<mn)mn=v;if(v>mx)mx=v;}
+  if(!isFinite(mn)){mn=0;mx=1;}if(mn===mx){mn-=1;mx+=1;}
+  const pad=(mx-mn)*0.06;return[mn-pad,mx+pad];
 }
-
-function svgPath(samples,field,W,H,mn,mx){
+function _teleSvgPath(samples,field,W,H,mn,mx,xMax){
   const yr=mx-mn||1;
   return'M'+samples.map(s=>{
-    const x=(s.distance_norm*W).toFixed(1);
+    const x=((_teleXVal(s)/xMax)*W).toFixed(1);
     const y=(H-((s[field]??mn)-mn)/yr*H).toFixed(1);
     return x+','+y;
   }).join('L');
 }
-
-function deltaSVG(delta,W=1000,H=48){
-  const zY=H/2;
-  const maxA=Math.max(...delta.map(d=>Math.abs(d.delta)),0.001);
-  const scale=(H/2-4)/maxA;
-  const pts=delta.map(d=>({x:d.norm*W,y:zY-d.delta*scale}));
-  // Build sign-segmented filled polygons
-  let segs=[],cur=null;
-  for(let i=0;i<pts.length;i++){
-    const sg=delta[i].delta<0?'g':'r';
-    if(!cur||cur.sg!==sg){if(cur)segs.push(cur);cur={sg,idx:[i]};}
-    else cur.idx.push(i);
+function _teleChannelSVG(field,H,mn,mx,xMax,lapNums,W=1000){
+  let paths='';
+  lapNums.forEach((n,i)=>{
+    const s=_teleLapData[n];if(!s)return;
+    const p=_teleSvgPath(s,field,W,H,mn,mx,xMax);
+    paths+=`<path d="${p}" fill="none" stroke="${_TELE_COLORS[i%4]}" stroke-width="1.8" stroke-linejoin="round"/>`;
+  });
+  if(_teleRefSamples){
+    const p=_teleSvgPath(_teleRefSamples,field,W,H,mn,mx,xMax);
+    paths+=`<path d="${p}" fill="none" stroke="#888" stroke-width="1.2" stroke-dasharray="5,3" opacity=".55"/>`;
   }
-  if(cur)segs.push(cur);
-  const polys=segs.map(s=>{
-    const fc=s.sg==='g'?'#22c55e':'#ef4444';
-    const trace=s.idx.map(i=>`${pts[i].x.toFixed(1)},${pts[i].y.toFixed(1)}`);
-    const close=[`${pts[s.idx[s.idx.length-1]].x.toFixed(1)},${zY}`,`${pts[s.idx[0]].x.toFixed(1)},${zY}`];
-    return `<polygon points="${[...trace,...close].join(' ')}" fill="${fc}44" stroke="${fc}" stroke-width="1.5" stroke-linejoin="round"/>`;
-  }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}" class="chart-svg">
-    <line x1="0" y1="${zY}" x2="${W}" y2="${zY}" stroke="#333" stroke-width="1"/>
-    ${polys}
-  </svg>`;
+  return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}" class="chart-svg">${paths}</svg>`;
 }
 
-function channelSVG(lapS,refS,field,color,W=1000,H=72,mn=null,mx=null,thresh=null){
-  if(mn===null)[mn,mx]=autoRange(lapS,refS,field);
-  const lp=svgPath(lapS,field,W,H,mn,mx);
-  const rp=svgPath(refS,field,W,H,mn,mx);
-  let th='';
-  if(thresh!=null){
-    const ty=(H-((thresh-mn)/(mx-mn||1))*H).toFixed(1);
-    th=`<line x1="0" y1="${ty}" x2="${W}" y2="${ty}" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>`;
+function renderTeleCharts(){
+  const lapNums=[..._teleSelLaps].filter(n=>_teleLapData[n]);
+  const inner=document.getElementById('tele-charts-inner');
+  if(!lapNums.length){
+    inner.innerHTML='<div style="color:var(--color-text-muted);padding:40px;text-align:center">No sample data — samples are only stored for laps within 102% of session best.</div>';
+    return;
   }
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}" class="chart-svg">
-    ${th}
-    <path d="${rp}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".55"/>
-    <path d="${lp}" fill="none" stroke="${color}" stroke-width="2"/>
-  </svg>`;
-}
-
-function renderCharts(){
-  if(!_cmpLapSamples||!_cmpRefSamples)return;
-  const lapS=_cmpLapSamples,refS=_cmpRefSamples;
-  const delta=buildDelta(lapS,refS);
-  const finalD=delta[delta.length-1].delta;
-  const sign=finalD<0?'−':'+';
-
-  // Meta label
-  const lap=_laps.find(l=>l.lap_number===_cmpLapN)||{};
-  let refLabel=_cmpRefType==='best_lap'?'Best Lap':'Theoretical Best';
-  if(_refs){
-    if(_cmpRefType==='best_lap'&&_refs.best_lap)
-      refLabel=`Best Lap — ${_refs.best_lap.session_date} (${fmtLap(_refs.best_lap.lap_time_s)})`;
-    else if(_cmpRefType==='theoretical'&&_refs.theoretical)
-      refLabel=`Theoretical Best — ${fmtLap(_refs.theoretical.theoretical_best_s)}`;
-  }
-  document.getElementById('cmp-meta').textContent=
-    `Lap ${_cmpLapN} (${fmtLap(lap.lap_time_s)}) vs ${refLabel}  ·  Δ${sign}${Math.abs(finalD).toFixed(3)}s`;
-
+  const xMax=_teleXMax();
+  const chk=id=>document.getElementById(id)?.checked;
   const rows=[];
-  rows.push(`<div class="chart-row"><div class="chart-lbl">Delta — solid faster · dashed slower</div>${deltaSVG(delta)}</div>`);
-  if(document.getElementById('tog-throttle').checked)
-    rows.push(`<div class="chart-row"><div class="chart-lbl">Throttle %</div>${channelSVG(lapS,refS,'throttle_pct','#22c55e',1000,68,0,100)}</div>`);
-  if(document.getElementById('tog-brake').checked)
-    rows.push(`<div class="chart-row"><div class="chart-lbl">Brake %</div>${channelSVG(lapS,refS,'brake_pct','#ef4444',1000,68,0,100)}</div>`);
-  if(document.getElementById('tog-speed').checked)
-    rows.push(`<div class="chart-row"><div class="chart-lbl">Speed mph</div>${channelSVG(lapS,refS,'speed_mph','#4a9aef',1000,68)}</div>`);
-  if(document.getElementById('tog-slip').checked)
-    rows.push(`<div class="chart-row"><div class="chart-lbl">Slip RL</div>${channelSVG(lapS,refS,'slip_rl','#f59e0b',1000,68,null,null,0.1)}</div>`);
-
-  document.getElementById('cmp-charts-inner').innerHTML=rows.join('');
-  setupCrosshair(delta);
-}
-
-function setupCrosshair(delta){
-  const wrap=document.getElementById('cmp-charts-wrap');
-  const inner=document.getElementById('cmp-charts-inner');
-  const line=document.getElementById('cmp-crosshair');
-  const tip=document.getElementById('cmp-tooltip');
-  // crosshair height = inner content only
-  inner.onmousemove=(e)=>{
-    const rect=inner.getBoundingClientRect();
-    const x=e.clientX-rect.left;
-    const pct=Math.max(0,Math.min(1,x/rect.width));
-    // Position relative to wrap
-    const wrapRect=wrap.getBoundingClientRect();
-    const wx=e.clientX-wrapRect.left;
-    line.style.left=wx+'px';
-    line.style.display='block';
-    const idx=Math.round(pct*(delta.length-1));
-    const d=delta[idx];
-    if(d){
-      const ds=d.delta<0?'−':'+';
-      tip.textContent=`${(pct*100).toFixed(0)}%  Δ${ds}${Math.abs(d.delta).toFixed(3)}s`;
-      tip.style.left=Math.min(wx+10,wrapRect.width-130)+'px';
-      tip.style.display='block';
-    }
+  // Legend
+  const legend=lapNums.map((n,i)=>{
+    const l=_laps.find(x=>x.lap_number===n);
+    return`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px"><span style="width:12px;height:2px;background:${_TELE_COLORS[i]};display:inline-block;border-radius:1px"></span><span style="font-size:.65rem;color:var(--color-text-secondary)">Lap ${n} ${l?fmtLap(l.lap_time_s):''}</span></span>`;
+  }).join('')+(_teleRefSamples?'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#888;display:inline-block;border-radius:1px;border-top:1px dashed #888"></span><span style="font-size:.65rem;color:var(--color-text-muted)">Ref</span></span>':'');
+  rows.push(`<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-border-subtle)">${legend}</div>`);
+  if(chk('tch-speed')){const[mn,mx]=_teleAutoRange('speed_mph',lapNums,_teleRefSamples);rows.push(`<div class="chart-row"><div class="chart-lbl">Speed mph</div>${_teleChannelSVG('speed_mph',72,mn,mx,xMax,lapNums)}</div>`);}
+  if(chk('tch-throttle'))rows.push(`<div class="chart-row"><div class="chart-lbl">Throttle %</div>${_teleChannelSVG('throttle_pct',68,0,100,xMax,lapNums)}</div>`);
+  if(chk('tch-brake'))rows.push(`<div class="chart-row"><div class="chart-lbl">Brake %</div>${_teleChannelSVG('brake_pct',68,0,100,xMax,lapNums)}</div>`);
+  if(chk('tch-gear')){const[mn,mx]=_teleAutoRange('gear',lapNums,null);rows.push(`<div class="chart-row"><div class="chart-lbl">Gear</div>${_teleChannelSVG('gear',52,Math.floor(mn),Math.ceil(mx),xMax,lapNums)}</div>`);}
+  if(chk('tch-steering')){const[mn,mx]=_teleAutoRange('steer',lapNums,null);rows.push(`<div class="chart-row"><div class="chart-lbl">Steering</div>${_teleChannelSVG('steer',60,mn,mx,xMax,lapNums)}</div>`);}
+  if(chk('tch-slip')){const[,mx]=_teleAutoRange('slip_rl',lapNums,null);rows.push(`<div class="chart-row"><div class="chart-lbl">Slip RL</div>${_teleChannelSVG('slip_rl',60,0,Math.max(mx,0.1),xMax,lapNums)}</div>`);}
+  if(chk('tch-tyres')){
+    const f=lapNums.some(n=>_teleLapData[n]?.some(s=>s.tyre_core_temp_rl!=null))?'tyre_core_temp_rl':
+              lapNums.some(n=>_teleLapData[n]?.some(s=>s.tyre_surface_temp_rl!=null))?'tyre_surface_temp_rl':null;
+    if(f){const[mn,mx]=_teleAutoRange(f,lapNums,null);rows.push(`<div class="chart-row"><div class="chart-lbl">Tyre Temp RL</div>${_teleChannelSVG(f,60,mn,mx,xMax,lapNums)}</div>`);}
+    else rows.push(`<div class="chart-row" style="color:var(--color-text-muted);font-size:.7rem;padding:6px 0">No tyre temperature data for this session.</div>`);
+  }
+  // X ticks
+  const ticks=[0,.25,.5,.75,1].map(f=>{
+    if(_teleXAxis==='distance')return`<span>${(f*100).toFixed(0)}%</span>`;
+    const t=f*xMax,m=Math.floor(t/60);
+    return`<span>${m}:${(t%60).toFixed(0).padStart(2,'0')}</span>`;
+  }).join('');
+  rows.push(`<div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">${ticks}</div>`);
+  inner.innerHTML=rows.join('');
+  // Crosshair
+  const wrap=document.getElementById('tele-charts-wrap'),line=document.getElementById('tele-crosshair'),tip=document.getElementById('tele-tooltip');
+  inner.onmousemove=e=>{
+    const r=inner.getBoundingClientRect(),pct=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+    const wr=wrap.getBoundingClientRect(),wx=e.clientX-wr.left;
+    line.style.left=wx+'px';line.style.display='block';
+    const lbl=_teleXAxis==='distance'?`${(pct*100).toFixed(0)}%`:(()=>{const t=pct*xMax,m=Math.floor(t/60);return`${m}:${(t%60).toFixed(1).padStart(4,'0')}`;})();
+    tip.textContent=lbl;tip.style.left=Math.min(wx+10,wr.width-80)+'px';tip.style.display='block';
   };
   inner.onmouseleave=()=>{line.style.display='none';tip.style.display='none';};
 }
 
-async function openCompare(lapN){
-  _cmpLapN=lapN;
+function openCompare(lapN){
+  if(!_teleInited){_teleInited=true;switchTab('telemetry');return;}
   switchTab('telemetry');
-  document.getElementById('tele-empty').style.display='none';
-  document.getElementById('cmp-panel').style.display='block';
-  document.getElementById('cmp-meta').textContent='Loading…';
-  document.getElementById('cmp-charts-inner').innerHTML='';
-
-  // Load reference metadata once
-  if(!_refs){
-    try{_refs=await fetch('/sessions/references?track='+encodeURIComponent(_sess.track||'')
-      +'&game='+encodeURIComponent(_sess.game||'')).then(r=>r.json());}
-    catch(e){_refs={};}
+  if(!_teleSelLaps.has(lapN)){
+    if(_teleSelLaps.size>=4){const f=_teleSelLaps.values().next().value;_teleSelLaps.delete(f);delete _teleLapData[f];}
+    _teleSelLaps.add(lapN);
+    renderTeleLapList();
+    loadTeleData();
   }
-
-  // Populate selectors
-  const lapSel=document.getElementById('cmp-lap-sel');
-  lapSel.innerHTML=_laps.filter(l=>l.lap_time_s).map(l=>
-    `<option value="${l.lap_number}"${l.lap_number===lapN?' selected':''}>Lap ${l.lap_number} — ${fmtLap(l.lap_time_s)}</option>`
-  ).join('');
-
-  const refSel=document.getElementById('cmp-ref-sel');
-  refSel.innerHTML='';
-  if(_refs.best_lap)
-    refSel.innerHTML+=`<option value="best_lap">Best Lap — ${_refs.best_lap.session_date} (${fmtLap(_refs.best_lap.lap_time_s)})</option>`;
-  if(_refs.theoretical)
-    refSel.innerHTML+=`<option value="theoretical">Theoretical Best — ${fmtLap(_refs.theoretical.theoretical_best_s)}</option>`;
-  if(!refSel.options.length)
-    refSel.innerHTML='<option value="">No reference data yet</option>';
-  _cmpRefType=refSel.value||'best_lap';
-
-  await _loadAndRender();
-  document.getElementById('cmp-panel').scrollIntoView({behavior:'smooth',block:'start'});
 }
-
-async function _loadAndRender(){
-  _cmpLapSamples=null;_cmpRefSamples=null;
-  const inner=document.getElementById('cmp-charts-inner');
-  inner.innerHTML='<div style="color:var(--n-400);padding:20px;text-align:center">Loading samples…</div>';
-  const [lapD,refD]=await Promise.all([
-    fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_id)+'&lap='+_cmpLapN).then(r=>r.json()).catch(()=>null),
-    _cmpRefType?fetch('/sessions/reference-samples?track='+encodeURIComponent(_sess.track||'')+'&type='+_cmpRefType).then(r=>r.json()).catch(()=>null):null,
-  ]);
-  if(!lapD||!lapD.length){
-    inner.innerHTML='<div style="color:var(--n-400);padding:20px;text-align:center">No sample data for this lap — samples are only stored for laps within 102% of session best.</div>';
-    return;
-  }
-  if(!refD||!refD.length){
-    inner.innerHTML='<div style="color:var(--n-400);padding:20px;text-align:center">No reference data for this track yet. Close more sessions at this track to build references.</div>';
-    return;
-  }
-  _cmpLapSamples=lapD;_cmpRefSamples=refD;
-  renderCharts();
-}
-
-async function onLapSelChange(){
-  _cmpLapN=parseInt(document.getElementById('cmp-lap-sel').value);
-  await _loadAndRender();
-}
-async function onRefSelChange(){
-  _cmpRefType=document.getElementById('cmp-ref-sel').value;
-  await _loadAndRender();
-}
-function closeCompare(){
-  document.getElementById('cmp-panel').style.display='none';
-  document.getElementById('tele-empty').style.display='';
-  switchTab('overview');
-}
-// ── End lap comparison ─────────────────────────────────────────────────────
+// ── End telemetry tab ───────────────────────────────────────────────────────
 init();
 </script>
 </body>
@@ -5741,6 +5801,7 @@ def _db_init():
                 ("grid_pos", "INTEGER"), ("finish_pos", "INTEGER"),
                 ("track_ordinal", "INTEGER"), ("car_class", "INTEGER"), ("car_pi", "INTEGER"),
                 ("weather_condition", "TEXT"), ("track_temp_c", "REAL"), ("air_temp_c", "REAL"),
+                ("car_manufacturer", "TEXT"), ("car_year", "INTEGER"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {defn}")
@@ -5841,6 +5902,9 @@ def _db_write_learned_ordinal(ordinal: int, game: str, track_name: str):
         finally:
             conn.close()
     _learned_ordinals_cache = None  # invalidate
+    # Re-merge learned ordinals into FORZA_TRACKS so new entries take effect immediately
+    global FORZA_TRACKS
+    FORZA_TRACKS[ordinal] = track_name
 
 
 def _effective_tracks() -> dict:
@@ -5944,8 +6008,9 @@ def _db_write_session(session_data: dict):
                 (session_id,game,track,car,session_type,race_type,
                  started_at,ended_at,packet_count,best_lap_time_s,lap_count,
                  grid_pos,finish_pos,track_ordinal,car_class,car_pi,
-                 weather_condition,track_temp_c,air_temp_c)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 weather_condition,track_temp_c,air_temp_c,
+                 car_manufacturer,car_year)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (sid,
                   session_data.get("game"), session_data.get("track"),
                   session_data.get("car"), session_data.get("session_type"),
@@ -5957,7 +6022,8 @@ def _db_write_session(session_data: dict):
                   session_data.get("track_ordinal"),
                   session_data.get("car_class"), session_data.get("car_pi"),
                   session_data.get("weather_condition"),
-                  session_data.get("track_temp_c"), session_data.get("air_temp_c")))
+                  session_data.get("track_temp_c"), session_data.get("air_temp_c"),
+                  session_data.get("car_manufacturer"), session_data.get("car_year")))
             conn.execute("DELETE FROM laps WHERE session_id=?", (sid,))
             for lap in laps:
                 conn.execute("""
@@ -7458,6 +7524,7 @@ async def main(demo_mode: bool = False):
     _listener_started_at = time.time()
     ensure_storage()
     _db_init()
+    _load_forza_reference_data()
     threading.Thread(target=_backfill_lap_samples, daemon=True).start()
     log.info("Pacefinder listener starting%s...", " [DEMO MODE]" if demo_mode else "")
 
