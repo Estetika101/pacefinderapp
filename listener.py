@@ -5173,7 +5173,7 @@ function renderSectorHdr(){
     html+=`<div class="s-hdr-row"><span class="s-row-lbl">${nm}</span>`;
     ts.forEach((t,i)=>{
       const isBest=t!=null&&Math.abs(t-best)<0.001;
-      html+=`<span class="s-cell${isBest?' best':''}" style="color:${lapEntries[i].col}">${t!=null?t.toFixed(3):'—'}</span>`;
+      html+=`<span class="s-cell${isBest?' best':''}" style="color:${lapEntries[i].col}">${t!=null?fmtLap(t):'—'}</span>`;
     });
     if(hasRef){
       const rt=refTimes?refTimes[si]:null;
@@ -5218,7 +5218,7 @@ function renderLapSummaries(){
     html+=`<div class="lap-sum-bar" style="border-color:${col}">
       <span class="lsb-l" style="color:${col}">LAP ${ln}</span>
       <span class="lsb-t" style="color:${col}">${fmtLap(lap.lap_time_s)}</span>
-      <span class="lsb-s">S1 ${s1!=null?s1.toFixed(3):'—'} &nbsp;S2 ${s2!=null?s2.toFixed(3):'—'} &nbsp;S3 ${s3!=null?s3.toFixed(3):'—'}</span>
+      <span class="lsb-s">S1 ${s1!=null?fmtLap(s1):'—'} &nbsp;S2 ${s2!=null?fmtLap(s2):'—'} &nbsp;S3 ${s3!=null?fmtLap(s3):'—'}</span>
       ${dHtml}<span class="lsb-slip">${slipHtml}</span>
     </div>`;
   });
@@ -7553,8 +7553,12 @@ async def handle_status(reader, writer):
                 laps_file = storage_path() / "sessions" / f"{sid}_laps.json"
                 try:
                     raw_laps = json.loads(laps_file.read_text())
+                    log.info(f"[session/data] {sid}: _laps.json found, {len(raw_laps)} laps, "
+                             f"finish_pos={sess_dict.get('finish_pos')} race_type={sess_dict.get('race_type')} "
+                             f"session_type={sess_dict.get('session_type')}")
                 except OSError:
                     raw_laps = []
+                    log.warning(f"[session/data] {sid}: _laps.json NOT FOUND at {laps_file}")
                 computed_laps = []
                 for lap in raw_laps:
                     samples  = lap.get("samples", [])
@@ -7582,6 +7586,7 @@ async def handle_status(reader, writer):
                         row["avg_throttle"] = row["avg_brake"] = None
                         row["avg_slip"] = row["peak_slip"] = row["slip_above_pct"] = None
                     computed_laps.append(row)
+                log.info(f"[session/data] {sid}: returning {len(computed_laps)} computed laps")
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps({"session": sess_dict, "laps": computed_laps}).encode()))
 
