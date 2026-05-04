@@ -4142,6 +4142,24 @@ td.date-col{color:var(--text)}
 .cc-R{background:#06b6d415;color:#06b6d4;border:1px solid #06b6d440}
 .gains-badge{font-size:.7rem;font-weight:bold;padding:1px 6px;border-radius:3px}
 .gains-badge.pos{color:#22c55e}.gains-badge.neg{color:var(--danger)}.gains-badge.even{color:var(--color-text-muted)}
+/* ── Session accordion ── */
+.acc-section{border-bottom:1px solid var(--color-border-subtle)}
+.acc-section:last-child{border-bottom:none}
+.acc-hdr{width:100%;display:flex;align-items:center;gap:10px;padding:11px var(--sp-5) 11px var(--sp-4);background:none;border:none;color:inherit;font-family:var(--font-mono);cursor:pointer;text-align:left;transition:background .12s}
+.acc-hdr:hover{background:var(--color-surface)}
+.acc-arrow{font-size:.6rem;color:var(--color-text-secondary);transition:transform .2s ease-out;display:inline-block;width:10px;flex-shrink:0;text-align:center}
+.acc-hdr.open .acc-arrow{transform:rotate(90deg)}
+.acc-label{font-size:var(--text-xs);font-weight:var(--fw-black);letter-spacing:2px;text-transform:uppercase;flex:0 0 auto;min-width:170px}
+.acc-count{font-size:var(--text-xs);color:var(--color-text-secondary);white-space:nowrap;flex:0 0 80px}
+.acc-best{font-size:var(--text-xs);color:#f59e0b;font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:auto}
+.acc-spark{flex-shrink:0;line-height:1;position:relative}
+.acc-trend{font-size:var(--text-sm);flex-shrink:0;width:18px;text-align:center}
+.acc-hdr.muted{opacity:.55}
+.acc-hdr.muted:hover{opacity:.8}
+.acc-body{overflow:hidden;max-height:0;transition:max-height .2s ease-out}
+.acc-body.open{max-height:5000px}
+.acc-tbl{padding:0 var(--sp-5) var(--sp-4)}
+#sp-tip{position:fixed;background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text-primary);font-family:var(--font-mono);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap;z-index:500}
 </style>
 </head>
 <body>
@@ -4195,13 +4213,8 @@ td.date-col{color:var(--text)}
         </div>
       </div>
       <div class="class-filter" id="class-filter" style="display:none"></div>
-      <div class="page">
-        <table id="sess-table" style="display:none">
-          <thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Pos</th><th>±</th><th>Class</th></tr></thead>
-          <tbody id="sess-tbody"></tbody>
-        </table>
-        <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
-      </div>
+      <div id="acc-container"></div>
+      <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
     </div>
 
     <!-- Telemetry tab -->
@@ -4297,7 +4310,7 @@ async function init(){
   renderLeftRail();
   renderHeader();
   renderClassFilter();
-  renderTable();
+  renderAccordions();
   loadTip();
   loadReferences();
 }
@@ -4333,7 +4346,7 @@ function renderClassFilter(){
   bar.style.display='flex';
   bar.innerHTML=[{label:'ALL',val:null},...classes.map(c=>({label:CLASS_NAMES[c]||String(c),val:c}))].map(p=>`<button class="cf-pill${p.val===_classFilter?' active':''}" onclick="setClass(${p.val===null?'null':p.val})">${p.label}</button>`).join('');
 }
-function setClass(c){_classFilter=c;renderClassFilter();renderHeader();renderTable();}
+function setClass(c){_classFilter=c;renderClassFilter();renderHeader();renderAccordions();}
 function renderHeader(){
   const fs=filteredSessions();
   document.getElementById('hdr-name').textContent=_track;
@@ -4345,36 +4358,162 @@ function renderHeader(){
   if(last3.length>=2){const d=last3[0]-last3[1];trendHtml=d<-0.5?'<span style="color:var(--color-green)">▲ Improving</span>':d>0.5?'<span style="color:var(--color-red)">▼ Declining</span>':'<span style="color:var(--color-text-muted)">Stable</span>';}
   document.getElementById('hdr-trend').innerHTML=trendHtml;
 }
-function renderTable(){
+
+// ── Session grouping ──────────────────────────────────────────────────────────
+function sessGroup(s,game){
+  const rt=s.race_type, st=s.session_type;
+  if(game==='forza_motorsport'){
+    if(rt==='real')return'race';
+    if(rt==='ai')return'ai';
+    if(rt==='time_trial'||rt==='hot_lap')return'practice';
+    if(st==='race')return'race';
+    if(st==='qualifying'||st==='hot_lap')return'qualifying';
+    return'practice';
+  }
+  // ACC and F1 — session_type is already normalised
+  if(st==='race')return'race';
+  if(st==='qualifying'||st==='hot_lap')return'qualifying';
+  return'practice';
+}
+
+// ── Accordion spark (80×24, amber) ───────────────────────────────────────────
+function hdrSpark(sessChron){
+  const v=sessChron.map(s=>s.best_lap_time_s).filter(t=>t>0);
+  if(!v.length)return'';
+  if(v.length===1)return`<svg width="80" height="24" style="vertical-align:middle"><circle class="sp-dot" cx="40" cy="12" r="2.5" fill="#f59e0b" data-t="${v[0].toFixed(3)}"/></svg>`;
+  const mn=Math.min(...v),mx=Math.max(...v),W=80,H=24,p=2;
+  const xf=i=>p+i/(v.length-1)*(W-p*2);
+  const yf=t=>H-p-(mx===mn?(H-p*2)/2:(t-mn)/(mx-mn)*(H-p*2));
+  const pts=v.map((t,i)=>xf(i).toFixed(1)+','+yf(t).toFixed(1)).join(' ');
+  const dots=v.map((t,i)=>`<circle class="sp-dot" cx="${xf(i).toFixed(1)}" cy="${yf(t).toFixed(1)}" r="2.5" fill="#f59e0b" data-t="${t.toFixed(3)}"/>`).join('');
+  return`<svg width="80" height="24" style="vertical-align:middle;overflow:visible"><polyline points="${pts}" fill="none" stroke="#f59e0b55" stroke-width="1.5" stroke-linejoin="round"/>${dots}</svg>`;
+}
+function trendArrow(sessChron){
+  const v=sessChron.map(s=>s.best_lap_time_s).filter(t=>t>0);
+  if(v.length<2)return'<span style="color:var(--color-text-dim)">—</span>';
+  const d=v[v.length-1]-v[v.length-2];
+  if(d<-0.5)return'<span style="color:var(--color-green)">↑</span>';
+  if(d>0.5)return'<span style="color:var(--color-red)">↓</span>';
+  return'<span style="color:var(--color-text-muted)">→</span>';
+}
+
+// ── sessionStorage open/close state ─────────────────────────────────────────
+const _skey='acc_'+_track+'_'+_game;
+function _loadAccState(){try{return JSON.parse(sessionStorage.getItem(_skey)||'null');}catch(e){return null;}}
+function _saveAccState(st){try{sessionStorage.setItem(_skey,JSON.stringify(st));}catch(e){}}
+
+// ── Session table body ────────────────────────────────────────────────────────
+function sessTableHtml(sessArr){
+  const bests=sessArr.map(s=>s.best_lap_time_s).filter(v=>v);
+  const gb=bests.length?Math.min(...bests):null;
+  return`<table><thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Pos</th><th>±</th><th>Class</th></tr></thead><tbody>`
+    +sessArr.map((s,i)=>{
+      const isGB=gb&&s.best_lap_time_s&&Math.abs(s.best_lap_time_s-gb)<0.001;
+      const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
+      const typeHtml=effType?`<span class="type-chip">${TYPE_LABELS[effType]||effType}</span>`:'';
+      const posHtml=s.finish_pos!=null?`P${s.finish_pos}`:'—';
+      return`<tr class="clickable" data-idx="${i}"><td class="date-col">${fmtDt(s.started_at)}</td><td>${typeHtml}</td><td class="${isGB?'best-time':''}">${fmtLap(s.best_lap_time_s)}</td><td>${s.lap_count||0}</td><td>${posHtml}</td><td>${gainsBadge(s.grid_pos,s.finish_pos)}</td><td>${classBadge(s.car_class)}</td></tr>`;
+    }).join('')
+    +'</tbody></table>';
+}
+
+// ── Render accordions ─────────────────────────────────────────────────────────
+const ACC_DEFS=[
+  {key:'race',    label:'Race'},
+  {key:'qualifying',label:'Qualifying / Hotlap'},
+  {key:'practice',label:'Practice / Time Trial'},
+  {key:'ai',      label:'AI Race',muted:true},
+];
+const _urlSection=new URLSearchParams(location.search).get('section')||null;
+
+function renderAccordions(){
   const fs=filteredSessions();
-  if(!fs.length){document.getElementById('empty').style.display='block';document.getElementById('sess-table').style.display='none';return;}
-  document.getElementById('empty').style.display='none';
-  document.getElementById('sess-table').style.display='';
-  const allBests=fs.map(s=>s.best_lap_time_s).filter(v=>v);
-  const globalBest=allBests.length?Math.min(...allBests):null;
-  document.getElementById('sess-tbody').innerHTML=fs.map(s=>{
-    const isGB=globalBest&&s.best_lap_time_s&&Math.abs(s.best_lap_time_s-globalBest)<0.001;
-    const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
-    const typeHtml=effType?`<span class="type-chip">${TYPE_LABELS[effType]||effType}</span>`:'';
-    const posHtml=s.finish_pos!=null?`P${s.finish_pos}`:'—';
-    return `<tr class="clickable" data-id="${s.session_id}">
-      <td class="date-col">${fmtDt(s.started_at)}</td>
-      <td>${typeHtml}</td>
-      <td class="${isGB?'best-time':''}">${fmtLap(s.best_lap_time_s)}</td>
-      <td>${s.lap_count||0}</td>
-      <td>${posHtml}</td>
-      <td>${gainsBadge(s.grid_pos,s.finish_pos)}</td>
-      <td>${classBadge(s.car_class)}</td>
-    </tr>`;
+  const container=document.getElementById('acc-container');
+  const empty=document.getElementById('empty');
+
+  // Group sessions (sessions come newest-first; reverse for chronological spark)
+  const groups={};
+  ACC_DEFS.forEach(d=>groups[d.key]=[]);
+  fs.forEach(s=>groups[sessGroup(s,_game)].push(s));
+
+  const nonEmpty=ACC_DEFS.filter(d=>groups[d.key].length);
+  if(!nonEmpty.length){container.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+
+  // Determine which section should be open
+  const saved=_loadAccState();
+  const defaultOpen=_urlSection||'race';
+
+  container.innerHTML=nonEmpty.map(def=>{
+    const key=def.key;
+    const arr=groups[key]; // newest-first
+    const chron=[...arr].reverse(); // chronological for spark/trend
+    const bestAll=arr.map(s=>s.best_lap_time_s).filter(v=>v);
+    const bestLap=bestAll.length?Math.min(...bestAll):null;
+    const count=arr.length;
+    const isOpen=saved?!!saved[key]:(key===defaultOpen);
+    return`<div class="acc-section">
+      <button class="acc-hdr${isOpen?' open':''}${def.muted?' muted':''}" id="acc-hdr-${key}" onclick="toggleAcc('${key}')">
+        <span class="acc-arrow">&#9654;</span>
+        <span class="acc-label">${def.label}</span>
+        <span class="acc-count">${count} session${count===1?'':'s'}</span>
+        <span class="acc-best">${bestLap?'Best: '+fmtLap(bestLap):''}</span>
+        <span class="acc-spark">${hdrSpark(chron)}</span>
+        <span class="acc-trend">${trendArrow(chron)}</span>
+      </button>
+      <div class="acc-body${isOpen?' open':''}" id="acc-body-${key}">
+        <div class="acc-tbl" id="acc-tbl-${key}">${sessTableHtml(arr)}</div>
+      </div>
+    </div>`;
   }).join('');
-  document.querySelectorAll('#sess-tbody tr').forEach((tr,i)=>{
-    tr.addEventListener('click',()=>{
-      let u='/sessions/session?id='+encodeURIComponent(fs[i].session_id);
-      if(_game)u+='&game='+encodeURIComponent(_game);
-      if(_track)u+='&track='+encodeURIComponent(_track);
-      location.href=u;
+
+  // Wire row clicks for each group
+  nonEmpty.forEach(def=>{
+    const arr=groups[def.key];
+    document.querySelectorAll(`#acc-tbl-${def.key} tr.clickable`).forEach(tr=>{
+      const i=parseInt(tr.dataset.idx);
+      tr.addEventListener('click',()=>{
+        let u='/sessions/session?id='+encodeURIComponent(arr[i].session_id);
+        if(_game)u+='&game='+encodeURIComponent(_game);
+        if(_track)u+='&track='+encodeURIComponent(_track);
+        location.href=u;
+      });
     });
   });
+
+  // Wire spark dot tooltips
+  const tip=document.getElementById('sp-tip');
+  document.querySelectorAll('#acc-container .sp-dot').forEach(dot=>{
+    dot.addEventListener('mouseenter',e=>{
+      tip.textContent=fmtLap(parseFloat(dot.dataset.t));
+      tip.style.display='block';
+      tip.style.left=(e.clientX+12)+'px';
+      tip.style.top=(e.clientY-24)+'px';
+    });
+    dot.addEventListener('mousemove',e=>{
+      tip.style.left=(e.clientX+12)+'px';
+      tip.style.top=(e.clientY-24)+'px';
+    });
+    dot.addEventListener('mouseleave',()=>{tip.style.display='none';});
+  });
+}
+
+function toggleAcc(key){
+  const hdr=document.getElementById('acc-hdr-'+key);
+  const body=document.getElementById('acc-body-'+key);
+  if(!hdr||!body)return;
+  const opening=!hdr.classList.contains('open');
+  hdr.classList.toggle('open',opening);
+  body.classList.toggle('open',opening);
+  // Persist
+  const saved=_loadAccState()||{};
+  saved[key]=opening;
+  _saveAccState(saved);
+  // Update URL section param without reload
+  const url=new URL(location.href);
+  if(opening)url.searchParams.set('section',key);
+  else url.searchParams.delete('section');
+  history.replaceState({},'',url);
 }
 async function loadReferences(){
   try{
@@ -4558,6 +4697,7 @@ init().then(()=>{
   if(_initTrackTab==='telemetry')switchTrackTab('telemetry');
 });
 </script>
+<div id="sp-tip"></div>
 </body>
 </html>
 """
