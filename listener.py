@@ -200,6 +200,7 @@ FORZA_TRACKS = {
     76:  "Catalunya Grand Prix",
     78:  "Catalunya National Circuit",
     83:  "Lime Rock Full Circuit",
+    67:  "Maple Valley Full Circuit",
     86:  "Maple Valley Full Circuit",
     92:  "Maple Valley Short Circuit",
     112: "Mid-Ohio Sports Car Course",
@@ -208,6 +209,7 @@ FORZA_TRACKS = {
     115: "Hakone Circuit",
     116: "Kyalami Grand Prix Circuit",
     530: "Spa Full Circuit",
+    990: "Virginia International Raceway Full",
     1630: "Grand Oak National Circuit",
 }
 
@@ -324,11 +326,20 @@ def parse_acc(data: bytes) -> Optional[dict]:
                 return None
             session_int = struct.unpack_from("<i", data, 8)[0]
             position    = struct.unpack_from("<i", data, 136)[0]
-            return {
+            result: dict = {
                 "_packet_type": "graphics",
                 "session_type": _ACC_SESSION_TYPES.get(session_int, "unknown"),
                 "race_position": position if position > 0 else None,
             }
+            # rainIntensity enum at offset 1552 (added in ACC 1.8 shared memory)
+            if len(data) >= 1556:
+                rain_int = struct.unpack_from("<i", data, 1552)[0]
+                _ACC_RAIN = {0: "Clear", 1: "LightCloud", 2: "LightRain",
+                             3: "Rain", 4: "HeavyRain", 5: "Thunderstorm"}
+                w = _ACC_RAIN.get(rain_int)
+                if w is not None:
+                    result["weather_condition"] = w
+            return result
         if packet_id != 0:
             return None  # Static or unknown packet — ignore
     except struct.error:
@@ -400,6 +411,15 @@ def parse_acc(data: bytes) -> Optional[dict]:
             result["tyre_core_temp_rl"] = round(t_rl, 1)
             result["tyre_core_temp_rr"] = round(t_rr, 1)
 
+        # airTemp at byte 288, roadTemp at byte 292 (fixed offsets in SPageFilePhysics)
+        if len(data) >= 296:
+            air_t  = struct.unpack_from("<f", data, 288)[0]
+            road_t = struct.unpack_from("<f", data, 292)[0]
+            if -50 < air_t < 80:   # sanity range
+                result["air_temp_c"]   = round(air_t, 1)
+            if -10 < road_t < 100:
+                result["track_temp_c"] = round(road_t, 1)
+
         return result
     except struct.error:
         return None
@@ -446,10 +466,13 @@ def parse_f1(data: bytes) -> Optional[dict]:
         session_uid = struct.unpack_from("<Q", data, 7)[0]
 
         if packet_id == 1:
-            # Session — extract track and session type
+            # Session — extract track, session type, weather, temperatures
             # layout: weather(B) trackTemp(b) airTemp(b) totalLaps(B) trackLength(H) sessionType(B) trackId(b)
             base = hdr
             if len(data) >= base + 8:
+                weather_val  = struct.unpack_from("<B", data, base + 0)[0]
+                track_temp   = struct.unpack_from("<b", data, base + 1)[0]
+                air_temp     = struct.unpack_from("<b", data, base + 2)[0]
                 session_type = struct.unpack_from("<B", data, base + 6)[0]
                 track_id     = struct.unpack_from("<b", data, base + 7)[0]
                 session_types = {
@@ -460,9 +483,14 @@ def parse_f1(data: bytes) -> Optional[dict]:
                     10: "race", 11: "race", 12: "race",
                     13: "time_trial",
                 }
+                _F1_WEATHER = {0: "Clear", 1: "LightCloud", 2: "Overcast",
+                               3: "LightRain", 4: "HeavyRain", 5: "Thunderstorm"}
                 _f1_session_meta[session_uid] = {
-                    "track":        F1_TRACKS.get(track_id, f"track_{track_id}"),
-                    "session_type": session_types.get(session_type, "unknown"),
+                    "track":             F1_TRACKS.get(track_id, f"track_{track_id}"),
+                    "session_type":      session_types.get(session_type, "unknown"),
+                    "weather_condition": _F1_WEATHER.get(weather_val),
+                    "track_temp_c":      float(track_temp) if -10 <= track_temp <= 100 else None,
+                    "air_temp_c":        float(air_temp)   if -50 <= air_temp <= 80  else None,
                 }
             return None
 
@@ -584,7 +612,7 @@ def parse_f1(data: bytes) -> Optional[dict]:
             engine_temp = struct.unpack_from("<H", data, base + 38)[0]
             tp_rl, tp_rr, tp_fl, tp_fr = struct.unpack_from("<ffff", data, base + 40)
             meta = _f1_session_meta.get(session_uid, {})
-            return {
+            ret: dict = {
                 "_packet_type":         "telemetry",
                 "_session_uid":         session_uid,
                 "track":                meta.get("track", "unknown"),
@@ -615,6 +643,12 @@ def parse_f1(data: bytes) -> Optional[dict]:
                 "tyre_pressure_rr":     round(tp_rr, 2),
                 "engine_temp":          engine_temp,
             }
+            # Carry weather/temp from session packet into each telemetry sample
+            for k in ("weather_condition", "track_temp_c", "air_temp_c"):
+                v = meta.get(k)
+                if v is not None:
+                    ret[k] = v
+            return ret
 
         if packet_id == 7:
             # CarStatus — fuel, tyre compound
@@ -737,6 +771,9 @@ class Session:
         self.track_ordinal: Optional[int] = None  # raw ordinal for learned track mapping
         self.car_class: Optional[int] = None   # 0=D 1=C 2=B 3=A 4=S1 5=S2 6=X
         self.car_pi: Optional[int] = None      # performance index (100–999)
+        self.weather_condition: Optional[str] = None
+        self.track_temp_c: Optional[float] = None
+        self.air_temp_c: Optional[float] = None
 
         self.last_activity = time.time()  # updated only when driver input is detected
 
@@ -778,6 +815,8 @@ class Session:
             rp = parsed.get("race_position")
             if rp is not None and rp > 0:
                 self._race_positions.append(rp)
+            if parsed.get("weather_condition") and self.weather_condition is None:
+                self.weather_condition = parsed["weather_condition"]
             return
 
         # Merge cached motion and lap data into telemetry
@@ -798,6 +837,12 @@ class Session:
             self.car_class = int(parsed["car_class"])
         if parsed.get("car_performance_index") is not None and self.car_pi is None:
             self.car_pi = int(parsed["car_performance_index"])
+        if parsed.get("weather_condition") and self.weather_condition is None:
+            self.weather_condition = parsed["weather_condition"]
+        if parsed.get("track_temp_c") is not None and self.track_temp_c is None:
+            self.track_temp_c = parsed["track_temp_c"]
+        if parsed.get("air_temp_c") is not None and self.air_temp_c is None:
+            self.air_temp_c = parsed["air_temp_c"]
         if parsed.get("session_type", "unknown") != "unknown":
             self.session_type = parsed["session_type"]
         if "car_ordinal" in parsed and self.car == "unknown":
@@ -911,9 +956,12 @@ class Session:
             "laps":             laps_summary,
             "grid_pos":         grid_pos,
             "finish_pos":       finish_pos,
-            "track_ordinal":    self.track_ordinal,
-            "car_class":        self.car_class,
-            "car_pi":           self.car_pi,
+            "track_ordinal":      self.track_ordinal,
+            "car_class":          self.car_class,
+            "car_pi":             self.car_pi,
+            "weather_condition":  self.weather_condition,
+            "track_temp_c":       self.track_temp_c,
+            "air_temp_c":         self.air_temp_c,
         }
 
         _db_write_session(session_data)
@@ -3021,6 +3069,7 @@ a{color:inherit;text-decoration:none}
 .recent-gained.pos{color:var(--color-green)}
 .recent-gained.neg{color:var(--color-red)}
 .recent-gained.neu{color:var(--color-text-muted)}
+.recent-wx{font-size:.85rem;line-height:1;opacity:.6;cursor:default}
 @media(max-width:640px){
   .page{padding:var(--space-4) var(--space-3) 48px}
   .kpi{min-width:130px;padding:14px 14px}
@@ -3184,9 +3233,12 @@ function renderTrendSpark(){
   }
   const pcts=withPos.map(s=>posToPercentile(s.finish_pos));
   const w=400,h=44,pad=3;
-  const mn=Math.min(...pcts),mx=Math.max(...pcts),rng=mx-mn||1;
+  const mn=Math.min(...pcts),mx=Math.max(...pcts);
+  const span=Math.max(mx-mn,15); // at least 15-point span so gentle improvement shows gently
+  const lo=Math.max(0,mn-span*0.10), hi=Math.min(100,mx+span*0.10);
+  const rng=hi-lo;
   const xs=pcts.map((_,i)=>pad+(w-pad*2)*i/Math.max(pcts.length-1,1));
-  const ys=pcts.map(v=>h-pad-(h-pad*2)*(v-mn)/rng);
+  const ys=pcts.map(v=>h-pad-(h-pad*2)*(v-lo)/rng);
   const pts=xs.map((x,i)=>x.toFixed(1)+','+ys[i].toFixed(1)).join(' ');
   // gradient: first half avg vs second half avg
   const half=Math.floor(pcts.length/2);
@@ -3351,17 +3403,20 @@ function renderRecent(){
       posHtml=`<span class="recent-pos ${cls}">P${fp}</span>`;
     }
     let gainedHtml='';
-    if(fp!=null&&gp!=null){
+    if(fp!=null&&gp!=null&&gp>0){
       const g=gp-fp;
       const cls=g>0?'pos':g<0?'neg':'neu';
       gainedHtml=`<span class="recent-gained ${cls}">${g>0?'+':''}${g}</span>`;
     }
+    const WX_ICON={'Clear':'☀','LightCloud':'⛅','Overcast':'☁','LightRain':'🌦','Rain':'🌧','HeavyRain':'⛈','Thunderstorm':'⛈'};
+    const wxHtml=s.weather_condition?`<span class="recent-wx" title="${s.weather_condition}${s.track_temp_c!=null?' · '+s.track_temp_c.toFixed(0)+'°C':''}">${WX_ICON[s.weather_condition]||''}</span>`:'';
     const href="/sessions/session?id="+encodeURIComponent(s.session_id)+"&game="+encodeURIComponent(s.game||'')+"&track="+encodeURIComponent(s.track||'');
     return`<div class="recent-row" onclick="location.href='${href}'">
       <span class="recent-badge ${gameKey}">${label}</span>
       <span class="recent-circuit">${s.track||'Unknown'}</span>
       <span class="recent-date">${fmtRel(s.started_at)}</span>
       <span class="recent-lap">${fmtLap(s.best_lap_time_s)}</span>
+      ${wxHtml}
       ${posHtml}
       ${gainedHtml}
     </div>`;
@@ -4707,6 +4762,7 @@ a{color:inherit;text-decoration:none}
 .hdr-stat .v{font-size:var(--text-md);font-weight:var(--fw-black);color:var(--color-text-primary)}
 .hdr-stat .l{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1px}
 .type-chip{font-size:.65rem;background:var(--accent-bg);border:1px solid var(--accent-bd);color:var(--accent-soft);padding:1px var(--sp-2);border-radius:10px;letter-spacing:.5px}
+.weather-badge{font-size:.65rem;color:var(--color-text-muted);border:1px solid var(--color-border);padding:1px 7px;border-radius:10px;letter-spacing:.04em;display:none}
 .section{padding:var(--sp-5) var(--sp-6)}
 .section-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:2px;margin-bottom:var(--space-3)}
 table{width:100%;border-collapse:collapse;font-size:.8rem}
@@ -4780,7 +4836,9 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
     </div>
     <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
     <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
+    <div class="hdr-stat" id="hdr-temp-stat" style="display:none"><div class="v" id="hdr-temp">&mdash;</div><div class="l">Track Temp</div></div>
     <span class="type-chip" id="hdr-type" style="display:none"></span>
+    <span class="weather-badge" id="hdr-weather"></span>
     <a id="edit-sess-btn" href="#" style="font-size:var(--text-xs);color:var(--color-text-secondary);border:1px solid var(--color-border);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Edit</a>
   </div>
   <div class="layout">
@@ -4947,6 +5005,16 @@ function renderHeader(){
   document.getElementById('hdr-laps').textContent=_laps.length;
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   if(effType){const el=document.getElementById('hdr-type');el.textContent=TYPE_LABELS[effType]||effType;el.style.display='';}
+  if(s.track_temp_c!=null){
+    document.getElementById('hdr-temp').textContent=s.track_temp_c.toFixed(1)+'°C';
+    document.getElementById('hdr-temp-stat').style.display='';
+  }
+  const wb=document.getElementById('hdr-weather');
+  if(s.weather_condition){
+    const WX={'Clear':'☀ Clear','LightCloud':'⛅ Lt Cloud','Overcast':'☁ Overcast',
+              'LightRain':'🌦 Lt Rain','Rain':'🌧 Rain','HeavyRain':'⛈ Heavy Rain','Thunderstorm':'⛈ Storm'};
+    wb.textContent=WX[s.weather_condition]||s.weather_condition;wb.style.display='';
+  }
   const editBtn=document.getElementById('edit-sess-btn');
   editBtn.href='/?edit='+encodeURIComponent(_id);editBtn.style.display='';
 }
@@ -5318,6 +5386,7 @@ def _db_init():
             for col, defn in [
                 ("grid_pos", "INTEGER"), ("finish_pos", "INTEGER"),
                 ("track_ordinal", "INTEGER"), ("car_class", "INTEGER"), ("car_pi", "INTEGER"),
+                ("weather_condition", "TEXT"), ("track_temp_c", "REAL"), ("air_temp_c", "REAL"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {defn}")
@@ -5454,33 +5523,51 @@ def _classify_race_type(positions: list, lap_count: int) -> Optional[str]:
 
 def _db_backfill_race_types():
     """
-    One-time migration: classify sessions whose race_type is NULL using
-    the grid_pos / finish_pos / lap_count stored at session close.
-    Idempotent — only touches rows where race_type IS NULL.
+    Classify sessions whose race_type is NULL.
+    Runs at startup and re-runs safely (idempotent — only touches NULL rows).
+    Uses stored grid_pos/finish_pos/lap_count with a broader heuristic than
+    live classification so older sessions without full position history get tagged.
     """
     with _db_lock:
         conn = _db_connect()
         try:
             rows = conn.execute(
-                "SELECT session_id, grid_pos, finish_pos, lap_count "
+                "SELECT session_id, session_type, grid_pos, finish_pos, lap_count "
                 "FROM sessions WHERE race_type IS NULL"
             ).fetchall()
             if not rows:
                 return
             updates = []
             for row in rows:
-                sid, grid_pos, finish_pos, lap_count = (
-                    row["session_id"], row["grid_pos"],
-                    row["finish_pos"], row["lap_count"] or 0,
-                )
-                # Reconstruct a minimal position list from the stored first/last positions
+                sid       = row["session_id"]
+                stype     = row["session_type"] or "unknown"
+                grid_pos  = row["grid_pos"]
+                finish_pos = row["finish_pos"]
+                lap_count = row["lap_count"] or 0
+
+                # Try the standard classifier first (uses position variance)
                 if grid_pos is not None and finish_pos is not None:
                     positions = [grid_pos, finish_pos]
                 else:
                     positions = []
                 rt = _classify_race_type(positions, lap_count)
+
+                # Fall back to heuristics when classifier can't decide
+                if rt is None:
+                    if stype == "time_trial" or lap_count <= 3:
+                        rt = "time_trial"
+                    elif stype == "race" or lap_count > 5:
+                        # Grid=finish and both non-1 → stayed in same position throughout
+                        # Most likely a real-lobby race; AI races typically vary
+                        if grid_pos is not None and finish_pos is not None and grid_pos == finish_pos and finish_pos != 1:
+                            rt = "real"
+                        elif grid_pos is None or finish_pos is None:
+                            rt = "real"  # No position data: assume real-lobby
+                        # else: handled by classifier above (ai or time_trial)
+
                 if rt is not None:
                     updates.append((rt, sid))
+
             if updates:
                 conn.executemany(
                     "UPDATE sessions SET race_type=? WHERE session_id=?", updates
@@ -5502,8 +5589,9 @@ def _db_write_session(session_data: dict):
                 INSERT OR REPLACE INTO sessions
                 (session_id,game,track,car,session_type,race_type,
                  started_at,ended_at,packet_count,best_lap_time_s,lap_count,
-                 grid_pos,finish_pos,track_ordinal,car_class,car_pi)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 grid_pos,finish_pos,track_ordinal,car_class,car_pi,
+                 weather_condition,track_temp_c,air_temp_c)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (sid,
                   session_data.get("game"), session_data.get("track"),
                   session_data.get("car"), session_data.get("session_type"),
@@ -5513,7 +5601,9 @@ def _db_write_session(session_data: dict):
                   len(laps),
                   session_data.get("grid_pos"), session_data.get("finish_pos"),
                   session_data.get("track_ordinal"),
-                  session_data.get("car_class"), session_data.get("car_pi")))
+                  session_data.get("car_class"), session_data.get("car_pi"),
+                  session_data.get("weather_condition"),
+                  session_data.get("track_temp_c"), session_data.get("air_temp_c")))
             conn.execute("DELETE FROM laps WHERE session_id=?", (sid,))
             for lap in laps:
                 conn.execute("""
@@ -5598,14 +5688,12 @@ def _db_career_kpis() -> dict:
                   AVG(CASE WHEN race_type='real' AND session_type='race' AND finish_pos IS NOT NULL
                            THEN CAST(finish_pos AS REAL) END) as avg_finish_real,
                   AVG(CASE WHEN race_type='real' AND session_type='race'
-                                AND grid_pos IS NOT NULL AND finish_pos IS NOT NULL
+                                AND grid_pos IS NOT NULL AND grid_pos > 0 AND finish_pos IS NOT NULL
                            THEN CAST(grid_pos AS REAL) - finish_pos END) as avg_pos_gained,
                   100.0 * SUM(CASE WHEN race_type='real' AND session_type='race' AND finish_pos=1 THEN 1 ELSE 0 END)
-                        / NULLIF(SUM(CASE WHEN race_type='real' AND session_type='race'
-                                         AND finish_pos IS NOT NULL THEN 1 ELSE 0 END), 0) as win_rate,
+                        / NULLIF(SUM(CASE WHEN race_type='real' AND session_type='race' THEN 1 ELSE 0 END), 0) as win_rate,
                   100.0 * SUM(CASE WHEN race_type='real' AND session_type='race' AND finish_pos<=3 THEN 1 ELSE 0 END)
-                        / NULLIF(SUM(CASE WHEN race_type='real' AND session_type='race'
-                                         AND finish_pos IS NOT NULL THEN 1 ELSE 0 END), 0) as podium_rate,
+                        / NULLIF(SUM(CASE WHEN race_type='real' AND session_type='race' THEN 1 ELSE 0 END), 0) as podium_rate,
                   SUM(lap_count) as total_laps,
                   COUNT(DISTINCT CASE WHEN track IS NOT NULL AND track != 'unknown' THEN track END) as circuit_count
                 FROM sessions
@@ -5642,7 +5730,8 @@ def _db_recent_sessions(limit: int = 8) -> list:
         try:
             rows = conn.execute("""
                 SELECT session_id, game, track, started_at, best_lap_time_s,
-                       lap_count, finish_pos, grid_pos, race_type, session_type
+                       lap_count, finish_pos, grid_pos, race_type, session_type,
+                       weather_condition, track_temp_c
                 FROM sessions ORDER BY started_at DESC LIMIT ?
             """, (limit,)).fetchall()
             return [dict(r) for r in rows]
@@ -6560,7 +6649,7 @@ async def handle_status(reader, writer):
                     sess_row = conn.execute(
                         "SELECT session_id,game,track,car,session_type,race_type,started_at,ended_at,"
                         "best_lap_time_s,lap_count,ai_analysis,ai_analyzed_at,ai_model,"
-                        "car_class,car_pi,finish_pos,grid_pos "
+                        "car_class,car_pi,finish_pos,grid_pos,weather_condition,track_temp_c,air_temp_c "
                         "FROM sessions WHERE session_id=?", (sid,)
                     ).fetchone()
                 finally:
