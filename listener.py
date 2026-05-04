@@ -264,6 +264,57 @@ def _load_forza_reference_data() -> None:
 # Ordinals seen in live packets but not in FORZA_TRACKS — logged once each
 _unknown_ordinals_seen: set = set()
 
+# FM2023 track names for manual session track confirmation via Edit modal
+FM2023_TRACKS = sorted([
+    "Brands Hatch Grand Prix",
+    "Brands Hatch Indy Circuit",
+    "Circuit de Spa-Francorchamps",
+    "Circuit de Spa-Francorchamps (24h Layout)",
+    "Circuit de Catalunya Grand Prix",
+    "Circuit de Catalunya National",
+    "Daytona International Speedway (Oval)",
+    "Daytona International Speedway (Road)",
+    "Dubai Autodrome Club",
+    "Dubai Autodrome Grand Prix",
+    "Dubai Autodrome International",
+    "Dubai Autodrome National",
+    "Hakone Circuit",
+    "Homestead-Miami Speedway",
+    "Indianapolis Motor Speedway (Oval)",
+    "Indianapolis Motor Speedway (Road)",
+    "Kyalami Grand Prix Circuit",
+    "Laguna Seca Full Circuit",
+    "Le Mans Full Circuit",
+    "Le Mans Old Mulsanne Circuit",
+    "Lime Rock Full Circuit",
+    "Maple Valley Full Circuit",
+    "Maple Valley Short Circuit",
+    "Mid-Ohio Sports Car Course",
+    "Mugello Full Circuit",
+    "Nürburgring 24h Course",
+    "Nürburgring Grand Prix",
+    "Nürburgring Nordschleife",
+    "Road America East Route",
+    "Road America Full Circuit",
+    "Road America West Route",
+    "Road Atlanta Full Circuit",
+    "Sebring Full Circuit",
+    "Sebring International Raceway",
+    "Sebring Short Circuit",
+    "Silverstone Grand Prix",
+    "Silverstone International",
+    "Silverstone National",
+    "Suzuka East",
+    "Suzuka Full Circuit",
+    "Watkins Glen Grand Prix",
+    "Watkins Glen Short Circuit",
+    "Yas Marina Corkscrew",
+    "Yas Marina Full Circuit",
+    "Yas Marina North Corkscrew",
+    "Yas Marina North Circuit",
+    "Yas Marina South Circuit",
+])
+
 
 # i I [51×f] [5×i: car_ordinal/class/pi/drivetrain/cylinders] [17×f] H [6×B] [3×b]
 # drivetrain_type and num_cylinders are int32 per spec, not float.
@@ -1200,6 +1251,9 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
                 return  # don't create a session from an idle broadcast
             session = Session(self.game, datetime.now())
             active_sessions[self.game] = session
+            if self.game == "forza_motorsport":
+                fmt_label = "FH5 (331-byte, track ordinal available)" if len(data) == FM_PACKET_SIZE_FH else "FM2023 (311-byte, no track in UDP)"
+                log.info(f"Forza packet format detected: {fmt_label}")
 
         session = active_sessions[self.game]
 
@@ -5410,21 +5464,8 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .chart-row{margin-bottom:6px}
 .chart-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px}
 .chart-svg{display:block;width:100%;overflow:visible}
-.tele-layout{display:flex;min-height:420px}
-.tele-sidebar{width:190px;flex-shrink:0;border-right:1px solid var(--color-border);padding:10px 0;overflow-y:auto;max-height:calc(100vh - 120px);position:sticky;top:120px}
-.tele-content{flex:1;min-width:0;padding:var(--sp-4) var(--sp-5)}
-.tele-sec-hdr{font-size:.58rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.12em;padding:8px 14px 4px;margin-top:6px}
-.tele-lap-item{display:flex;align-items:center;gap:7px;padding:5px 14px;font-size:.72rem;color:var(--color-text-secondary);cursor:pointer;user-select:none}
-.tele-lap-item:hover{background:var(--color-surface)}
-.tele-lap-item input[type=checkbox]{accent-color:var(--color-accent);width:11px;height:11px;flex-shrink:0}
-.tele-lap-best{color:var(--accent-soft)!important}
-.tele-lap-time{color:var(--color-text-muted);font-size:.66rem;margin-left:auto}
-.tele-ref-sel{width:calc(100% - 28px);margin:2px 14px 0;background:var(--color-surface-2,var(--color-surface));border:1px solid var(--color-border);color:var(--color-text-primary);font-family:inherit;font-size:.7rem;padding:4px 7px;border-radius:4px}
-.tele-ch-item{display:flex;align-items:center;gap:7px;padding:4px 14px;font-size:.72rem;color:var(--color-text-secondary);cursor:pointer;user-select:none}
-.tele-ch-item input[type=checkbox]{accent-color:var(--color-accent);width:11px;height:11px;flex-shrink:0}
-.tele-xaxis{display:flex;margin:4px 14px 0;border:1px solid var(--color-border);border-radius:4px;overflow:hidden}
-.txa-btn{flex:1;background:none;border:none;color:var(--color-text-muted);font-family:inherit;font-size:.66rem;padding:4px 0;cursor:pointer;text-align:center;transition:background .12s,color .12s}
-.txa-btn.active{background:var(--color-surface);color:var(--color-text-primary)}
+#cmp-crosshair{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.2);pointer-events:none;display:none}
+#cmp-tooltip{position:absolute;top:4px;background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -5445,103 +5486,69 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
   <a href="#" id="bc-track">Track</a> &rsaquo;
   <span id="bc-sess">Session</span>
 </div>
-<div class="sess-tab-bar">
-  <button class="sess-tab" id="st-overview" onclick="switchTab('overview')">Overview</button>
-  <button class="sess-tab" id="st-telemetry" onclick="switchTab('telemetry')">Telemetry</button>
-</div>
-<div class="lr-pills" id="lr-pills"></div>
-
-<!-- Overview tab -->
-<div id="tab-overview">
-  <div class="sess-hdr">
-    <div>
-      <div class="sess-title" id="hdr-track">Loading&hellip;</div>
-      <div class="sess-sub" id="hdr-sub"></div>
-    </div>
-    <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
-    <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
-    <div class="hdr-stat" id="hdr-temp-stat" style="display:none"><div class="v" id="hdr-temp">&mdash;</div><div class="l">Track Temp</div></div>
-    <span class="type-chip" id="hdr-type" style="display:none"></span>
-    <span class="weather-badge" id="hdr-weather"></span>
-    <a id="edit-sess-btn" href="#" style="font-size:var(--text-xs);color:var(--color-text-secondary);border:1px solid var(--color-border);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Edit</a>
+<div class="sess-hdr">
+  <div>
+    <div class="sess-title" id="hdr-track">Loading&hellip;</div>
+    <div class="sess-sub" id="hdr-sub"></div>
   </div>
-  <div class="layout">
-    <nav class="left-rail" id="left-rail">
-      <div class="lr-section-lbl">Circuits</div>
-      <div id="lr-items"></div>
-      <div class="lr-divider"></div>
-      <div class="lr-this" id="lr-this" style="display:none">
-        <div class="lr-this-lbl">This Session</div>
-        <div class="lr-this-car" id="lr-car"></div>
-        <div class="lr-this-badges" id="lr-badges"></div>
-      </div>
-    </nav>
-    <div class="main-content">
-      <div class="section">
-        <div class="section-lbl">Lap Times</div>
-        <table>
-          <thead><tr>
-            <th>Lap</th><th>Time</th><th>Max Spd</th><th>Thr%</th><th>Brk%</th>
-            <th>Avg Slip</th><th>Peak Slip</th><th>Slip&gt;0.1%</th><th></th>
-          </tr></thead>
-          <tbody id="lap-tbody"></tbody>
-        </table>
-      </div>
-      <div class="ai-section">
-        <div class="ai-lbl">AI Coaching</div>
-        <div>
-          <div class="ai-spotter-lbl">Spotter</div>
-          <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
-          <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
-          <span class="ai-meta" id="ai-meta"></span>
-        </div>
-        <div class="ai-body" id="ai-body"></div>
-        <div class="ai-err" id="ai-err"></div>
-      </div>
+  <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
+  <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
+  <span class="type-chip" id="hdr-type" style="display:none"></span>
+  <a id="tele-link" href="#" style="font-size:var(--text-xs);color:var(--accent-bd2);border:1px solid var(--accent-bd);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Telemetry &rarr;</a>
+</div>
+<div class="section">
+  <div class="section-lbl">Lap Times</div>
+  <table>
+    <thead><tr>
+      <th>Lap</th>
+      <th>Time</th>
+      <th>Max Spd</th>
+      <th>Thr%</th>
+      <th>Brk%</th>
+      <th>Avg Slip</th>
+      <th>Peak Slip</th>
+      <th>Slip&gt;0.1%</th>
+      <th></th>
+    </tr></thead>
+    <tbody id="lap-tbody"></tbody>
+  </table>
+</div>
+<div class="ai-section">
+  <div class="ai-lbl">AI Coaching</div>
+  <div>
+    <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
+    <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
+    <span class="ai-meta" id="ai-meta"></span>
+  </div>
+  <div class="ai-body" id="ai-body"></div>
+  <div class="ai-err" id="ai-err"></div>
+</div>
+<div class="cmp-panel" id="cmp-panel" style="display:none">
+  <div class="cmp-hdr">
+    <span class="cmp-meta" id="cmp-meta">Loading&hellip;</span>
+    <button class="cmp-close" onclick="closeCompare()" title="Close">&times;</button>
+  </div>
+  <div class="cmp-ctrl">
+    <select class="cmp-sel" id="cmp-lap-sel" onchange="onLapSelChange()"></select>
+    <select class="cmp-sel" id="cmp-ref-sel" onchange="onRefSelChange()"></select>
+    <div class="cmp-togg">
+      <label class="cmp-tog"><input type="checkbox" id="tog-throttle" checked onchange="renderCharts()"> Throttle</label>
+      <label class="cmp-tog"><input type="checkbox" id="tog-brake" checked onchange="renderCharts()"> Brake</label>
+      <label class="cmp-tog"><input type="checkbox" id="tog-speed" checked onchange="renderCharts()"> Speed</label>
+      <label class="cmp-tog"><input type="checkbox" id="tog-slip" checked onchange="renderCharts()"> Slip RL</label>
     </div>
   </div>
-</div>
-
-<!-- Telemetry tab -->
-<div id="tab-telemetry" style="display:none">
-  <div class="tele-layout">
-    <div class="tele-sidebar">
-      <div class="tele-sec-hdr">Laps</div>
-      <div id="tele-lap-list"></div>
-      <div class="tele-sec-hdr">Reference</div>
-      <select class="tele-ref-sel" id="tele-ref-sel" onchange="onTeleRefChange()">
-        <option value="">None</option>
-        <option value="best_lap" selected>My Best Lap</option>
-        <option value="theoretical">Theoretical Best</option>
-      </select>
-      <div class="tele-sec-hdr">Channels</div>
-      <label class="tele-ch-item"><input type="checkbox" id="tch-speed" checked onchange="renderTeleCharts()"> Speed</label>
-      <label class="tele-ch-item"><input type="checkbox" id="tch-throttle" checked onchange="renderTeleCharts()"> Throttle</label>
-      <label class="tele-ch-item"><input type="checkbox" id="tch-brake" checked onchange="renderTeleCharts()"> Brake</label>
-      <label class="tele-ch-item"><input type="checkbox" id="tch-gear" checked onchange="renderTeleCharts()"> Gear</label>
-      <label class="tele-ch-item"><input type="checkbox" id="tch-steering" checked onchange="renderTeleCharts()"> Steering</label>
-      <label class="tele-ch-item"><input type="checkbox" id="tch-slip" checked onchange="renderTeleCharts()"> Slip</label>
-      <label class="tele-ch-item"><input type="checkbox" id="tch-tyres" onchange="renderTeleCharts()"> Tyres</label>
-      <div class="tele-sec-hdr">X Axis</div>
-      <div class="tele-xaxis">
-        <button class="txa-btn active" id="txa-dist" onclick="setTeleXAxis('distance')">Distance</button>
-        <button class="txa-btn" id="txa-time" onclick="setTeleXAxis('time')">Time</button>
-      </div>
-    </div>
-    <div class="tele-content">
-      <div id="tele-status" style="color:var(--color-text-muted);font-size:var(--text-sm);text-align:center;padding:60px 0"></div>
-      <div id="tele-charts-wrap" style="position:relative">
-        <div id="tele-crosshair" style="position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.18);pointer-events:none;display:none"></div>
-        <div id="tele-tooltip" style="position:absolute;top:4px;background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text-primary);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap;z-index:5"></div>
-        <div id="tele-charts-inner"></div>
-      </div>
+  <div class="cmp-charts-wrap" id="cmp-charts-wrap">
+    <div id="cmp-crosshair"></div>
+    <div id="cmp-tooltip"></div>
+    <div id="cmp-charts-inner"></div>
+    <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">
+      <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
     </div>
   </div>
 </div>
-
 <script>
-const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Real Race',ai:'AI Race'};
-const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function scls(v){return v>0.25?'crit':v>0.12?'warn':'';}
@@ -5867,58 +5874,24 @@ function renderTeleCharts(){
     inner.innerHTML='<div style="color:var(--color-text-muted);padding:40px;text-align:center">No sample data — samples are only stored for laps within 102% of session best.</div>';
     return;
   }
-  const xMax=_teleXMax();
-  const chk=id=>document.getElementById(id)?.checked;
-  const rows=[];
-  // Legend
-  const legend=lapNums.map((n,i)=>{
-    const l=_laps.find(x=>x.lap_number===n);
-    return`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px"><span style="width:12px;height:2px;background:${_TELE_COLORS[i]};display:inline-block;border-radius:1px"></span><span style="font-size:.65rem;color:var(--color-text-secondary)">Lap ${n} ${l?fmtLap(l.lap_time_s):''}</span></span>`;
-  }).join('')+(_teleRefSamples?'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#888;display:inline-block;border-radius:1px;border-top:1px dashed #888"></span><span style="font-size:.65rem;color:var(--color-text-muted)">Ref</span></span>':'');
-  rows.push(`<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-border-subtle)">${legend}</div>`);
-  if(chk('tch-speed')){const[mn,mx]=_teleAutoRange('speed_mph',lapNums,_teleRefSamples);rows.push(`<div class="chart-row"><div class="chart-lbl">Speed mph</div>${_teleChannelSVG('speed_mph',72,mn,mx,xMax,lapNums)}</div>`);}
-  if(chk('tch-throttle'))rows.push(`<div class="chart-row"><div class="chart-lbl">Throttle %</div>${_teleChannelSVG('throttle_pct',68,0,100,xMax,lapNums)}</div>`);
-  if(chk('tch-brake'))rows.push(`<div class="chart-row"><div class="chart-lbl">Brake %</div>${_teleChannelSVG('brake_pct',68,0,100,xMax,lapNums)}</div>`);
-  if(chk('tch-gear')){const[mn,mx]=_teleAutoRange('gear',lapNums,null);rows.push(`<div class="chart-row"><div class="chart-lbl">Gear</div>${_teleChannelSVG('gear',52,Math.floor(mn),Math.ceil(mx),xMax,lapNums)}</div>`);}
-  if(chk('tch-steering')){const[mn,mx]=_teleAutoRange('steer',lapNums,null);rows.push(`<div class="chart-row"><div class="chart-lbl">Steering</div>${_teleChannelSVG('steer',60,mn,mx,xMax,lapNums)}</div>`);}
-  if(chk('tch-slip')){const[,mx]=_teleAutoRange('slip_rl',lapNums,null);rows.push(`<div class="chart-row"><div class="chart-lbl">Slip RL</div>${_teleChannelSVG('slip_rl',60,0,Math.max(mx,0.1),xMax,lapNums)}</div>`);}
-  if(chk('tch-tyres')){
-    const f=lapNums.some(n=>_teleLapData[n]?.some(s=>s.tyre_core_temp_rl!=null))?'tyre_core_temp_rl':
-              lapNums.some(n=>_teleLapData[n]?.some(s=>s.tyre_surface_temp_rl!=null))?'tyre_surface_temp_rl':null;
-    if(f){const[mn,mx]=_teleAutoRange(f,lapNums,null);rows.push(`<div class="chart-row"><div class="chart-lbl">Tyre Temp RL</div>${_teleChannelSVG(f,60,mn,mx,xMax,lapNums)}</div>`);}
-    else rows.push(`<div class="chart-row" style="color:var(--color-text-muted);font-size:.7rem;padding:6px 0">No tyre temperature data for this session.</div>`);
+  if(!refD||!refD.length){
+    inner.innerHTML='<div style="color:var(--n-400);padding:20px;text-align:center">No reference data for this track yet. Close more sessions at this track to build references.</div>';
+    return;
   }
-  // X ticks
-  const ticks=[0,.25,.5,.75,1].map(f=>{
-    if(_teleXAxis==='distance')return`<span>${(f*100).toFixed(0)}%</span>`;
-    const t=f*xMax,m=Math.floor(t/60);
-    return`<span>${m}:${(t%60).toFixed(0).padStart(2,'0')}</span>`;
-  }).join('');
-  rows.push(`<div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">${ticks}</div>`);
-  inner.innerHTML=rows.join('');
-  // Crosshair
-  const wrap=document.getElementById('tele-charts-wrap'),line=document.getElementById('tele-crosshair'),tip=document.getElementById('tele-tooltip');
-  inner.onmousemove=e=>{
-    const r=inner.getBoundingClientRect(),pct=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
-    const wr=wrap.getBoundingClientRect(),wx=e.clientX-wr.left;
-    line.style.left=wx+'px';line.style.display='block';
-    const lbl=_teleXAxis==='distance'?`${(pct*100).toFixed(0)}%`:(()=>{const t=pct*xMax,m=Math.floor(t/60);return`${m}:${(t%60).toFixed(1).padStart(4,'0')}`;})();
-    tip.textContent=lbl;tip.style.left=Math.min(wx+10,wr.width-80)+'px';tip.style.display='block';
-  };
-  inner.onmouseleave=()=>{line.style.display='none';tip.style.display='none';};
+  _cmpLapSamples=lapD;_cmpRefSamples=refD;
+  renderCharts();
 }
 
-function openCompare(lapN){
-  if(!_teleInited){_teleInited=true;switchTab('telemetry');return;}
-  switchTab('telemetry');
-  if(!_teleSelLaps.has(lapN)){
-    if(_teleSelLaps.size>=4){const f=_teleSelLaps.values().next().value;_teleSelLaps.delete(f);delete _teleLapData[f];}
-    _teleSelLaps.add(lapN);
-    renderTeleLapList();
-    loadTeleData();
-  }
+async function onLapSelChange(){
+  _cmpLapN=parseInt(document.getElementById('cmp-lap-sel').value);
+  await _loadAndRender();
 }
-// ── End telemetry tab ───────────────────────────────────────────────────────
+async function onRefSelChange(){
+  _cmpRefType=document.getElementById('cmp-ref-sel').value;
+  await _loadAndRender();
+}
+function closeCompare(){document.getElementById('cmp-panel').style.display='none';}
+// ── End lap comparison ─────────────────────────────────────────────────────
 init();
 </script>
 </body>
@@ -7623,6 +7596,10 @@ async def handle_status(reader, writer):
                     writer.write(_http_response("404 Not Found", "application/json",
                                                 json.dumps({"error": "Session not found"}).encode()))
                 else:
+                    # Update track
+                    if "track" in body_data:
+                        session_data["track"] = body_data["track"]
+
                     # Update race_type
                     if "race_type" in body_data:
                         session_data["race_type"] = body_data["race_type"]
@@ -7666,6 +7643,8 @@ async def handle_status(reader, writer):
 
                     # Sync to SQLite
                     db_kwargs = {}
+                    if "track" in body_data:
+                        db_kwargs["track"] = body_data["track"]
                     if "race_type" in body_data:
                         db_kwargs["race_type"] = body_data["race_type"]
                     if "track" in body_data:
