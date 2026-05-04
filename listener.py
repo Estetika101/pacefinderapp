@@ -257,6 +257,9 @@ def _load_forza_reference_data() -> None:
 
     FORZA_TRACKS = merged
     log.info(f"Loaded {track_count} FM tracks, {car_count} FM cars from reference data")
+    # Diagnostic: first 20 entries so mismatches are visible at startup
+    preview = sorted(merged.items())[:20]
+    log.debug(f"FORZA_TRACKS sample: {preview}")
 
 # Ordinals seen in live packets but not in FORZA_TRACKS — logged once each
 _unknown_ordinals_seen: set = set()
@@ -995,6 +998,17 @@ class Session:
         # Classify race_type from position history (overrides any existing value)
         valid_laps = len([l for l in self.completed_laps if l.lap_time_s and l.lap_time_s > 0])
         self.race_type = _classify_race_type(self._race_positions, valid_laps)
+
+        # Minimum validity check — discard menu-browse ghost sessions
+        has_enough_laps = len(self.completed_laps) >= 2
+        has_valid_lap = bool(self.best_lap_time_s and 0 < self.best_lap_time_s < 600)
+        if not (has_enough_laps or has_valid_lap):
+            log.info(
+                f"Session discarded — insufficient data "
+                f"({len(self.completed_laps)} lap(s), "
+                f"best_lap={'%.3f' % self.best_lap_time_s if self.best_lap_time_s else 'none'})"
+            )
+            return {}
 
         session_data = {
             "session_id":       self.session_id,
@@ -3573,6 +3587,57 @@ a{color:inherit;text-decoration:none}
 .cc-P{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf640}
 .empty-state{color:var(--n-500);font-size:.85rem;padding:48px var(--space-4);text-align:center}
 @media(max-width:700px){.left-rail{display:none}.main-content{width:100%}}
+/* ── Game overview sections ─────────────────────────────────── */
+.ov{padding:18px var(--space-4) 0}
+.kpi-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;scrollbar-width:none}
+.kpi-row::-webkit-scrollbar{display:none}
+.kpi{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:14px 16px;min-width:130px;flex:1;display:flex;flex-direction:column;justify-content:space-between}
+.kpi-label{font-size:.6rem;color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.kpi-val{font-size:var(--text-xl);font-weight:var(--fw-black);line-height:1;margin-bottom:4px}
+.kpi-val.dash{font-size:var(--text-md);color:var(--color-text-dim);font-weight:var(--fw-normal)}
+.kpi-sub{font-size:.6rem;color:var(--color-text-dim)}
+.kpi-val.blue{color:var(--color-blue,#60a5fa)}
+.kpi-val.green{color:var(--color-green,#4ade80)}
+.kpi-val.amber{color:var(--color-amber,#f59e0b)}
+.kpi-val.muted{color:var(--color-text-muted)}
+.ov-trend{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:18px}
+.ov-trend-meta{min-width:120px}
+.ov-trend-lbl{font-size:.6rem;color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.ov-trend-dir{font-size:var(--text-md);font-weight:var(--fw-bold)}
+.ov-trend-dir.up{color:var(--color-green,#4ade80)}
+.ov-trend-dir.dn{color:var(--color-red,#f87171)}
+.ov-trend-dir.fl{color:var(--color-text-muted)}
+.ov-trend-spark{flex:1;height:40px;min-width:0}
+.ov-trend-spark svg{width:100%;height:100%}
+.ov-form{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:14px;display:flex;gap:24px;flex-wrap:wrap}
+.ov-form-left{min-width:140px}
+.ov-form-lbl{font-size:.6rem;color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.ov-form-trend{font-size:var(--text-md);font-weight:var(--fw-bold);margin-bottom:4px}
+.ov-form-trend.up{color:var(--color-green,#4ade80)}
+.ov-form-trend.dn{color:var(--color-red,#f87171)}
+.ov-form-trend.fl{color:var(--color-text-muted)}
+.ov-form-pct{font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:3px}
+.ov-form-note{font-size:.65rem;color:var(--color-text-muted)}
+.ov-form-right{flex:1;min-width:200px}
+.ov-ffilters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.ov-fgroup{display:flex;gap:3px}
+.ftog{font-size:.6rem;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);cursor:pointer;color:var(--color-text-muted);background:none;font-family:inherit;transition:all .15s}
+.ftog.on{border-color:var(--color-surface-2,#333);color:var(--color-text-primary);background:var(--color-surface)}
+.ov-form-chart{display:flex;align-items:flex-end;gap:3px;height:64px}
+.bar{flex:1;min-width:8px;border-radius:3px 3px 0 0;position:relative;cursor:default}
+.bar:hover .bar-tip{display:block}
+.bar-tip{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:3px 7px;font-size:.65rem;color:var(--color-text-primary);white-space:nowrap;z-index:5}
+.ov-recent{margin-bottom:14px}
+.ov-recent-lbl{font-size:.6rem;color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.ov-recent-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--color-border-subtle);cursor:pointer;transition:background .12s;border-radius:var(--radius-sm)}
+.ov-recent-row:hover{background:var(--color-surface);padding-left:6px}
+.ov-recent-circuit{flex:1;font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-bold)}
+.ov-recent-date{font-size:.65rem;color:var(--color-text-muted);white-space:nowrap}
+.ov-recent-lap{font-size:var(--text-xs);color:var(--color-amber,#f59e0b);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ov-recent-pos{font-size:.65rem;font-weight:var(--fw-bold);padding:2px 7px;border-radius:var(--radius-sm);white-space:nowrap}
+.ov-recent-pos.p1{color:var(--color-amber,#f59e0b);background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2)}
+.ov-recent-pos.podium{color:var(--color-green,#4ade80);background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2)}
+.ov-recent-pos.ok{color:var(--color-text-secondary);background:rgba(136,136,136,.08);border:1px solid rgba(136,136,136,.2)}
 </style>
 </head>
 <body>
@@ -3606,11 +3671,57 @@ a{color:inherit;text-decoration:none}
     <div id="lr-items"></div>
   </nav>
   <div class="main-content">
-    <div class="kpi-strip" id="kpi-strip" style="display:none">
-      <div class="kpi-item"><div class="kpi-val" id="kpi-sessions">—</div><div class="kpi-lbl">Sessions</div></div>
-      <div class="kpi-item"><div class="kpi-val" id="kpi-circuits">—</div><div class="kpi-lbl">Circuits</div></div>
-      <div class="kpi-item"><div class="kpi-val" id="kpi-best">—</div><div class="kpi-lbl">Best Lap</div></div>
-      <div class="kpi-item"><div class="kpi-val" id="kpi-besttrack" style="font-size:var(--text-xs);color:var(--color-text-muted);font-weight:normal"></div><div class="kpi-lbl"></div></div>
+    <!-- Game overview — shown only when ?name= is set -->
+    <div id="game-overview" style="display:none">
+      <div class="ov">
+        <!-- KPI cards -->
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-label">Total Sessions</div><div class="kpi-val muted" id="gkv-total">—</div><div class="kpi-sub" id="gks-total">&nbsp;</div></div>
+          <div class="kpi"><div class="kpi-label">Avg Finish</div><div class="kpi-val blue" id="gkv-finish">—</div><div class="kpi-sub">Race lobbies</div></div>
+          <div class="kpi"><div class="kpi-label">Avg Pos Gained</div><div class="kpi-val green" id="gkv-gained">—</div><div class="kpi-sub">From grid</div></div>
+          <div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-val amber" id="gkv-win">—</div><div class="kpi-sub">Real lobbies</div></div>
+          <div class="kpi"><div class="kpi-label">Podium Rate</div><div class="kpi-val green" id="gkv-podium">—</div><div class="kpi-sub">Real lobbies</div></div>
+          <div class="kpi"><div class="kpi-label">Best Lap</div><div class="kpi-val amber" id="gkv-best">—</div><div class="kpi-sub" id="gks-best">&nbsp;</div></div>
+          <div class="kpi"><div class="kpi-label">Total Laps</div><div class="kpi-val muted" id="gkv-laps">—</div><div class="kpi-sub" id="gks-circuits">&nbsp;</div></div>
+        </div>
+        <!-- Performance Trend -->
+        <div class="ov-trend">
+          <div class="ov-trend-meta">
+            <div class="ov-trend-lbl">Performance Trend</div>
+            <div class="ov-trend-dir fl" id="gtd-dir">—</div>
+          </div>
+          <div class="ov-trend-spark" id="gtd-spark"></div>
+        </div>
+        <!-- Current Form -->
+        <div class="ov-form">
+          <div class="ov-form-left">
+            <div class="ov-form-lbl">Current Form</div>
+            <div class="ov-form-trend fl" id="gf-trend">—</div>
+            <div class="ov-form-pct" id="gf-pct"></div>
+            <div class="ov-form-note" id="gf-note"></div>
+          </div>
+          <div class="ov-form-right">
+            <div class="ov-ffilters">
+              <div class="ov-fgroup" id="gf-type">
+                <button class="ftog on" data-val="real">Real</button>
+                <button class="ftog" data-val="ai">AI</button>
+                <button class="ftog" data-val="all">All</button>
+              </div>
+              <div class="ov-fgroup" id="gf-last">
+                <button class="ftog" data-val="5">Last 5</button>
+                <button class="ftog on" data-val="10">Last 10</button>
+                <button class="ftog" data-val="20">Last 20</button>
+              </div>
+            </div>
+            <div class="ov-form-chart" id="gf-chart"></div>
+          </div>
+        </div>
+        <!-- Recent Sessions -->
+        <div class="ov-recent">
+          <div class="ov-recent-lbl">Recent Sessions</div>
+          <div id="gf-recent"></div>
+        </div>
+      </div>
     </div>
     <div class="sec-hdr">
       <h2 id="page-title">Tracks</h2>
@@ -3653,25 +3764,133 @@ const tabMap={'forza_motorsport':'tab-forza','acc':'tab-acc','f1':'tab-f1'};
 if(_game&&tabMap[_game])document.getElementById(tabMap[_game]).classList.add('active');
 else document.getElementById('tab-all').classList.add('active');
 
-// ── Game KPIs ─────────────────────────────────────────────────
+// ── Tab counts ────────────────────────────────────────────────
 (async()=>{
   let games=[];try{games=await fetch('/sessions/games').then(r=>r.json());}catch(e){}
   let all=0;
-  const gameData={};
-  games.forEach(g=>{const n=g.session_count||0;all+=n;gameData[g.game]=g;
+  games.forEach(g=>{const n=g.session_count||0;all+=n;
     const m={'forza_motorsport':'cnt-forza','acc':'cnt-acc','f1':'cnt-f1'}[g.game];
     if(m){const el=document.getElementById(m);if(el&&n)el.textContent='('+n+')';}
   });
   const ca=document.getElementById('cnt-all');if(ca&&all)ca.textContent='('+all+')';
-  if(_game&&gameData[_game]){
-    const g=gameData[_game];
-    document.getElementById('kpi-sessions').textContent=g.session_count||0;
-    document.getElementById('kpi-circuits').textContent=g.track_count||0;
-    document.getElementById('kpi-best').textContent=fmtLap(g.best_lap_time_s);
-    if(g.best_lap_track)document.getElementById('kpi-besttrack').textContent=g.best_lap_track;
-    document.getElementById('kpi-strip').style.display='';
-  }
 })();
+
+// ── Game Overview (only when ?name= is set) ───────────────────
+let _gfType='real',_gfLast=10,_gfFormData=[];
+
+function gSetKV(id,val){const el=document.getElementById(id);if(!el)return;if(val==null||val==='—'){el.textContent='—';el.classList.add('dash');}else{el.textContent=val;el.classList.remove('dash');}}
+function p1(v,d=1){return v==null?null:parseFloat(v.toFixed(d));}
+function posToPercentile(fp){if(fp==null)return null;return Math.max(5,Math.min(100,Math.round(100-(fp-1)*6)));}
+
+async function loadGameOverview(){
+  document.getElementById('game-overview').style.display='';
+  // KPIs
+  let k={};
+  try{k=await fetch('/sessions/career?game='+encodeURIComponent(_game)).then(r=>r.json());}catch(e){}
+  const t=k.total_sessions||0,rc=k.real_count||0,ai=k.ai_count||0;
+  gSetKV('gkv-total',t||'0');
+  document.getElementById('gks-total').textContent=t?(rc+' real · '+ai+' AI'):'';
+  gSetKV('gkv-finish',k.avg_finish_real!=null?'P'+p1(k.avg_finish_real):null);
+  gSetKV('gkv-gained',k.avg_pos_gained!=null?(k.avg_pos_gained>=0?'+':'')+p1(k.avg_pos_gained):null);
+  gSetKV('gkv-win',k.win_rate!=null?p1(k.win_rate,0)+'%':null);
+  gSetKV('gkv-podium',k.podium_rate!=null?p1(k.podium_rate,0)+'%':null);
+  gSetKV('gkv-best',fmtLap(k.best_lap_time_s)||'—');
+  gSetKV('gkv-laps',k.total_laps||'0');
+  document.getElementById('gks-circuits').textContent=(k.circuit_count||0)+' circuits';
+  // Form + Trend
+  await loadGameForm();
+  // Recent
+  let recent=[];
+  try{recent=await fetch('/sessions/recent?game='+encodeURIComponent(_game)+'&limit=5').then(r=>r.json());}catch(e){}
+  renderGameRecent(recent);
+}
+
+async function loadGameForm(){
+  try{_gfFormData=await fetch('/sessions/form?type='+_gfType+'&last=50&game='+encodeURIComponent(_game)).then(r=>r.json());}catch(e){_gfFormData=[];}
+  renderGameForm();
+  renderGameTrend();
+}
+
+function renderGameTrend(){
+  const data=_gfFormData;
+  const el=document.getElementById('gtd-spark');
+  const dir=document.getElementById('gtd-dir');
+  const withPos=data.filter(s=>s.finish_pos!=null);
+  if(withPos.length<2){el.innerHTML='<span style="font-size:var(--text-xs);color:var(--color-text-muted)">Not enough race data</span>';dir.textContent='';dir.className='ov-trend-dir fl';return;}
+  const pcts=withPos.map(s=>posToPercentile(s.finish_pos));
+  const w=400,h=40,pad=3;
+  const mn=Math.min(...pcts),mx=Math.max(...pcts),span=Math.max(mx-mn,15);
+  const lo=Math.max(0,mn-span*0.1),hi=Math.min(100,mx+span*0.1),rng=hi-lo;
+  const xs=pcts.map((_,i)=>pad+(w-pad*2)*i/Math.max(pcts.length-1,1));
+  const ys=pcts.map(v=>h-pad-(h-pad*2)*(v-lo)/rng);
+  const pts=xs.map((x,i)=>x.toFixed(1)+','+ys[i].toFixed(1)).join(' ');
+  const half=Math.floor(pcts.length/2);
+  const diff=(pcts.slice(half).reduce((a,b)=>a+b,0)/((pcts.length-half)||1))-(pcts.slice(0,half).reduce((a,b)=>a+b,0)/(half||1));
+  const col=diff>4?'#4ade80':diff<-4?'#f87171':'#888';
+  const lx=xs[xs.length-1],ly=ys[ys.length-1];
+  el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%">
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
+    <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3" fill="${col}" opacity=".9"/>
+  </svg>`;
+  if(diff>4){dir.textContent='▲ Improving';dir.className='ov-trend-dir up';}
+  else if(diff<-4){dir.textContent='▼ Declining';dir.className='ov-trend-dir dn';}
+  else{dir.textContent='— Steady';dir.className='ov-trend-dir fl';}
+}
+
+function renderGameForm(){
+  const sliced=_gfFormData.slice(-_gfLast);
+  const el=document.getElementById('gf-chart');
+  if(!sliced.length){el.innerHTML='<span style="font-size:var(--text-xs);color:var(--color-text-muted)">No race data</span>';
+    document.getElementById('gf-trend').textContent='';document.getElementById('gf-pct').textContent='';document.getElementById('gf-note').textContent='';return;}
+  el.innerHTML=sliced.map(s=>{
+    const pct=posToPercentile(s.finish_pos);
+    const h=pct!=null?Math.round(pct+20):0;
+    const col=pct!=null?`hsl(${h},70%,38%)`:'#1a1a1a';
+    const ht=pct!=null?(pct+'% · P'+s.finish_pos+' · '+(s.track||'?')):'(no pos) · '+(s.track||'?');
+    return`<div class="bar" style="height:${pct!=null?pct:20}%;background:${col}"><div class="bar-tip">${ht}</div></div>`;
+  }).join('');
+  // meta
+  const withPos=sliced.filter(s=>s.finish_pos!=null);
+  const trend=document.getElementById('gf-trend');
+  if(!withPos.length){trend.textContent='';document.getElementById('gf-pct').textContent='';document.getElementById('gf-note').textContent='';return;}
+  const pcts=withPos.map(s=>posToPercentile(s.finish_pos));
+  const avg=pcts.reduce((a,b)=>a+b,0)/pcts.length;
+  const half=Math.floor(pcts.length/2);
+  const diff=(pcts.slice(half).reduce((a,b)=>a+b,0)/((pcts.length-half)||1))-(pcts.slice(0,half).reduce((a,b)=>a+b,0)/(half||1));
+  if(diff>4){trend.textContent='▲ Improving';trend.className='ov-form-trend up';}
+  else if(diff<-4){trend.textContent='▼ Declining';trend.className='ov-form-trend dn';}
+  else{trend.textContent='— Steady';trend.className='ov-form-trend fl';}
+  document.getElementById('gf-pct').textContent='Top '+Math.round(100-avg)+'% avg finish';
+  document.getElementById('gf-note').textContent=withPos.length+' sessions with position data';
+}
+
+function renderGameRecent(sessions){
+  const el=document.getElementById('gf-recent');
+  if(!sessions.length){el.innerHTML='<div style="color:var(--color-text-muted);font-size:var(--text-xs);padding:10px 0">No sessions yet</div>';return;}
+  el.innerHTML=sessions.map(s=>{
+    const fp=s.finish_pos,gp=s.grid_pos;
+    let posHtml='';
+    if(fp!=null){const cls=fp===1?'p1':fp<=3?'podium':'ok';posHtml=`<span class="ov-recent-pos ${cls}">P${fp}</span>`;}
+    const href='/sessions/session?id='+encodeURIComponent(s.session_id)+'&game='+encodeURIComponent(s.game||'')+'&track='+encodeURIComponent(s.track||'');
+    return`<div class="ov-recent-row" onclick="location.href='${href}'">
+      <span class="ov-recent-circuit">${s.track&&s.track!=='unknown'?s.track:'Unknown Track'}</span>
+      <span class="ov-recent-date">${fmtDate(s.started_at)}</span>
+      <span class="ov-recent-lap">${fmtLap(s.best_lap_time_s)}</span>
+      ${posHtml}
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('gf-type').addEventListener('click',e=>{
+  const b=e.target.closest('.ftog');if(!b)return;
+  document.querySelectorAll('#gf-type .ftog').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');_gfType=b.dataset.val;loadGameForm();
+});
+document.getElementById('gf-last').addEventListener('click',e=>{
+  const b=e.target.closest('.ftog');if(!b)return;
+  document.querySelectorAll('#gf-last .ftog').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');_gfLast=+b.dataset.val;renderGameForm();
+});
 
 // ── Left rail flyout ─────────────────────────────────────────
 let _flyTimer=null;
@@ -3696,8 +3915,9 @@ let _tracks=[];
 async function init(){
   const label=GAME_LABELS[_game]||_game||'All';
   document.getElementById('page-title').textContent=label?label+' Circuits':'All Circuits';
-  document.title='Pacefinder · '+label;
+  document.title='Pacefinder · '+(label||'Sessions');
   const url='/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'');
+  if(_game) loadGameOverview(); // fire in parallel
   try{_tracks=await fetch(url).then(r=>r.json());}catch(e){_tracks=[];}
   document.getElementById('count').textContent=_tracks.length+' circuit'+(_tracks.length!==1?'s':'');
   // Left rail
@@ -5939,36 +6159,124 @@ def _classify_race_type(positions: list, lap_count: int) -> Optional[str]:
     return None
 
 
-def _db_backfill_track_names():
+def _db_cull_ghost_sessions():
     """
-    For sessions that were stored as 'Track #<N>' or 'unknown' but have a
-    track_ordinal that now resolves in FORZA_TRACKS, update the track name.
-    Idempotent — only touches rows that still have the placeholder value.
-    Does NOT overwrite names that were manually confirmed by the user.
+    Move sessions with lap_count=1 AND best_lap_time_s IS NULL to
+    discarded_sessions — these are Forza menu-browse artifacts.
+    Deletes the corresponding _laps.json files but keeps .bin files.
+    Runs once at startup; idempotent.
     """
-    if not FORZA_TRACKS:
-        return
+    sessions_dir = storage_path() / "sessions"
     with _db_lock:
         conn = _db_connect()
         try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS discarded_sessions (
+                    session_id  TEXT PRIMARY KEY,
+                    game        TEXT,
+                    track       TEXT,
+                    started_at  TEXT,
+                    reason      TEXT,
+                    culled_at   TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            conn.commit()
+            ghosts = conn.execute(
+                "SELECT session_id, game, track, started_at "
+                "FROM sessions WHERE lap_count <= 1 AND best_lap_time_s IS NULL"
+            ).fetchall()
+            if not ghosts:
+                return
+            conn.executemany(
+                "INSERT OR IGNORE INTO discarded_sessions "
+                "(session_id, game, track, started_at, reason) VALUES (?,?,?,?,?)",
+                [(r["session_id"], r["game"], r["track"], r["started_at"],
+                  "lap_count<=1 and no lap time") for r in ghosts],
+            )
+            ids = [r["session_id"] for r in ghosts]
+            conn.execute(
+                f"DELETE FROM sessions WHERE session_id IN ({','.join('?'*len(ids))})", ids
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    # Delete _laps.json files for culled sessions (keep .bin)
+    if sessions_dir.exists():
+        for sid in ids:
+            laps_file = sessions_dir / f"{sid}_laps.json"
+            try:
+                laps_file.unlink(missing_ok=True)
+            except OSError:
+                pass
+    log.info(f"Culled {len(ghosts)} ghost session(s) to discarded_sessions table")
+
+
+def _db_backfill_track_names():
+    """
+    For sessions stored as 'Track #<N>' or 'unknown' with a known track_ordinal,
+    update track name from FORZA_TRACKS.  Also backfills car name/manufacturer/year
+    from FORZA_CARS where car column is a raw ordinal string.
+    Idempotent.
+    """
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            # ── Track name backfill ──────────────────────────────────────────
             rows = conn.execute(
                 "SELECT session_id, track, track_ordinal FROM sessions "
                 "WHERE track_ordinal IS NOT NULL "
                 "AND (track = 'unknown' OR track LIKE 'Track #%')"
             ).fetchall()
-            if not rows:
-                return
-            updates = []
+            # Log all distinct ordinals found vs hits/misses
+            distinct_ords = {r["track_ordinal"] for r in rows}
+            if distinct_ords:
+                hits   = {o for o in distinct_ords if FORZA_TRACKS.get(o)}
+                misses = distinct_ords - hits
+                log.info(
+                    f"Track ordinal backfill: {len(distinct_ords)} distinct ordinals "
+                    f"({len(hits)} hits, {len(misses)} misses). "
+                    f"Misses: {sorted(misses)[:10]}"
+                )
+            track_updates = []
             for row in rows:
                 name = FORZA_TRACKS.get(row["track_ordinal"])
                 if name:
-                    updates.append((name, row["session_id"]))
-            if updates:
-                conn.executemany(
-                    "UPDATE sessions SET track=? WHERE session_id=?", updates
-                )
+                    track_updates.append((name, row["session_id"]))
+            if track_updates:
+                conn.executemany("UPDATE sessions SET track=? WHERE session_id=?", track_updates)
                 conn.commit()
-                log.info(f"Backfilled track names for {len(updates)} session(s)")
+                log.info(f"Backfilled track names for {len(track_updates)} session(s)")
+
+            # ── Car name backfill ────────────────────────────────────────────
+            # Sessions where car is a raw numeric string (unresolved ordinal)
+            if FORZA_CARS:
+                car_rows = conn.execute(
+                    "SELECT session_id, car FROM sessions "
+                    "WHERE car GLOB '[0-9]*' OR car = 'unknown'"
+                ).fetchall()
+                car_updates = []
+                for row in car_rows:
+                    try:
+                        ordinal = int(row["car"]) if row["car"] != "unknown" else None
+                    except (ValueError, TypeError):
+                        ordinal = None
+                    if ordinal is None:
+                        continue
+                    info = FORZA_CARS.get(ordinal)
+                    if info:
+                        car_updates.append((
+                            info["name"], info["manufacturer"], info["year"],
+                            row["session_id"]
+                        ))
+                if car_updates:
+                    conn.executemany(
+                        "UPDATE sessions SET car=?, car_manufacturer=?, car_year=? "
+                        "WHERE session_id=?",
+                        car_updates
+                    )
+                    conn.commit()
+                    log.info(f"Backfilled car names for {len(car_updates)} session(s)")
         finally:
             conn.close()
 
@@ -6129,12 +6437,14 @@ def _db_games_index() -> list:
         finally:
             conn.close()
 
-def _db_career_kpis() -> dict:
-    """Return career-level KPI aggregates for the sessions home page."""
+def _db_career_kpis(game: Optional[str] = None) -> dict:
+    """Return career-level KPI aggregates. Optionally filtered to a single game."""
     with _db_lock:
         conn = _db_connect()
         try:
-            row = conn.execute("""
+            where = "WHERE game=?" if game else ""
+            params = [game] if game else []
+            row = conn.execute(f"""
                 SELECT
                   COUNT(*) as total_sessions,
                   SUM(CASE WHEN race_type='real' THEN 1 ELSE 0 END) as real_count,
@@ -6149,14 +6459,16 @@ def _db_career_kpis() -> dict:
                   100.0 * SUM(CASE WHEN race_type='real' AND session_type='race' AND finish_pos<=3 THEN 1 ELSE 0 END)
                         / NULLIF(SUM(CASE WHEN race_type='real' AND session_type='race' THEN 1 ELSE 0 END), 0) as podium_rate,
                   SUM(lap_count) as total_laps,
+                  MIN(best_lap_time_s) as best_lap_time_s,
                   COUNT(DISTINCT CASE WHEN track IS NOT NULL AND track != 'unknown' THEN track END) as circuit_count
-                FROM sessions
-            """).fetchone()
+                FROM sessions {where}
+            """, params).fetchone()
             return dict(row) if row else {}
         finally:
             conn.close()
 
-def _db_form_data(race_type_filter: Optional[str] = None, last_n: int = 10) -> list:
+def _db_form_data(race_type_filter: Optional[str] = None, last_n: int = 10,
+                  game: Optional[str] = None) -> list:
     """Return last N race sessions for the Current Form bar chart."""
     with _db_lock:
         conn = _db_connect()
@@ -6166,6 +6478,9 @@ def _db_form_data(race_type_filter: Optional[str] = None, last_n: int = 10) -> l
             if race_type_filter and race_type_filter != "all":
                 where += " AND race_type=?"
                 params.append(race_type_filter)
+            if game:
+                where += " AND game=?"
+                params.append(game)
             params.append(last_n)
             rows = conn.execute(f"""
                 SELECT session_id, track, started_at, finish_pos, grid_pos,
@@ -6177,17 +6492,19 @@ def _db_form_data(race_type_filter: Optional[str] = None, last_n: int = 10) -> l
         finally:
             conn.close()
 
-def _db_recent_sessions(limit: int = 8) -> list:
-    """Return last N sessions across all games for the recent feed."""
+def _db_recent_sessions(limit: int = 8, game: Optional[str] = None) -> list:
+    """Return last N sessions, optionally filtered by game."""
     with _db_lock:
         conn = _db_connect()
         try:
-            rows = conn.execute("""
+            where = "WHERE game=?" if game else ""
+            params = [game, limit] if game else [limit]
+            rows = conn.execute(f"""
                 SELECT session_id, game, track, started_at, best_lap_time_s,
                        lap_count, finish_pos, grid_pos, race_type, session_type,
                        weather_condition, track_temp_c
-                FROM sessions ORDER BY started_at DESC LIMIT ?
-            """, (limit,)).fetchall()
+                FROM sessions {where} ORDER BY started_at DESC LIMIT ?
+            """, params).fetchall()
             return [dict(r) for r in rows]
         finally:
             conn.close()
@@ -7004,7 +7321,10 @@ async def handle_status(reader, writer):
             writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
 
         elif path == "/sessions/career":
-            result = _db_career_kpis()
+            qs = {k: urllib.parse.unquote_plus(v)
+                  for pair in query_string.split("&") if "=" in pair
+                  for k, v in [pair.split("=", 1)]}
+            result = _db_career_kpis(qs.get("game") or None)
             writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
 
         elif path == "/sessions/form":
@@ -7013,11 +7333,15 @@ async def handle_status(reader, writer):
                   for k, v in [pair.split("=", 1)]}
             rt   = qs.get("type", "all") or "all"
             last = int(qs.get("last", "10") or "10")
-            result = _db_form_data(rt if rt != "all" else None, last)
+            result = _db_form_data(rt if rt != "all" else None, last, qs.get("game") or None)
             writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
 
         elif path == "/sessions/recent":
-            result = _db_recent_sessions(8)
+            qs = {k: urllib.parse.unquote_plus(v)
+                  for pair in query_string.split("&") if "=" in pair
+                  for k, v in [pair.split("=", 1)]}
+            _limit = int(qs.get("limit", "8") or "8")
+            result = _db_recent_sessions(_limit, qs.get("game") or None)
             writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
 
         elif path == "/sessions/tracks":
@@ -7559,6 +7883,7 @@ async def main(demo_mode: bool = False):
     ensure_storage()
     _db_init()
     _load_forza_reference_data()
+    _db_cull_ghost_sessions()
     _db_backfill_track_names()
     threading.Thread(target=_backfill_lap_samples, daemon=True).start()
     log.info("Pacefinder listener starting%s...", " [DEMO MODE]" if demo_mode else "")
