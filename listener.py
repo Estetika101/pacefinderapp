@@ -1519,15 +1519,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <title>Pacefinder</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;max-width:100vw}
 """ + _CSS_TOKENS + """
-body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);display:flex;flex-direction:column;width:100dvw;height:100dvh;overflow:hidden;user-select:none}
+body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);display:flex;flex-direction:column;width:100dvw;height:100dvh;overflow:hidden;overflow-x:hidden;user-select:none}
 
 /* ── topbar ── */
 .tb{flex:none;height:50px;display:flex;align-items:center;padding:0 var(--space-4);gap:14px;border-bottom:1px solid var(--color-border);overflow-x:auto}
-.dot{width:9px;height:9px;min-width:9px;min-height:9px;border-radius:50%;flex:none;background:var(--color-text-muted)}
-.dot.receiving{background:var(--color-accent);box-shadow:0 0 8px var(--color-accent);animation:blink 1s infinite}
-.dot.race_ended{background:var(--color-amber)}
+.dot{width:9px;height:9px;min-width:9px;min-height:9px;border-radius:50%;flex:none;background:#444}
+.dot.receiving{background:var(--color-green);box-shadow:0 0 8px var(--color-green);animation:blink 1s infinite}
+.dot.race_ended{background:var(--color-accent)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .tb-stat{font-size:var(--text-sm);letter-spacing:2px;text-transform:uppercase;color:var(--color-text-secondary);white-space:nowrap;min-width:80px}
 .tb-stat.receiving{color:var(--color-accent)}
@@ -1555,25 +1555,25 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .flash{animation:flash-red .35s ease-out forwards}
 
 /* ── MAIN PANELS: 4 equal columns ── */
-.panels{display:grid;grid-template-columns:repeat(4,1fr);min-height:0;overflow:hidden}
-.panel-col{display:flex;flex-direction:column;padding:var(--space-3) 14px;border-right:1px solid var(--color-border-subtle);min-width:0}
-.panel-col:last-child{border-right:none}
+.panels{display:grid;grid-template-columns:1fr 1fr 1fr minmax(260px,1fr);min-height:0;overflow:hidden}
+.panel-col{display:flex;flex-direction:column;padding:var(--space-3) 14px var(--space-3) 14px;border-right:1px solid var(--color-border-subtle);min-width:0;overflow:hidden}
+.panel-col:last-child{border-right:none;padding-right:var(--space-4)}
 .p-lbl{font-size:var(--dash-label-size);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;flex:none}
 
 /* vertical bars — throttle / brake */
 .vbar-wrap{flex:1;background:var(--color-surface);border-radius:var(--radius-sm);position:relative;overflow:hidden;margin-bottom:var(--space-3);min-height:0}
 .vbar-fill{position:absolute;bottom:0;left:0;right:0;height:0%;border-radius:var(--radius-sm);transition:height .04s linear}
-.thr-fill{background:var(--color-accent)}
+.thr-fill{background:linear-gradient(to top,var(--color-green) 0%,var(--color-green) 70%,var(--color-accent) 70%,var(--color-accent) 90%,var(--color-red) 90%,var(--color-red) 100%)}
 .brk-fill{background:var(--color-red)}
 .p-num{font-size:var(--dash-value-size);font-weight:var(--fw-black);text-align:center;flex:none;line-height:1}
 .thr-pct{color:var(--color-accent)}
 .brk-pct{color:var(--color-red)}
 
 /* slip column */
-.slip-bars{flex:1;display:flex;gap:var(--space-3);min-height:0}
-.slip-bar-col{flex:1;display:flex;flex-direction:column;min-width:0}
+.slip-bars{flex:1;display:flex;gap:var(--space-4);min-height:0}
+.slip-bar-col{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .slip-bar-lbl{font-size:var(--dash-label-size);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.12em;text-align:center;margin-bottom:6px;flex:none}
-.slip-num{font-size:var(--dash-value-size);font-weight:var(--fw-black);text-align:center;flex:none;line-height:1;transition:color .1s;margin-top:10px}
+.slip-num{font-size:var(--dash-value-size);font-weight:var(--fw-black);text-align:center;flex:none;line-height:1;transition:color .1s;margin-top:0;overflow:hidden;white-space:nowrap;width:100%}
 
 /* timing column */
 .t-lbl{font-size:var(--dash-label-size);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.12em;margin-bottom:1px}
@@ -1590,7 +1590,7 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .tyre-inline-lbl{font-size:var(--dash-label-size);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.12em;margin-bottom:1px}
 
 /* ── BOTTOM STRIP: Gear · Speed · RPM ── */
-.bot-panels{flex:none;height:clamp(56px,8vh,80px);display:flex;align-items:stretch;border-bottom:1px solid var(--color-surface);overflow:hidden}
+.bot-panels{flex:none;min-height:clamp(56px,8vh,80px);display:flex;align-items:stretch;border-bottom:1px solid var(--color-surface);overflow:visible}
 .bp{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 var(--space-4);border-right:1px solid var(--color-border-subtle);flex:none}
 .bp-lbl{font-size:var(--dash-label-size);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:2px}
 .gear-val{font-size:var(--dash-gear-size);font-weight:var(--fw-black);color:var(--color-text-secondary);line-height:1}
@@ -3441,13 +3441,13 @@ TRACKS_HTML = """<!DOCTYPE html>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);min-height:100vh}
 a{color:inherit;text-decoration:none}
-.tb{height:50px;display:flex;align-items:center;padding:0 var(--space-4);gap:14px;border-bottom:1px solid var(--color-border);position:sticky;top:0;background:var(--color-bg);z-index:10}
+.tb{height:50px;display:flex;align-items:center;padding:0 var(--space-4);gap:14px;border-bottom:1px solid var(--color-border);position:sticky;top:0;background:var(--color-bg);z-index:20}
 .tb h1{font-size:var(--text-md);color:var(--color-text-primary);letter-spacing:3px;text-transform:uppercase;flex:1}
 .tb-nav{display:flex;gap:14px}
 .tb-nav a{font-size:var(--text-xs);color:var(--color-text-secondary);letter-spacing:1px;text-transform:uppercase}
 .tb-nav a:hover{color:var(--color-text-primary)}
 .tb-nav a.cur{color:var(--color-text-primary);border-bottom:1px solid var(--color-text-secondary)}
-.gtab-bar{display:flex;gap:0;border-bottom:1px solid var(--color-border);overflow-x:auto;scrollbar-width:none;padding:0 var(--space-4);background:var(--color-bg)}
+.gtab-bar{display:flex;gap:0;border-bottom:1px solid var(--color-border);overflow-x:auto;scrollbar-width:none;padding:0 var(--space-4);background:var(--color-bg);position:sticky;top:50px;z-index:15}
 .gtab-bar::-webkit-scrollbar{display:none}
 .gtab{display:inline-block;background:none;border:none;border-bottom:2px solid transparent;
   color:var(--color-text-muted);font-family:var(--font-mono);font-size:calc(var(--text-sm) * 1.4);letter-spacing:.05em;
@@ -3457,26 +3457,53 @@ a{color:inherit;text-decoration:none}
 .gtab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
 .gtab .cnt{font-size:var(--text-xs);color:var(--color-text-dim);margin-left:5px;font-weight:var(--fw-normal)}
 .gtab.active .cnt{color:var(--color-text-muted)}
-.page{padding:var(--space-4) var(--space-4) 60px;max-width:1100px;margin:0 auto}
-.page-hdr{display:flex;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-4)}
-.page-hdr h2{font-size:var(--text-md);color:var(--color-text-primary);letter-spacing:2px;text-transform:uppercase}
+/* ── Layout: left rail + main ── */
+.layout{display:flex;min-height:calc(100vh - 94px)}
+.left-rail{width:190px;flex-shrink:0;border-right:1px solid var(--color-border);overflow-y:auto;position:sticky;top:94px;max-height:calc(100vh - 94px);scrollbar-width:thin;scrollbar-color:var(--color-border) transparent}
+.left-rail::-webkit-scrollbar{width:4px}.left-rail::-webkit-scrollbar-thumb{background:var(--color-border)}
+.lr-section{font-size:.6rem;color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;padding:10px 14px 4px}
+.lr-item{display:block;padding:7px 14px;cursor:pointer;border-left:2px solid transparent;transition:background .1s,border-color .1s;text-decoration:none;color:inherit;position:relative}
+.lr-item:hover{background:var(--color-surface);border-left-color:var(--color-accent)}
+.lr-item.active{border-left-color:var(--color-accent);background:var(--color-surface)}
+.lr-name{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lr-sub{font-size:.62rem;color:var(--color-text-muted);margin-top:1px}
+/* ── Flyout panel ── */
+.flyout{position:fixed;left:190px;top:0;width:220px;background:var(--color-surface-2);border:1px solid var(--color-border);border-left:none;padding:14px 16px;z-index:100;pointer-events:none;opacity:0;transition:opacity .1s;box-shadow:4px 0 20px rgba(0,0,0,.4)}
+.flyout.show{opacity:1;pointer-events:auto}
+.flyout-name{font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--color-text-primary);margin-bottom:6px;line-height:1.3}
+.flyout-best{font-size:var(--text-xl);font-weight:var(--fw-black);color:var(--color-accent);font-variant-numeric:tabular-nums;margin-bottom:2px}
+.flyout-bestlbl{font-size:.6rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+.flyout-laps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.flyout-lap{font-size:.65rem;background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text-secondary);padding:2px 6px;border-radius:3px;font-variant-numeric:tabular-nums}
+.flyout-link{font-size:.65rem;color:var(--color-accent);text-transform:uppercase;letter-spacing:.08em;text-decoration:none}
+.flyout-link:hover{text-decoration:underline}
+/* ── Main content ── */
+.main-content{flex:1;min-width:0}
+/* ── Game KPIs strip ── */
+.kpi-strip{display:flex;gap:0;border-bottom:1px solid var(--color-border-subtle);padding:14px var(--space-4);flex-wrap:wrap;gap:var(--space-6)}
+.kpi-item{text-align:left}
+.kpi-val{font-size:var(--text-lg);font-weight:var(--fw-black);color:var(--color-text-primary);font-variant-numeric:tabular-nums}
+.kpi-lbl{font-size:.6rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+/* ── Section header ── */
+.sec-hdr{display:flex;align-items:baseline;gap:var(--space-3);padding:12px var(--space-4) 8px}
+.sec-hdr h2{font-size:var(--text-sm);color:var(--color-text-secondary);letter-spacing:2px;text-transform:uppercase;font-weight:normal}
 .count{font-size:var(--text-xs);color:var(--color-text-muted)}
 /* ── Track list ── */
-.tracks-list{border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden}
-.tl-row{display:flex;align-items:center;height:72px;border-bottom:1px solid var(--color-border-subtle);cursor:pointer;transition:background .12s,border-left .12s;border-left:2px solid transparent;padding:0 16px 0 14px;gap:16px}
+.tracks-list{border-top:1px solid var(--color-border-subtle)}
+.tl-row{display:flex;align-items:center;height:68px;border-bottom:1px solid var(--color-border-subtle);cursor:pointer;transition:background .12s,border-left .12s;border-left:2px solid transparent;padding:0 16px 0 14px;gap:16px}
 .tl-row:last-child{border-bottom:none}
 .tl-row:hover{background:var(--color-surface);border-left-color:var(--color-accent)}
 .tl-row.no-lap{opacity:.45}
-.tl-left{flex:0 0 40%;min-width:0;overflow:hidden}
+.tl-left{flex:0 0 38%;min-width:0;overflow:hidden}
 .tl-name{font-size:var(--text-md);font-weight:var(--fw-bold);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tl-meta{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tl-center{flex:0 0 35%;display:flex;align-items:center;gap:8px}
-.tl-spark{flex:0 0 180px;height:40px}
+.tl-center{flex:1;display:flex;align-items:center;gap:8px}
+.tl-spark{flex:1;max-width:200px;height:36px}
 .tl-spark svg{display:block}
-.tl-arrow{font-size:.8rem;flex-shrink:0}
-.tl-right{flex:0 0 25%;text-align:right}
-.tl-best{font-size:var(--text-xl);font-weight:var(--fw-black);color:var(--color-accent);font-variant-numeric:tabular-nums;line-height:1}
-.tl-finish{font-size:var(--text-xs);color:var(--color-blue);margin-top:4px}
+.tl-arrow{font-size:.75rem;flex-shrink:0}
+.tl-right{flex:0 0 22%;text-align:right}
+.tl-best{font-size:var(--text-lg);font-weight:var(--fw-black);color:var(--color-accent);font-variant-numeric:tabular-nums;line-height:1}
+.tl-finish{font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:3px}
 /* ── Car class badges ── */
 .cc{font-size:.58rem;font-weight:var(--fw-bold);padding:1px 5px;border-radius:3px;letter-spacing:.5px;vertical-align:middle;margin-right:4px}
 .cc-X{background:#ef444415;color:#ef4444;border:1px solid #ef444440}
@@ -3488,7 +3515,8 @@ a{color:inherit;text-decoration:none}
 .cc-D{background:#33333350;color:#888;border:1px solid #44444460}
 .cc-R{background:#06b6d415;color:#06b6d4;border:1px solid #06b6d440}
 .cc-P{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf640}
-.empty-state{color:var(--n-500);font-size:.85rem;padding:48px var(--sp-6);text-align:center}
+.empty-state{color:var(--n-500);font-size:.85rem;padding:48px var(--space-4);text-align:center}
+@media(max-width:700px){.left-rail{display:none}.main-content{width:100%}}
 </style>
 </head>
 <body>
@@ -3508,12 +3536,32 @@ a{color:inherit;text-decoration:none}
   <a class="gtab" href="/sessions/game?name=acc" id="tab-acc">ACC<span class="cnt" id="cnt-acc"></span></a>
   <a class="gtab" href="/sessions/game?name=f1" id="tab-f1">F1<span class="cnt" id="cnt-f1"></span></a>
 </div>
-<div class="page">
-  <div class="page-hdr">
-    <h2 id="page-title">Tracks</h2>
-    <span class="count" id="count"></span>
+<!-- Flyout panel (shared, moved by JS) -->
+<div class="flyout" id="flyout">
+  <div class="flyout-name" id="fo-name"></div>
+  <div class="flyout-best" id="fo-best"></div>
+  <div class="flyout-bestlbl">Best Lap</div>
+  <div class="flyout-laps" id="fo-laps"></div>
+  <a class="flyout-link" id="fo-link">View all →</a>
+</div>
+<div class="layout">
+  <nav class="left-rail" id="left-rail">
+    <div class="lr-section">Circuits</div>
+    <div id="lr-items"></div>
+  </nav>
+  <div class="main-content">
+    <div class="kpi-strip" id="kpi-strip" style="display:none">
+      <div class="kpi-item"><div class="kpi-val" id="kpi-sessions">—</div><div class="kpi-lbl">Sessions</div></div>
+      <div class="kpi-item"><div class="kpi-val" id="kpi-circuits">—</div><div class="kpi-lbl">Circuits</div></div>
+      <div class="kpi-item"><div class="kpi-val" id="kpi-best">—</div><div class="kpi-lbl">Best Lap</div></div>
+      <div class="kpi-item"><div class="kpi-val" id="kpi-besttrack" style="font-size:var(--text-xs);color:var(--color-text-muted);font-weight:normal"></div><div class="kpi-lbl"></div></div>
+    </div>
+    <div class="sec-hdr">
+      <h2 id="page-title">Tracks</h2>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="tracks-list" id="list"><div class="empty-state">Loading&hellip;</div></div>
   </div>
-  <div class="tracks-list" id="list"><div class="empty-state">Loading&hellip;</div></div>
 </div>
 <script>
 const GAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
@@ -3525,7 +3573,7 @@ function classBadge(cls){if(cls==null)return'';const n=CLASS_NAMES[cls]||'?';ret
 function sparkSVG(vals){
   const v=(vals||[]).filter(t=>t>0);
   if(!v.length)return'';
-  const W=180,H=40,p=3;
+  const W=180,H=36,p=3;
   const mn=Math.min(...v),mx=Math.max(...v),rng=mx-mn||0.001;
   if(v.length===1){
     return`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -3536,12 +3584,11 @@ function sparkSVG(vals){
   const ys=v.map(t=>H-p-(H-p*2)*(mx-t)/rng);
   const pts=xs.map((x,i)=>x.toFixed(1)+','+ys[i].toFixed(1)).join(' ');
   const fillPts=`${xs[0].toFixed(1)},${H} ${pts} ${xs[xs.length-1].toFixed(1)},${H}`;
-  return`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="var(--color-accent)" stop-opacity=".25"/>
+  return`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <defs><linearGradient id="sg${Math.random().toString(36).slice(2)}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--color-accent)" stop-opacity=".2"/>
       <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0"/>
     </linearGradient></defs>
-    <polygon points="${fillPts}" fill="url(#sg)"/>
     <polyline points="${pts}" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
   </svg>`;
 }
@@ -3549,29 +3596,79 @@ const _game=new URLSearchParams(location.search).get('name')||'';
 const tabMap={'forza_motorsport':'tab-forza','acc':'tab-acc','f1':'tab-f1'};
 if(_game&&tabMap[_game])document.getElementById(tabMap[_game]).classList.add('active');
 else document.getElementById('tab-all').classList.add('active');
+
+// ── Game KPIs ─────────────────────────────────────────────────
 (async()=>{
   let games=[];try{games=await fetch('/sessions/games').then(r=>r.json());}catch(e){}
   let all=0;
-  games.forEach(g=>{const n=g.session_count||0;all+=n;
+  const gameData={};
+  games.forEach(g=>{const n=g.session_count||0;all+=n;gameData[g.game]=g;
     const m={'forza_motorsport':'cnt-forza','acc':'cnt-acc','f1':'cnt-f1'}[g.game];
     if(m){const el=document.getElementById(m);if(el&&n)el.textContent='('+n+')';}
   });
   const ca=document.getElementById('cnt-all');if(ca&&all)ca.textContent='('+all+')';
+  if(_game&&gameData[_game]){
+    const g=gameData[_game];
+    document.getElementById('kpi-sessions').textContent=g.session_count||0;
+    document.getElementById('kpi-circuits').textContent=g.track_count||0;
+    document.getElementById('kpi-best').textContent=fmtLap(g.best_lap_time_s);
+    if(g.best_lap_track)document.getElementById('kpi-besttrack').textContent=g.best_lap_track;
+    document.getElementById('kpi-strip').style.display='';
+  }
 })();
+
+// ── Left rail flyout ─────────────────────────────────────────
+let _flyTimer=null;
+const _fo=document.getElementById('flyout');
+function showFlyout(el,track){
+  clearTimeout(_flyTimer);
+  _flyTimer=setTimeout(()=>{
+    const rect=el.getBoundingClientRect();
+    _fo.style.top=Math.max(0,rect.top)+'px';
+    document.getElementById('fo-name').textContent=track.track==='unknown'?'Unknown Track':track.track;
+    document.getElementById('fo-best').textContent=fmtLap(track.best_lap_time_s);
+    const laps=(track.spark_laps||[]).slice(-3);
+    document.getElementById('fo-laps').innerHTML=laps.map(t=>`<span class="flyout-lap">${fmtLap(t)}</span>`).join('');
+    const href='/sessions/track?name='+encodeURIComponent(track.track)+(_game?'&game='+encodeURIComponent(_game):'');
+    const foLink=document.getElementById('fo-link');foLink.href=href;
+    _fo.classList.add('show');
+  },150);
+}
+function hideFlyout(){clearTimeout(_flyTimer);_fo.classList.remove('show');}
+
 let _tracks=[];
 async function init(){
   const label=GAME_LABELS[_game]||_game||'All';
-  document.getElementById('page-title').textContent=label+' Tracks';
+  document.getElementById('page-title').textContent=label?label+' Circuits':'All Circuits';
   document.title='Pacefinder · '+label;
   const url='/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'');
   try{_tracks=await fetch(url).then(r=>r.json());}catch(e){_tracks=[];}
+  document.getElementById('count').textContent=_tracks.length+' circuit'+(_tracks.length!==1?'s':'');
+  // Left rail
+  const withLap=_tracks.filter(t=>t.best_lap_time_s&&t.track!=='unknown');
+  const noLap=_tracks.filter(t=>!t.best_lap_time_s&&t.track!=='unknown');
+  const unk=_tracks.filter(t=>t.track==='unknown');
+  const sorted=[...withLap,...noLap,...unk];
+  const lrItems=document.getElementById('lr-items');
+  lrItems.innerHTML=sorted.map(t=>{
+    const label=t.track==='unknown'?`Unidentified (${t.session_count})`:esc(t.track);
+    const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
+    return`<a class="lr-item${t.track==='unknown'?' lr-item-unk':''}" href="${href}" data-idx="${sorted.indexOf(t)}">
+      <div class="lr-name">${label}</div>
+      <div class="lr-sub">${t.session_count} sess${t.session_count===1?'':'.'}</div>
+    </a>`;
+  }).join('');
+  // Attach flyout events
+  lrItems.querySelectorAll('.lr-item').forEach((el,i)=>{
+    el.addEventListener('mouseenter',()=>showFlyout(el,sorted[i]));
+    el.addEventListener('mouseleave',hideFlyout);
+  });
+  _fo.addEventListener('mouseenter',()=>clearTimeout(_flyTimer));
+  _fo.addEventListener('mouseleave',hideFlyout);
+  // Main track list
   const list=document.getElementById('list');
-  document.getElementById('count').textContent=_tracks.length+' track'+(_tracks.length!==1?'s':'');
   if(!_tracks.length){list.innerHTML='<div class="empty-state">No sessions recorded yet</div>';return;}
-  // Tracks with best lap first, then no-lap tracks at bottom
-  const withLap=_tracks.filter(t=>t.best_lap_time_s);
-  const noLap=_tracks.filter(t=>!t.best_lap_time_s);
-  list.innerHTML=[...withLap,...noLap].map((t,i)=>{
+  list.innerHTML=[...withLap,...noLap,...unk].map((t,i)=>{
     const label=t.track==='unknown'?'Unknown Track':esc(t.track);
     const hasLap=!!t.best_lap_time_s;
     const badge=classBadge(t.best_car_class);
@@ -3644,6 +3741,9 @@ a{color:inherit;text-decoration:none}
 .lr-item{display:block;padding:8px 14px;cursor:pointer;border-left:2px solid transparent;transition:background .12s,border-color .12s;text-decoration:none;color:inherit}
 .lr-item:hover{background:var(--color-surface)}
 .lr-item.active{border-left-color:var(--color-accent);background:var(--color-surface)}
+.lr-item-unk{opacity:.45}
+.lr-item-unk:hover{opacity:.7}
+.lr-pill-unk{opacity:.4}
 .lr-name{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lr-sub{font-size:.65rem;color:var(--color-text-muted);margin-top:2px}
 .main-content{flex:1;min-width:0}
@@ -3676,6 +3776,19 @@ td.best-time{color:var(--accent-soft);font-weight:bold}
 td.date-col{color:var(--text)}
 .type-chip{font-size:.65rem;background:var(--accent-bg);border:1px solid var(--accent-bd);color:var(--accent-soft);padding:1px 7px;border-radius:10px;letter-spacing:.5px}
 .empty-state{color:var(--n-500);font-size:.85rem;padding:48px var(--sp-6);text-align:center}
+.trk-tab-bar{display:flex;gap:0;border-bottom:1px solid var(--color-border);padding:0 var(--space-4);background:var(--color-bg)}
+.trk-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--text-sm);font-weight:var(--fw-normal);padding:10px 16px 10px 0;cursor:pointer;white-space:nowrap;margin-bottom:-1px;transition:color .15s,border-color .15s,font-weight .15s}
+.trk-tab:hover{color:var(--color-text-secondary)}
+.trk-tab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
+.tele-ctrl{display:flex;align-items:center;gap:var(--sp-4);padding:10px var(--sp-6);border-bottom:1px solid var(--color-border-subtle);flex-wrap:wrap}
+.tele-sel{background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text-primary);font-family:inherit;font-size:.78rem;padding:4px 8px;border-radius:4px;max-width:340px}
+.tele-label{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em}
+.tele-chart-area{padding:var(--sp-4) var(--sp-6);position:relative}
+.tele-empty-msg{padding:40px var(--sp-6);color:var(--color-text-muted);font-size:var(--text-sm);text-align:center}
+.class-filter{display:flex;align-items:center;gap:6px;padding:10px var(--sp-6) 4px;flex-wrap:wrap}
+.cf-pill{background:none;border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:inherit;font-size:.65rem;font-weight:bold;padding:3px 10px;border-radius:12px;cursor:pointer;letter-spacing:.5px;transition:border-color .12s,color .12s}
+.cf-pill:hover{border-color:var(--color-text-muted);color:var(--color-text-primary)}
+.cf-pill.active{border-color:var(--color-accent);color:var(--color-accent)}
 .ref-card{margin:var(--sp-4) var(--sp-6);border:1px solid var(--surface-bd);border-radius:6px;background:var(--bg-raised);padding:var(--sp-4) var(--sp-5);display:none}
 .ref-card.on{display:block}
 .ref-card-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:2px;margin-bottom:var(--space-3)}
@@ -3688,6 +3801,17 @@ td.date-col{color:var(--text)}
 .ref-sectors{font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px;padding-left:94px}
 .ref-gap{margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--border-sub);font-size:.75rem;color:var(--n-300);display:flex;align-items:center;gap:var(--sp-3)}
 .ref-gap-val{color:var(--warn);font-weight:bold;font-size:.9rem}
+.cc-badge{font-size:.62rem;padding:1px 6px;border-radius:3px;font-weight:bold;letter-spacing:.5px}
+.cc-X{background:#f9731615;color:#f97316;border:1px solid #f9731640}
+.cc-S2{background:#a855f715;color:#a855f7;border:1px solid #a855f740}
+.cc-S1{background:#f59e0b15;color:#f59e0b;border:1px solid #f59e0b40}
+.cc-A{background:#3b82f615;color:#3b82f6;border:1px solid #3b82f640}
+.cc-B{background:#22c55e15;color:#22c55e;border:1px solid #22c55e40}
+.cc-C{background:#64748b15;color:#94a3b8;border:1px solid #64748b40}
+.cc-D{background:#33333350;color:#888;border:1px solid #44444460}
+.cc-R{background:#06b6d415;color:#06b6d4;border:1px solid #06b6d440}
+.gains-badge{font-size:.7rem;font-weight:bold;padding:1px 6px;border-radius:3px}
+.gains-badge.pos{color:#22c55e}.gains-badge.neg{color:var(--danger)}.gains-badge.even{color:var(--color-text-muted)}
 </style>
 </head>
 <body>
@@ -3709,6 +3833,10 @@ td.date-col{color:var(--text)}
 </div>
 <div class="breadcrumb"><a href="/sessions">Sessions</a> &rsaquo; <a href="#" id="bc-game" style="display:none"></a><span id="bc-sep" style="display:none"> &rsaquo; </span><span id="bc-track">Track</span></div>
 <div class="lr-pills" id="lr-pills"></div>
+<div class="trk-tab-bar">
+  <button class="trk-tab active" id="trk-tab-overview" onclick="switchTrackTab('overview')">Overview</button>
+  <button class="trk-tab" id="trk-tab-telemetry" onclick="switchTrackTab('telemetry')">Telemetry</button>
+</div>
 <div class="layout">
   <nav class="left-rail" id="left-rail">
     <div class="lr-section-lbl">Circuits</div>
@@ -3721,32 +3849,68 @@ td.date-col{color:var(--text)}
       <div class="hdr-stat"><div class="v" id="hdr-count">&mdash;</div><div class="l">Sessions</div></div>
       <div class="hdr-stat"><div class="v" id="hdr-trend">&mdash;</div><div class="l">Trend</div></div>
     </div>
-    <div class="track-tip-bar" id="tip-bar">
-      <span id="tip-text"></span>
-      <button class="tip-gen" id="tip-btn" onclick="generateTip()">Generate AI tip</button>
-    </div>
-    <div class="ref-card" id="ref-card">
-      <div class="ref-card-lbl" id="ref-card-title">References</div>
-      <div class="ref-rows" id="ref-rows"></div>
-      <div class="ref-gap" id="ref-gap" style="display:none">
-        <span>Gap to theoretical</span>
-        <span class="ref-gap-val" id="ref-gap-val"></span>
+
+    <!-- Overview tab -->
+    <div id="trk-overview">
+      <div class="track-tip-bar" id="tip-bar">
+        <span id="tip-text"></span>
+        <button class="tip-gen" id="tip-btn" onclick="generateTip()">Generate AI tip</button>
+      </div>
+      <div class="ref-card" id="ref-card">
+        <div class="ref-card-lbl" id="ref-card-title">References</div>
+        <div class="ref-rows" id="ref-rows"></div>
+        <div class="ref-gap" id="ref-gap" style="display:none">
+          <span>Gap to theoretical</span>
+          <span class="ref-gap-val" id="ref-gap-val"></span>
+        </div>
+      </div>
+      <div class="class-filter" id="class-filter" style="display:none"></div>
+      <div class="page">
+        <table id="sess-table" style="display:none">
+          <thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Pos</th><th>±</th><th>Class</th></tr></thead>
+          <tbody id="sess-tbody"></tbody>
+        </table>
+        <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
       </div>
     </div>
-    <div class="page">
-      <table id="sess-table" style="display:none">
-        <thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Pace</th></tr></thead>
-        <tbody id="sess-tbody"></tbody>
-      </table>
-      <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
+
+    <!-- Telemetry tab -->
+    <div id="trk-telemetry" style="display:none">
+      <div class="tele-ctrl">
+        <div>
+          <div class="tele-label">Lap</div>
+          <select class="tele-sel" id="tele-sess-sel" onchange="onTeleSessChange()"></select>
+        </div>
+        <div>
+          <div class="tele-label">Lap #</div>
+          <select class="tele-sel" id="tele-lap-sel" onchange="onTeleLapChange()"></select>
+        </div>
+        <div>
+          <div class="tele-label">Reference</div>
+          <select class="tele-sel" id="tele-ref-sel" onchange="onTeleRefChange()"></select>
+        </div>
+      </div>
+      <div class="tele-chart-area" id="tele-chart-area">
+        <div class="tele-empty-msg" id="tele-msg">Loading best lap&hellip;</div>
+        <div id="tele-cmp-wrap" style="display:none">
+          <div id="tele-crosshair" style="position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.2);pointer-events:none;display:none"></div>
+          <div id="tele-tooltip" style="position:absolute;top:4px;background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text-primary);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap"></div>
+          <div id="tele-charts-inner"></div>
+          <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--color-text-muted);margin-top:2px"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+        </div>
+      </div>
     </div>
+
   </div>
 </div>
 <script>
 const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Real Race',ai:'AI Race'};
+const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
 const GAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
+function classBadge(c){if(c==null)return'';const n=CLASS_NAMES[c]||'?';return`<span class="cc-badge cc-${n}">${n}</span>`;}
+function gainsBadge(gp,fp){if(gp==null||fp==null||gp===0)return'';const g=gp-fp;if(g===0)return'<span class="gains-badge even">—</span>';return g>0?`<span class="gains-badge pos">+${g}</span>`:`<span class="gains-badge neg">${g}</span>`;}
 function spark(times){
   const v=(times||[]).filter(t=>t>0);
   if(v.length<2)return '<span style="color:var(--color-text-dim)">—</span>';
@@ -3760,7 +3924,8 @@ function spark(times){
 }
 const _track=new URLSearchParams(location.search).get('name')||'';
 const _game=new URLSearchParams(location.search).get('game')||'';
-let _sessions=[], _allTracks=[];
+let _sessions=[], _allTracks=[], _classFilter=null;
+function filteredSessions(){return _classFilter===null?_sessions:_sessions.filter(s=>s.car_class===_classFilter);}
 
 // ── Game tab setup ────────────────────────────────────────────
 (async()=>{
@@ -3801,6 +3966,7 @@ async function init(){
   try{_allTracks=await fetch('/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'')).then(r=>r.json());}catch(e){_allTracks=[];}
   renderLeftRail();
   renderHeader();
+  renderClassFilter();
   renderTable();
   loadTip();
   loadReferences();
@@ -3809,52 +3975,71 @@ async function init(){
 function renderLeftRail(){
   const items=document.getElementById('lr-items');
   const pills=document.getElementById('lr-pills');
-  items.innerHTML=_allTracks.map(t=>{
-    const label=t.track==='unknown'?'Unknown':t.track;
+  const known=_allTracks.filter(t=>t.track!=='unknown');
+  const unk=_allTracks.filter(t=>t.track==='unknown');
+  const sorted=[...known,...unk];
+  items.innerHTML=sorted.map(t=>{
+    const isUnk=t.track==='unknown';
+    const label=isUnk?`Unidentified (${t.session_count})`:t.track;
     const active=t.track===_track;
     const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
-    return`<a class="lr-item${active?' active':''}" href="${href}">
+    return`<a class="lr-item${active?' active':''}${isUnk?' lr-item-unk':''}" href="${href}">
       <div class="lr-name">${label}</div>
-      <div class="lr-sub">${t.session_count} session${t.session_count===1?'':'s'}</div>
+      ${isUnk?'':'<div class="lr-sub">'+t.session_count+' session'+(t.session_count===1?'':'s')+'</div>'}
     </a>`;
   }).join('');
-  pills.innerHTML=_allTracks.map(t=>{
+  pills.innerHTML=sorted.map(t=>{
+    const isUnk=t.track==='unknown';
     const active=t.track===_track;
     const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
-    return`<a class="lr-pill${active?' active':''}" href="${href}">${t.track==='unknown'?'Unknown':t.track}</a>`;
+    return`<a class="lr-pill${active?' active':''}${isUnk?' lr-pill-unk':''}" href="${href}">${isUnk?`Unidentified (${t.session_count})`:t.track}</a>`;
   }).join('');
 }
 
+function renderClassFilter(){
+  const classes=[...new Set(_sessions.map(s=>s.car_class).filter(c=>c!=null))].sort((a,b)=>b-a);
+  const bar=document.getElementById('class-filter');
+  if(!classes.length){bar.style.display='none';return;}
+  bar.style.display='flex';
+  bar.innerHTML=[{label:'ALL',val:null},...classes.map(c=>({label:CLASS_NAMES[c]||String(c),val:c}))].map(p=>`<button class="cf-pill${p.val===_classFilter?' active':''}" onclick="setClass(${p.val===null?'null':p.val})">${p.label}</button>`).join('');
+}
+function setClass(c){_classFilter=c;renderClassFilter();renderHeader();renderTable();}
 function renderHeader(){
+  const fs=filteredSessions();
   document.getElementById('hdr-name').textContent=_track;
-  const allBest=_sessions.map(s=>s.best_lap_time_s).filter(v=>v);
+  const allBest=fs.map(s=>s.best_lap_time_s).filter(v=>v);
   document.getElementById('hdr-best').textContent=allBest.length?fmtLap(Math.min(...allBest)):'—';
-  document.getElementById('hdr-count').textContent=_sessions.length;
-  const last3=_sessions.slice(0,3).map(s=>s.best_lap_time_s).filter(v=>v);
+  document.getElementById('hdr-count').textContent=fs.length;
+  const last3=fs.slice(0,3).map(s=>s.best_lap_time_s).filter(v=>v);
   let trendHtml='—';
   if(last3.length>=2){const d=last3[0]-last3[1];trendHtml=d<-0.5?'<span style="color:var(--color-green)">▲ Improving</span>':d>0.5?'<span style="color:var(--color-red)">▼ Declining</span>':'<span style="color:var(--color-text-muted)">Stable</span>';}
   document.getElementById('hdr-trend').innerHTML=trendHtml;
 }
 function renderTable(){
-  if(!_sessions.length){document.getElementById('empty').style.display='block';return;}
+  const fs=filteredSessions();
+  if(!fs.length){document.getElementById('empty').style.display='block';document.getElementById('sess-table').style.display='none';return;}
+  document.getElementById('empty').style.display='none';
   document.getElementById('sess-table').style.display='';
-  const allBests=_sessions.map(s=>s.best_lap_time_s).filter(v=>v);
+  const allBests=fs.map(s=>s.best_lap_time_s).filter(v=>v);
   const globalBest=allBests.length?Math.min(...allBests):null;
-  document.getElementById('sess-tbody').innerHTML=_sessions.map(s=>{
+  document.getElementById('sess-tbody').innerHTML=fs.map(s=>{
     const isGB=globalBest&&s.best_lap_time_s&&Math.abs(s.best_lap_time_s-globalBest)<0.001;
     const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
     const typeHtml=effType?`<span class="type-chip">${TYPE_LABELS[effType]||effType}</span>`:'';
+    const posHtml=s.finish_pos!=null?`P${s.finish_pos}`:'—';
     return `<tr class="clickable" data-id="${s.session_id}">
       <td class="date-col">${fmtDt(s.started_at)}</td>
       <td>${typeHtml}</td>
       <td class="${isGB?'best-time':''}">${fmtLap(s.best_lap_time_s)}</td>
       <td>${s.lap_count||0}</td>
-      <td>${spark(s.lap_times)}</td>
+      <td>${posHtml}</td>
+      <td>${gainsBadge(s.grid_pos,s.finish_pos)}</td>
+      <td>${classBadge(s.car_class)}</td>
     </tr>`;
   }).join('');
   document.querySelectorAll('#sess-tbody tr').forEach((tr,i)=>{
     tr.addEventListener('click',()=>{
-      let u='/sessions/session?id='+encodeURIComponent(_sessions[i].session_id);
+      let u='/sessions/session?id='+encodeURIComponent(fs[i].session_id);
       if(_game)u+='&game='+encodeURIComponent(_game);
       if(_track)u+='&track='+encodeURIComponent(_track);
       location.href=u;
@@ -3871,7 +4056,7 @@ async function loadReferences(){
     document.getElementById('ref-card-title').textContent=(_track.toUpperCase()||'TRACK')+' References';
     let html='';
     if(d.best_lap){const bl=d.best_lap;html+=`<div class="ref-row"><span class="ref-row-type">Best Lap</span><span class="ref-row-time green">${fmtLap(bl.lap_time_s)}</span><span class="ref-row-meta">${bl.session_date}&nbsp;&nbsp;Lap ${bl.lap_number}</span></div>`;}
-    if(d.theoretical){const th=d.theoretical;html+=`<div class="ref-row"><span class="ref-row-type">Theoretical</span><span class="ref-row-time">${fmtLap(th.theoretical_best_s)}</span><span class="ref-row-meta"></span></div><div class="ref-sectors">S1 ${th.s1_s!=null?th.s1_s.toFixed(3)+'s':'—'} ${th.s1_session_date||''} &nbsp;·&nbsp; S2 ${th.s2_s!=null?th.s2_s.toFixed(3)+'s':'—'} ${th.s2_session_date||''} &nbsp;·&nbsp; S3 ${th.s3_s!=null?th.s3_s.toFixed(3)+'s':'—'} ${th.s3_session_date||''}</div>`;if(d.best_lap&&d.best_lap.lap_time_s&&th.theoretical_best_s){const gap=d.best_lap.lap_time_s-th.theoretical_best_s;if(gap>0.01){document.getElementById('ref-gap-val').textContent='+'+gap.toFixed(3)+'s';document.getElementById('ref-gap').style.display='flex';}}}
+    if(d.theoretical){const th=d.theoretical;html+=`<div class="ref-row"><span class="ref-row-type">Theoretical</span><span class="ref-row-time">${fmtLap(th.theoretical_best_s)}</span><span class="ref-row-meta"></span></div><div class="ref-sectors">S1 ${th.s1_s!=null?fmtLap(th.s1_s):'—'} ${th.s1_session_date||''} &nbsp;·&nbsp; S2 ${th.s2_s!=null?fmtLap(th.s2_s):'—'} ${th.s2_session_date||''} &nbsp;·&nbsp; S3 ${th.s3_s!=null?fmtLap(th.s3_s):'—'} ${th.s3_session_date||''}</div>`;if(d.best_lap&&d.best_lap.lap_time_s&&th.theoretical_best_s){const gap=d.best_lap.lap_time_s-th.theoretical_best_s;if(gap>0.01){document.getElementById('ref-gap-val').textContent='+'+gap.toFixed(3)+'s';document.getElementById('ref-gap').style.display='flex';}}}
     rows.innerHTML=html;card.classList.add('on');
   }catch(e){}
 }
@@ -3886,7 +4071,162 @@ async function generateTip(){
   const btn=document.getElementById('tip-btn');btn.textContent='Generating…';btn.disabled=true;
   try{const d=await fetch('/sessions/track/tip?name='+encodeURIComponent(_track)+'&generate=true').then(r=>r.json());if(d&&d.tip){document.getElementById('tip-text').textContent=d.tip;btn.style.display='none';}else{btn.textContent='Generate AI tip';btn.disabled=false;}}catch(e){btn.textContent='Error — retry';btn.disabled=false;}
 }
-init();
+
+// ── Track Telemetry Tab ───────────────────────────────────────
+const _initTrackTab=new URLSearchParams(location.search).get('tab')||'overview';
+let _teleInited=false,_teleSessData={},_teleLapSamples=null,_teleRefSamples=null;
+let _teleSelSessId=null,_teleSelLapN=null,_teleSelRef='best';
+
+function switchTrackTab(tab){
+  document.getElementById('trk-overview').style.display=tab==='overview'?'':'none';
+  document.getElementById('trk-telemetry').style.display=tab==='telemetry'?'':'none';
+  document.getElementById('trk-tab-overview').classList.toggle('active',tab==='overview');
+  document.getElementById('trk-tab-telemetry').classList.toggle('active',tab==='telemetry');
+  const url=new URL(location.href);url.searchParams.set('tab',tab);history.replaceState({},'',url);
+  if(tab==='telemetry'&&!_teleInited){_teleInited=true;initTelemetry();}
+}
+
+async function initTelemetry(){
+  document.getElementById('tele-msg').textContent='Loading sessions…';
+  // Build session selector from _sessions (already loaded)
+  const sel=document.getElementById('tele-sess-sel');
+  sel.innerHTML=_sessions.map(s=>`<option value="${s.session_id}">${fmtDt(s.started_at)} — ${fmtLap(s.best_lap_time_s)}</option>`).join('');
+  if(!_sessions.length){document.getElementById('tele-msg').textContent='No sessions at this track.';return;}
+  // Default to best-lap session
+  const allWithLap=_sessions.filter(s=>s.best_lap_time_s);
+  if(!allWithLap.length){document.getElementById('tele-msg').textContent='No lap data available.';return;}
+  const bestSess=allWithLap.reduce((a,b)=>a.best_lap_time_s<b.best_lap_time_s?a:b);
+  _teleSelSessId=bestSess.session_id;
+  sel.value=_teleSelSessId;
+  await loadTeleSessData(_teleSelSessId,true);
+}
+
+async function loadTeleSessData(sessId,selectBestLap){
+  document.getElementById('tele-msg').textContent='Loading…';
+  document.getElementById('tele-cmp-wrap').style.display='none';
+  try{
+    if(!_teleSessData[sessId]){
+      const d=await fetch('/sessions/session/data?id='+encodeURIComponent(sessId)).then(r=>r.json());
+      _teleSessData[sessId]=d;
+    }
+    const d=_teleSessData[sessId];
+    const laps=(d.laps||[]).filter(l=>l.lap_number>0&&l.lap_time_s&&l.samples&&l.samples.length);
+    // Populate lap selector
+    const lapSel=document.getElementById('tele-lap-sel');
+    lapSel.innerHTML=laps.map(l=>`<option value="${l.lap_number}">Lap ${l.lap_number} — ${fmtLap(l.lap_time_s)}</option>`).join('');
+    if(!laps.length){document.getElementById('tele-msg').textContent='No telemetry laps in this session.';return;}
+    if(selectBestLap){
+      const bestLap=laps.reduce((a,b)=>a.lap_time_s<b.lap_time_s?a:b);
+      _teleSelLapN=bestLap.lap_number;
+      lapSel.value=_teleSelLapN;
+    }
+    // Populate ref selector
+    buildTeleRefSel(d,laps);
+    await renderTeleCharts();
+  }catch(e){document.getElementById('tele-msg').textContent='Error loading telemetry.';}
+}
+
+function buildTeleRefSel(sessData,laps){
+  const refSel=document.getElementById('tele-ref-sel');
+  const opts=[{val:'none',label:'None'}];
+  // Other sessions at this track
+  _sessions.filter(s=>s.session_id!==_teleSelSessId&&s.best_lap_time_s).forEach(s=>{
+    opts.push({val:'sess:'+s.session_id,label:'Best: '+fmtDt(s.started_at)+' '+fmtLap(s.best_lap_time_s)});
+  });
+  refSel.innerHTML=opts.map(o=>`<option value="${o.val}">${o.label}</option>`).join('');
+  if(_teleSelRef&&refSel.querySelector(`[value="${_teleSelRef}"]`)){refSel.value=_teleSelRef;}
+  else{refSel.value='none';_teleSelRef='none';}
+}
+
+function tInterp(samples,norm,field){
+  if(!samples||!samples.length)return 0;
+  let lo=0,hi=samples.length-1;
+  while(lo<hi-1){const mid=(lo+hi)>>1;if(samples[mid].distance_norm<=norm)lo=mid;else hi=mid;}
+  const a=samples[lo],b=samples[hi];
+  const dn=b.distance_norm-a.distance_norm;
+  if(dn<1e-9)return a[field]??0;
+  const f=(norm-a.distance_norm)/dn;
+  return (a[field]??0)+f*((b[field]??0)-(a[field]??0));
+}
+
+function tSvgPath(samples,field,W,H,mn,mx){
+  const yr=mx-mn||1;
+  return'M'+samples.map(s=>{
+    const x=(s.distance_norm*W).toFixed(1);
+    const y=(H-((s[field]??mn)-mn)/yr*H).toFixed(1);
+    return x+','+y;
+  }).join('L');
+}
+
+async function onTeleSessChange(){
+  _teleSelSessId=document.getElementById('tele-sess-sel').value;
+  await loadTeleSessData(_teleSelSessId,true);
+}
+async function onTeleLapChange(){
+  _teleSelLapN=parseInt(document.getElementById('tele-lap-sel').value);
+  await renderTeleCharts();
+}
+async function onTeleRefChange(){
+  _teleSelRef=document.getElementById('tele-ref-sel').value;
+  await renderTeleCharts();
+}
+
+async function renderTeleCharts(){
+  const d=_teleSessData[_teleSelSessId];
+  if(!d)return;
+  const laps=(d.laps||[]);
+  const lap=laps.find(l=>l.lap_number===_teleSelLapN);
+  if(!lap||!lap.samples||!lap.samples.length){document.getElementById('tele-msg').textContent='No sample data for this lap.';document.getElementById('tele-cmp-wrap').style.display='none';return;}
+  const lapS=lap.samples;
+  let refS=null;
+  const refVal=_teleSelRef;
+  if(refVal&&refVal!=='none'&&refVal.startsWith('sess:')){
+    const refSessId=refVal.slice(5);
+    try{
+      if(!_teleSessData[refSessId]){
+        const rd=await fetch('/sessions/session/data?id='+encodeURIComponent(refSessId)).then(r=>r.json());
+        _teleSessData[refSessId]=rd;
+      }
+      const rd=_teleSessData[refSessId];
+      const rLaps=(rd.laps||[]).filter(l=>l.lap_number>0&&l.lap_time_s&&l.samples&&l.samples.length);
+      if(rLaps.length){const best=rLaps.reduce((a,b)=>a.lap_time_s<b.lap_time_s?a:b);refS=best.samples;}
+    }catch(e){}
+  }
+  const W=1000;
+  const tracks=[
+    {label:'Speed',field:'speed_ms',color:'rgba(96,165,250,.8)',refColor:'rgba(96,165,250,.35)',H:80},
+    {label:'Throttle',field:'throttle',color:'rgba(34,197,94,.8)',refColor:'rgba(34,197,94,.35)',H:60},
+    {label:'Brake',field:'brake',color:'rgba(248,113,113,.8)',refColor:'rgba(248,113,113,.35)',H:60},
+    {label:'Slip RL',field:'slip_rl',color:'rgba(251,191,36,.8)',refColor:'rgba(251,191,36,.35)',H:50},
+  ];
+  let html='';
+  for(const tr of tracks){
+    const vals=lapS.map(s=>s[tr.field]??0);
+    const mn=Math.min(...vals),mx=Math.max(...vals);
+    const padMn=mn-(mx-mn)*0.05,padMx=mx+(mx-mn)*0.05||mx+1;
+    const path=tSvgPath(lapS,tr.field,W,tr.H,padMn,padMx);
+    let refPath='';
+    if(refS){
+      const rVals=refS.map(s=>s[tr.field]??0);
+      const rMn=Math.min(mn,...rVals),rMx=Math.max(padMx,...rVals);
+      refPath=`<path d="${tSvgPath(refS,tr.field,W,tr.H,rMn,rMx)}" fill="none" stroke="${tr.refColor}" stroke-width="1.5" stroke-linejoin="round"/>`;
+    }
+    html+=`<div class="chart-row" style="margin-bottom:8px">
+      <div style="font-size:.6rem;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px">${tr.label}</div>
+      <svg viewBox="0 0 ${W} ${tr.H}" style="width:100%;display:block;overflow:visible">
+        ${refPath}
+        <path d="${path}" fill="none" stroke="${tr.color}" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+    </div>`;
+  }
+  document.getElementById('tele-charts-inner').innerHTML=html;
+  document.getElementById('tele-msg').style.display='none';
+  document.getElementById('tele-cmp-wrap').style.display='';
+}
+
+init().then(()=>{
+  if(_initTrackTab==='telemetry')switchTrackTab('telemetry');
+});
 </script>
 </body>
 </html>
@@ -4773,11 +5113,16 @@ td:first-child{text-align:left;color:var(--n-300)}
 tr.best-row td{color:var(--accent-soft)}
 tr.best-row td:first-child{color:var(--accent-bd2)}
 .warn{color:var(--warn)}.crit{color:var(--danger)}
+.out-lap-lbl{font-style:italic;color:var(--color-text-muted);font-size:.75em}
+.out-lap-time{color:var(--color-text-muted)}
+.outlier-row td{opacity:.55}
+.outlier-time{color:var(--color-text-muted)}
 .ai-section{padding:var(--sp-5) var(--sp-6);border-top:1px solid var(--border-sub);max-width:760px}
 .ai-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px}
-.btn-analyze{background:var(--accent-soft);color:var(--bg);border:none;font-family:inherit;font-size:.85rem;font-weight:bold;padding:10px var(--sp-6);border-radius:4px;cursor:pointer;letter-spacing:1px}
-.btn-analyze:hover{background:#16a34a}
-.btn-analyze:disabled{background:var(--color-surface-2);color:var(--color-text-muted);cursor:default}
+.btn-analyze{background:var(--color-surface-2);color:var(--color-accent);border:1px solid var(--color-accent);font-family:inherit;font-size:.85rem;font-weight:bold;padding:10px var(--sp-6);border-radius:4px;cursor:pointer;letter-spacing:1px}
+.btn-analyze:hover{background:var(--accent-bg)}
+.btn-analyze:disabled{opacity:.4;cursor:default}
+.ai-spotter-lbl{font-size:.6rem;color:var(--color-accent);text-transform:uppercase;letter-spacing:.2em;margin-bottom:6px;opacity:.7}
 .btn-re{background:none;border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:inherit;font-size:var(--text-sm);padding:var(--space-2) var(--space-4);border-radius:var(--radius-sm);cursor:pointer;letter-spacing:1px;margin-left:10px}
 .btn-re:hover{border-color:var(--n-300);color:#ccc}
 .btn-re:disabled{opacity:.4;cursor:default}
@@ -4866,6 +5211,7 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
       <div class="ai-section">
         <div class="ai-lbl">AI Coaching</div>
         <div>
+          <div class="ai-spotter-lbl">Spotter</div>
           <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
           <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
           <span class="ai-meta" id="ai-meta"></span>
@@ -4909,7 +5255,7 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Real Race',ai:'AI Race'};
 const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
-function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
+function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function scls(v){return v>0.25?'crit':v>0.12?'warn':'';}
 const _qs=new URLSearchParams(location.search);
 const _id=_qs.get('id')||'';
@@ -5020,18 +5366,26 @@ function renderHeader(){
 }
 function renderLaps(){
   const best=_sess.best_lap_time_s;
+  const validTimes=_laps.filter(l=>l.lap_number>0&&l.lap_time_s).map(l=>l.lap_time_s);
+  validTimes.sort((a,b)=>a-b);
+  const median=validTimes.length?validTimes[Math.floor(validTimes.length/2)]:null;
   document.getElementById('lap-tbody').innerHTML=_laps.map(l=>{
-    const isB=best&&l.lap_time_s&&Math.abs(l.lap_time_s-best)<0.001;
-    return `<tr class="${isB?'best-row':''}">
-      <td>${l.lap_number}</td>
-      <td>${fmtLap(l.lap_time_s)}</td>
+    const isOut=l.lap_number===0;
+    const isSlow=!isOut&&median&&l.lap_time_s&&l.lap_time_s>median*1.4;
+    const isB=!isOut&&best&&l.lap_time_s&&Math.abs(l.lap_time_s-best)<0.001;
+    const rowCls=[isB?'best-row':'',isSlow?'outlier-row':''].filter(Boolean).join(' ');
+    const lapNumHtml=isOut?`<span class="out-lap-lbl">OUT LAP</span>`:l.lap_number;
+    const timeHtml=isOut?`<span class="out-lap-time">${fmtLap(l.lap_time_s)}</span>`:(isSlow?`<span class="outlier-time">${fmtLap(l.lap_time_s)}</span>`:fmtLap(l.lap_time_s));
+    return `<tr class="${rowCls}">
+      <td>${lapNumHtml}</td>
+      <td>${timeHtml}</td>
       <td>${l.max_speed_mph!=null?l.max_speed_mph.toFixed(1)+' mph':'—'}</td>
       <td>${l.avg_throttle!=null?l.avg_throttle.toFixed(1)+'%':'—'}</td>
       <td>${l.avg_brake!=null?l.avg_brake.toFixed(1)+'%':'—'}</td>
       <td class="${scls(l.avg_slip||0)}">${l.avg_slip!=null?l.avg_slip.toFixed(4):'—'}</td>
       <td class="${scls(l.peak_slip||0)}">${l.peak_slip!=null?l.peak_slip.toFixed(4):'—'}</td>
       <td>${l.slip_above_pct!=null?l.slip_above_pct.toFixed(1)+'%':'—'}</td>
-      <td><button class="btn-cmp" onclick="openCompare(${l.lap_number})">Compare</button></td>
+      <td><button class="btn-cmp" title="Compare lap ${l.lap_number}" onclick="openCompare(${l.lap_number})">⇄</button></td>
     </tr>`;
   }).join('');
 }
@@ -6682,7 +7036,9 @@ async def handle_status(reader, writer):
                         row["avg_throttle"]   = round(sum(throttle) / n, 1)
                         row["avg_brake"]      = round(sum(brake)    / n, 1)
                         row["avg_slip"]       = round(sum(slip_vals) / n, 4)
-                        row["peak_slip"]      = round(max(slip_vals), 4)
+                        _sv_sorted = sorted(slip_vals)
+                        _p99_idx = max(0, int(len(_sv_sorted) * 0.99) - 1)
+                        row["peak_slip"]      = round(_sv_sorted[_p99_idx], 4)
                         row["slip_above_pct"] = round(
                             sum(1 for v in slip_vals if v > 0.1) / n * 100, 1)
                     else:
