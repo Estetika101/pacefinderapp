@@ -42,6 +42,7 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 .s-row-lbl{width:24px;color:var(--color-text-secondary);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:1px;flex-shrink:0}
 .s-cell{flex:1;text-align:center;font-variant-numeric:tabular-nums;font-size:.7rem;color:var(--n-400)}
 .s-cell.best{color:var(--accent-soft);font-weight:bold}
+.s-cell-d{flex:.7}
 .s-cell-hd{flex:1;text-align:center;font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px}
 .lap-summaries{margin-bottom:var(--sp-3);display:flex;flex-direction:column;gap:3px}
 .lap-sum-bar{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;padding:5px var(--sp-3);border-radius:4px;background:var(--bg-raised);border-left:3px solid}
