@@ -4687,8 +4687,13 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
   </nav>
 </div>
-<script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
-<div class="breadcrumb">
+<script>
+if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';
+if(new URLSearchParams(location.search).get('embed')==='1'){
+  document.querySelector('.tb').style.display='none';
+}
+</script>
+<div class="breadcrumb" id="tele-breadcrumb">
   <a href="/sessions">Sessions</a> &rsaquo;
   <a href="#" id="bc-game" style="display:none"></a><span id="bc-gsep" style="display:none"> &rsaquo; </span>
   <a href="#" id="bc-track"></a> &rsaquo;
@@ -4842,12 +4847,12 @@ function stepPts(samples,field,H,mn,mx){
 function secLine(frac,H){
   const x=normToSX(frac).toFixed(1);
   if(x<-10||x>W+10)return'';
-  return`<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="#282828" stroke-width="1" stroke-dasharray="4,3"/>`;
+  return`<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="#444" stroke-width="1" stroke-dasharray="4,3" opacity=".6"/>`;
 }
 function secLabel(frac,lbl,H){
   const x=normToSX(frac).toFixed(1);
   if(x<0||x>W-30)return'';
-  return`<text x="${parseFloat(x)+5}" y="14" fill="#383838" font-size="20" font-family="monospace">${lbl}</text>`;
+  return`<text x="${parseFloat(x)+5}" y="14" fill="#444" font-size="20" font-family="monospace">${lbl}</text>`;
 }
 // ── Delta builder ─────────────────────────────────────────────────────────
 function buildDelta(lapS,refS,N=500){
@@ -4919,7 +4924,7 @@ function setPanel(id,label,svgHtml,show){
 }
 // ── Individual panel SVG builders ─────────────────────────────────────────
 function speedSVG(){
-  const H=120;
+  const H=140;
   const allS=Object.values(_lapSamples).filter(Boolean);
   let[mn,mx]=autoRange([...allS,_refSamples?_refSamples:[]],'speed_mph');mn=Math.max(0,mn);
   const yr=mx-mn||1;
@@ -4945,7 +4950,7 @@ function speedSVG(){
   return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">${c}</svg>`;
 }
 function throttleSVG(){
-  const H=80;
+  const H=100;
   const y50=(H-50/100*H).toFixed(1),y70=(H-70/100*H).toFixed(1);
   let c=`${secLine(1/3,H)}${secLine(2/3,H)}
     <rect x="0" y="${y70}" width="${W}" height="${(parseFloat(y50)-parseFloat(y70)).toFixed(1)}" fill="#f59e0b1f"/>`;
@@ -5184,7 +5189,7 @@ function renderAll(){
     deltaHtml=`<svg viewBox="0 0 ${W} 32" preserveAspectRatio="none" width="100%" height="32">
       <text x="${W/2}" y="20" text-anchor="middle" fill="#282828" font-size="18" font-family="monospace">Select a reference to see delta</text></svg>`;
   }
-  setPanel('panel-delta','DELTA — cumulative time vs reference  (green=faster · red=slower)',deltaHtml,true);
+  setPanel('panel-delta','DELTA — CUMULATIVE TIME VS REFERENCE  (GREEN=FASTER · RED=SLOWER)',deltaHtml,true);
   setPanel('panel-speed','SPEED mph — ▽ corner minimum speed',speedSVG(),$('ch-speed').checked);
   setPanel('panel-throttle','THROTTLE % — amber band = 50-70% dwell zone',throttleSVG(),$('ch-throttle').checked);
   setPanel('panel-brake','BRAKE % — ● peak points',brakeSVG(),$('ch-brake').checked);
@@ -5305,25 +5310,36 @@ function setXMode(m){
   renderAll();
 }
 // ── Lap selector ──────────────────────────────────────────────────────────
+function _partialThresh(){
+  const validTimes=_laps.filter(l=>l.lap_number>0&&l.lap_time_s).map(l=>l.lap_time_s);
+  if(validTimes.length<2)return 0;
+  const sorted=[...validTimes].sort((a,b)=>a-b);
+  const median=sorted[Math.floor(sorted.length/2)];
+  return median*0.6;
+}
 function renderLapList(){
   const best=_sess.best_lap_time_s;
-  const partialThresh=best?best*0.6:0;
+  const pThresh=_partialThresh();
   $('lap-list').innerHTML=_laps.filter(l=>l.lap_time_s&&l.lap_number>0).map(l=>{
     const ci=_selectedLaps.indexOf(l.lap_number);
     const checked=ci>=0;
     const col=checked?LAP_COLORS[ci]:'#444';
     const isBest=best&&Math.abs(l.lap_time_s-best)<0.001;
-    const isPartial=partialThresh>0&&l.lap_time_s<partialThresh;
+    const isPartial=pThresh>0&&l.lap_time_s<pThresh;
+    const partialMark=isPartial?' <span style="font-size:.6rem;color:#555">(partial)</span>':'';
+    const bestMark=isBest&&!isPartial?' <span class="lap-best-badge">★</span>':'';
     return`<label class="lap-item">
       <input type="checkbox" ${checked?'checked':''} onchange="onLapToggle(${l.lap_number},this.checked)">
       <span class="lap-swatch" style="background:${col}"></span>
-      Lap ${l.lap_number}${isBest?' <span class="lap-best-badge">★</span>':''}${isPartial?' <span style="font-size:.6rem;color:#555">(partial)</span>':''}
+      Lap ${l.lap_number}${bestMark}${partialMark}
       <span class="lap-time-s">${fmtLap(l.lap_time_s)}</span>
     </label>`;
   }).join('');
-  // Exclude partial laps from ref selector
+  // Disable "My Best Lap" ref if that reference lap is a partial
   const refSel=$('ref-sel');
-  if(refSel&&refSel.options[1])refSel.options[1].disabled=!!(partialThresh>0&&best&&best<partialThresh);
+  if(refSel&&refSel.options[1]&&_refMeta&&_refMeta.best_lap){
+    refSel.options[1].disabled=pThresh>0&&_refMeta.best_lap.lap_time_s<pThresh;
+  }
 }
 async function onLapToggle(lapN,checked){
   if(checked){
@@ -5363,8 +5379,10 @@ function updateMaxT(){
   if(!_maxT)_maxT=1;
 }
 // ── Init ──────────────────────────────────────────────────────────────────
+const _isEmbed=new URLSearchParams(location.search).get('embed')==='1';
 async function init(){
   if(!_id){location.href='/sessions';return;}
+  if(_isEmbed){const bc=$('tele-breadcrumb');if(bc)bc.style.display='none';}
   let d;
   try{d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());}
   catch(e){$('tele-loading').textContent='Session not found';return;}
@@ -5382,10 +5400,12 @@ async function init(){
   if(game)sessHref+='&game='+encodeURIComponent(game);
   if(track)sessHref+='&track='+encodeURIComponent(track);
   $('bc-sess').href=sessHref;
-  // Best lap default
+  // Best lap default — skip partial laps
   const best=_sess.best_lap_time_s;
   const validLaps=_laps.filter(l=>l.lap_number>0&&l.lap_time_s);
-  const bestLap=validLaps.find(l=>best&&Math.abs(l.lap_time_s-best)<0.001)||validLaps[0];
+  const pThreshInit=_partialThresh();
+  const nonPartialLaps=pThreshInit>0?validLaps.filter(l=>l.lap_time_s>=pThreshInit):validLaps;
+  const bestLap=nonPartialLaps.find(l=>best&&Math.abs(l.lap_time_s-best)<0.001)||nonPartialLaps[0]||validLaps[0];
   if(bestLap){
     _selectedLaps=[bestLap.lap_number];
     _primaryLap=bestLap.lap_number;
@@ -5396,6 +5416,11 @@ async function init(){
     _refMeta=await fetch('/sessions/references?track='+encodeURIComponent(_sess.track||'')+'&game='+encodeURIComponent(_sess.game||'')).then(r=>r.json());
     if(_refMeta.best_lap&&$('ref-sel').options[1])$('ref-sel').options[1].text='My Best — '+fmtLap(_refMeta.best_lap.lap_time_s);
     if(_refMeta.theoretical&&$('ref-sel').options[2])$('ref-sel').options[2].text='Theoretical — '+fmtLap(_refMeta.theoretical.theoretical_best_s);
+    // Auto-skip partial reference
+    if(_refMeta.best_lap&&pThreshInit>0&&_refMeta.best_lap.lap_time_s<pThreshInit){
+      $('ref-sel').value=_refMeta.theoretical?'theoretical':'';
+      _refType=$('ref-sel').value;
+    }
   }catch(e){}
   await fetchRef();
   updateMaxT();
@@ -5508,22 +5533,6 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .chart-row{margin-bottom:6px}
 .chart-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px}
 .chart-svg{display:block;width:100%;overflow:visible}
-/* ── Telemetry tab ── */
-.tele-layout{display:flex;gap:var(--space-6);padding:var(--sp-5) var(--sp-6)}
-.tele-sidebar{width:160px;flex-shrink:0}
-.tele-sb-lbl{font-size:.6rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;margin-top:14px}
-.tele-sb-lbl:first-child{margin-top:0}
-.tele-lap-item{display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:var(--text-sm);color:var(--color-text-secondary)}
-.tele-lap-best{color:var(--color-accent)}
-.tele-lap-time{margin-left:auto;color:var(--color-text-dim);font-size:var(--text-xs)}
-.tele-refsel{width:100%;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:var(--font-mono);font-size:var(--text-xs);padding:4px 6px;border-radius:var(--radius-sm)}
-.tele-xax{display:flex;gap:4px}
-.txa{background:none;border:1px solid var(--color-border);color:var(--color-text-muted);font-family:inherit;font-size:var(--text-xs);padding:3px 10px;border-radius:var(--radius-sm);cursor:pointer;transition:border-color .12s,color .12s}
-.txa.active{border-color:var(--color-accent);color:var(--color-accent)}
-.tele-main{flex:1;min-width:0}
-.tele-status{font-size:var(--text-sm);color:var(--color-text-muted);padding:32px;text-align:center}
-.tele-channel{margin-bottom:14px}
-.tele-ch-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px}
 /* ── Edit modal ── */
 .edit-ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center}
 .edit-ovl.open{display:flex}
@@ -5639,23 +5648,7 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
       </div>
     </div>
     <div id="tab-telemetry" style="display:none">
-      <div class="tele-layout">
-        <div class="tele-sidebar">
-          <div class="tele-sb-lbl">Laps</div>
-          <div id="tele-lap-list"></div>
-          <div class="tele-sb-lbl">Reference</div>
-          <select class="tele-refsel" id="tele-ref-sel" onchange="onTeleRefChange()"></select>
-          <div class="tele-sb-lbl">X Axis</div>
-          <div class="tele-xax">
-            <button id="txa-dist" class="txa active" onclick="setTeleXAxis('distance')">Dist</button>
-            <button id="txa-time" class="txa" onclick="setTeleXAxis('time')">Time</button>
-          </div>
-        </div>
-        <div class="tele-main">
-          <div class="tele-status" id="tele-status" style="display:none"></div>
-          <div id="tele-charts-inner"></div>
-        </div>
-      </div>
+      <iframe id="tele-frame" src="" style="width:100%;height:calc(100vh - 120px);border:none;display:block"></iframe>
     </div>
   </div>
 </div>
@@ -5682,7 +5675,15 @@ function switchTab(tab){
   document.getElementById('st-overview').classList.toggle('active',tab==='overview');
   document.getElementById('st-telemetry').classList.toggle('active',tab==='telemetry');
   const url=new URL(location.href);url.searchParams.set('tab',tab);history.replaceState({},'',url);
-  if(tab==='telemetry'&&!_teleInited){_teleInited=true;initTeleTab();}
+  if(tab==='telemetry'&&!_teleInited){
+    _teleInited=true;
+    const game=_sgame||(_sess&&_sess.game)||'';
+    const track=_strack||(_sess&&_sess.track)||'';
+    let src='/sessions/telemetry?embed=1&id='+encodeURIComponent(_id);
+    if(game)src+='&game='+encodeURIComponent(game);
+    if(track)src+='&track='+encodeURIComponent(track);
+    document.getElementById('tele-frame').src=src;
+  }
 }
 
 async function init(){
@@ -5824,174 +5825,6 @@ async function runAnalysis(force){
     rbtn.disabled=false;if(!_sess.ai_analysis)rbtn.style.display='none';
   }
 }
-// ── Telemetry tab (self-contained) ─────────────────────────────────────────
-const _TELE_COLORS=['#60a5fa','#f87171','#34d399','#fb923c'];
-let _teleSelLaps=new Set(); // Set<lapNumber>
-let _teleRefType='best_lap';
-let _teleRefs=null;
-let _teleLapData={};       // lapN -> samples[]|null
-let _teleRefSamples=null;
-let _teleXAxis='distance';
-
-function _teleBestLap(){
-  return _laps.reduce((b,l)=>(!l.lap_time_s||l.lap_number===0)?b:(!b||l.lap_time_s<b.lap_time_s?l:b),null);
-}
-
-function renderTeleLapList(){
-  const best=_teleBestLap();
-  const valid=_laps.filter(l=>l.lap_number>0&&l.lap_time_s);
-  document.getElementById('tele-lap-list').innerHTML=valid.map(l=>{
-    const isBest=best&&l.lap_number===best.lap_number;
-    const chk=_teleSelLaps.has(l.lap_number)?'checked':'';
-    const colorIdx=[..._teleSelLaps].indexOf(l.lap_number);
-    const dot=colorIdx>=0?`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${_TELE_COLORS[colorIdx]};flex-shrink:0"></span>`:'<span style="display:inline-block;width:8px;height:8px;flex-shrink:0"></span>';
-    return`<label class="tele-lap-item">
-      <input type="checkbox" ${chk} onchange="onTeleLapToggle(${l.lap_number},this.checked)">
-      ${dot}
-      <span class="${isBest?'tele-lap-best':''}">Lap ${l.lap_number}${isBest?' ★':''}</span>
-      <span class="tele-lap-time">${fmtLap(l.lap_time_s)}</span>
-    </label>`;
-  }).join('');
-}
-
-async function initTeleTab(){
-  const best=_teleBestLap();
-  renderTeleLapList();
-  // Load reference metadata
-  if(!_teleRefs){
-    try{_teleRefs=await fetch('/sessions/references?track='+encodeURIComponent(_sess.track||'')+'&game='+encodeURIComponent(_sess.game||'')).then(r=>r.json());}
-    catch(e){_teleRefs={};}
-  }
-  // Populate reference selector
-  const refSel=document.getElementById('tele-ref-sel');
-  refSel.innerHTML='<option value="">None</option>';
-  if(_teleRefs.best_lap)
-    refSel.innerHTML+=`<option value="best_lap">My Best Lap (${fmtLap(_teleRefs.best_lap.lap_time_s)})</option>`;
-  if(_teleRefs.theoretical)
-    refSel.innerHTML+=`<option value="theoretical">Theoretical Best (${fmtLap(_teleRefs.theoretical.theoretical_best_s)})</option>`;
-  refSel.value=(_teleRefs.best_lap||_teleRefs.theoretical)?_teleRefType:'';
-  _teleRefType=refSel.value;
-  // Auto-select best lap on first open
-  if(best&&_teleSelLaps.size===0){
-    _teleSelLaps.add(best.lap_number);
-    renderTeleLapList();
-  }
-  await loadTeleData();
-}
-
-async function onTeleLapToggle(lapN,checked){
-  if(checked){
-    if(_teleSelLaps.size>=4){const f=_teleSelLaps.values().next().value;_teleSelLaps.delete(f);delete _teleLapData[f];}
-    _teleSelLaps.add(lapN);
-  }else{
-    _teleSelLaps.delete(lapN);
-    delete _teleLapData[lapN];
-  }
-  renderTeleLapList();
-  await loadTeleData();
-}
-
-async function onTeleRefChange(){
-  _teleRefType=document.getElementById('tele-ref-sel').value;
-  _teleRefSamples=null;
-  await loadTeleData();
-}
-
-function setTeleXAxis(axis){
-  _teleXAxis=axis;
-  document.getElementById('txa-dist').classList.toggle('active',axis==='distance');
-  document.getElementById('txa-time').classList.toggle('active',axis==='time');
-  renderTeleCharts();
-}
-
-async function loadTeleData(){
-  const st=document.getElementById('tele-status');
-  if(_teleSelLaps.size===0){
-    st.textContent='Select at least one lap.';st.style.display='';
-    document.getElementById('tele-charts-inner').innerHTML='';
-    return;
-  }
-  st.textContent='Loading…';st.style.display='';
-  // Fetch missing laps
-  const toLoad=[..._teleSelLaps].filter(n=>!Object.prototype.hasOwnProperty.call(_teleLapData,n));
-  if(toLoad.length){
-    await Promise.all(toLoad.map(async n=>{
-      try{const d=await fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_id)+'&lap='+n).then(r=>r.json());
-        _teleLapData[n]=d&&d.length?d:null;}
-      catch(e){_teleLapData[n]=null;}
-    }));
-  }
-  // Fetch reference
-  if(_teleRefType&&!_teleRefSamples){
-    try{const d=await fetch('/sessions/reference-samples?track='+encodeURIComponent(_sess.track||'')+'&type='+_teleRefType).then(r=>r.json());
-      _teleRefSamples=d&&d.length?d:null;}
-    catch(e){_teleRefSamples=null;}
-  }else if(!_teleRefType){_teleRefSamples=null;}
-  st.style.display='none';
-  renderTeleCharts();
-}
-
-function _teleXVal(s){return _teleXAxis==='distance'?s.distance_norm:(s.t??0);}
-function _teleXMax(){
-  if(_teleXAxis==='distance')return 1;
-  let mx=0;
-  for(const n of _teleSelLaps){const s=_teleLapData[n];if(s&&s.length)mx=Math.max(mx,s[s.length-1].t??0);}
-  if(_teleRefSamples&&_teleRefSamples.length)mx=Math.max(mx,_teleRefSamples[_teleRefSamples.length-1].t??0);
-  return mx||1;
-}
-function _teleAutoRange(field,lapNums,ref){
-  let mn=Infinity,mx=-Infinity;
-  for(const n of lapNums){const s=_teleLapData[n];if(!s)continue;for(const p of s){const v=p[field]??0;if(v<mn)mn=v;if(v>mx)mx=v;}}
-  if(ref)for(const p of ref){const v=p[field]??0;if(v<mn)mn=v;if(v>mx)mx=v;}
-  if(!isFinite(mn)){mn=0;mx=1;}if(mn===mx){mn-=1;mx+=1;}
-  const pad=(mx-mn)*0.06;return[mn-pad,mx+pad];
-}
-function _teleSvgPath(samples,field,W,H,mn,mx,xMax){
-  const yr=mx-mn||1;
-  return'M'+samples.map(s=>{
-    const x=((_teleXVal(s)/xMax)*W).toFixed(1);
-    const y=(H-((s[field]??mn)-mn)/yr*H).toFixed(1);
-    return x+','+y;
-  }).join('L');
-}
-function _teleChannelSVG(field,H,mn,mx,xMax,lapNums,W=1000){
-  let paths='';
-  lapNums.forEach((n,i)=>{
-    const s=_teleLapData[n];if(!s)return;
-    const p=_teleSvgPath(s,field,W,H,mn,mx,xMax);
-    paths+=`<path d="${p}" fill="none" stroke="${_TELE_COLORS[i%4]}" stroke-width="1.8" stroke-linejoin="round"/>`;
-  });
-  if(_teleRefSamples){
-    const p=_teleSvgPath(_teleRefSamples,field,W,H,mn,mx,xMax);
-    paths+=`<path d="${p}" fill="none" stroke="#888" stroke-width="1.2" stroke-dasharray="5,3" opacity=".55"/>`;
-  }
-  return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}" class="chart-svg">${paths}</svg>`;
-}
-
-function renderTeleCharts(){
-  const lapNums=[..._teleSelLaps].filter(n=>_teleLapData[n]);
-  const inner=document.getElementById('tele-charts-inner');
-  if(!lapNums.length){
-    inner.innerHTML='<div style="color:var(--color-text-muted);padding:40px;text-align:center">No sample data — samples are only stored for laps within 102% of session best.</div>';
-    return;
-  }
-  const xMax=_teleXMax();
-  const CHANNELS=[
-    {field:'throttle_pct',label:'Throttle',h:60},
-    {field:'brake_pct',label:'Brake',h:60},
-    {field:'speed_mph',label:'Speed',h:80},
-    {field:'slip_rl',label:'Slip RL',h:60},
-  ];
-  let html='';
-  for(const ch of CHANNELS){
-    const[mn,mx]=_teleAutoRange(ch.field,lapNums,_teleRefSamples);
-    html+=`<div class="tele-channel"><div class="tele-ch-lbl">${ch.label}</div>${_teleChannelSVG(ch.field,ch.h,mn,mx,xMax,lapNums)}</div>`;
-  }
-  inner.innerHTML=html;
-}
-
-// ── End telemetry tab ─────────────────────────────────────────────────────
-
 // ── Edit modal ────────────────────────────────────────────────
 let _editTrack='',_editRaceType=null;
 function openEdit(){
@@ -7541,6 +7374,15 @@ async def handle_status(reader, writer):
                                             json.dumps({"error": "Session not found"}).encode()))
             else:
                 sess_dict = dict(sess_row)
+                # Resolve car ordinal stored as numeric string to full name
+                car_val = sess_dict.get("car", "")
+                if car_val and isinstance(car_val, str) and car_val.isdigit():
+                    ordinal = int(car_val)
+                    car_info = FORZA_CARS.get(ordinal)
+                    if car_info:
+                        sess_dict["car"] = f"{car_info.get('year','')} {car_info['name']}".strip()
+                    else:
+                        sess_dict["car"] = f"Unknown car ({car_val})"
                 laps_file = storage_path() / "sessions" / f"{sid}_laps.json"
                 _debug = {
                     "sid": sid,
