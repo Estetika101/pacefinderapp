@@ -206,10 +206,6 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
 <div class="breadcrumb"><a href="/sessions">Sessions</a> &rsaquo; <a href="#" id="bc-game" style="display:none"></a><span id="bc-sep" style="display:none"> &rsaquo; </span><span id="bc-track">Track</span></div>
 <div class="lr-pills" id="lr-pills"></div>
-<div class="trk-tab-bar">
-  <button class="trk-tab active" id="trk-tab-overview" onclick="switchTrackTab('overview')">Overview</button>
-  <button class="trk-tab" id="trk-tab-telemetry" onclick="switchTrackTab('telemetry')">Telemetry</button>
-</div>
 <div class="layout">
   <nav class="left-rail" id="left-rail">
     <div class="lr-section-lbl">Circuits</div>
@@ -223,7 +219,6 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
       <div class="hdr-stat"><div class="v" id="hdr-trend">&mdash;</div><div class="l">Trend</div></div>
     </div>
 
-    <!-- Overview tab -->
     <div id="trk-overview">
       <div class="track-tip-bar" id="tip-bar">
         <span id="tip-text"></span>
@@ -240,33 +235,6 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
       <div class="class-filter" id="class-filter" style="display:none"></div>
       <div id="acc-container"></div>
       <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
-    </div>
-
-    <!-- Telemetry tab -->
-    <div id="trk-telemetry" style="display:none">
-      <div class="tele-ctrl">
-        <div>
-          <div class="tele-label">Lap</div>
-          <select class="tele-sel" id="tele-sess-sel" onchange="onTeleSessChange()"></select>
-        </div>
-        <div>
-          <div class="tele-label">Lap #</div>
-          <select class="tele-sel" id="tele-lap-sel" onchange="onTeleLapChange()"></select>
-        </div>
-        <div>
-          <div class="tele-label">Reference</div>
-          <select class="tele-sel" id="tele-ref-sel" onchange="onTeleRefChange()"></select>
-        </div>
-      </div>
-      <div class="tele-chart-area" id="tele-chart-area">
-        <div class="tele-empty-msg" id="tele-msg">Loading best lap&hellip;</div>
-        <div id="tele-cmp-wrap" style="display:none">
-          <div id="tele-crosshair" style="position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.2);pointer-events:none;display:none"></div>
-          <div id="tele-tooltip" style="position:absolute;top:4px;background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text-primary);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap"></div>
-          <div id="tele-charts-inner"></div>
-          <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--color-text-muted);margin-top:2px"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
-        </div>
-      </div>
     </div>
 
   </div>
