@@ -45,6 +45,8 @@ from reference.loader import (
 from session.manager import (
     _is_driving, Session, state, active_sessions, update_state,
 )
+from session.protocol import TelemetryProtocol
+from session.watchdog import session_watchdog
 from config import (
     load_config, save_config, config, storage_path,
     PORTS, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, STATUS_PORT, LOG_LEVEL,
@@ -163,132 +165,6 @@ def _get_local_ips() -> list:
     except Exception:
         pass
     return ips
-
-# ─── UDP Protocol Handlers ────────────────────────────────────────────────────
-
-class TelemetryProtocol(asyncio.DatagramProtocol):
-    def __init__(self, game: str, parser):
-        self.game         = game
-        self.parser       = parser
-        self._logged_size = False  # log unexpected packet size once per run
-
-    def datagram_received(self, data: bytes, addr):
-        state["udp_received"][self.game] = state["udp_received"].get(self.game, 0) + 1
-        state["udp_last_at"][self.game] = datetime.now().isoformat(timespec="seconds")
-
-        parsed = self.parser(data)
-        if not parsed:
-            count = state["udp_rejected"].get(self.game, 0) + 1
-            state["udp_rejected"][self.game] = count
-            state["last_rejected_size"][self.game] = len(data)
-            ts = datetime.now().strftime("%H:%M:%S")
-            hex16 = data[:16].hex(" ") if len(data) >= 16 else data.hex(" ")
-            _debug_push(f"{ts} [REJECTED] {self.game} {len(data)}B from {addr[0]}  hex={hex16}")
-            # Log on first rejection and every 100th after
-            if count == 1 or count % 100 == 0:
-                log.warning(
-                    f"[{self.game}] packet #{count} from {addr[0]} rejected — "
-                    f"size={len(data)} bytes  first16={hex16}. "
-                    f"Forza expects {FM_PACKET_SIZE} (FM2023) or {FM_PACKET_SIZE_FH} (FH4/FH5), "
-                    f"ACC expects >={100}, F1 expects >={F1_HEADER_SIZE}. "
-                    f"Check Data Out settings."
-                )
-            return
-
-        ts = datetime.now().strftime("%H:%M:%S")
-        speed = parsed.get("speed_mph", 0)
-        gear  = parsed.get("gear", parsed.get("current_engine_rpm", "?"))
-        rpm   = parsed.get("rpm", parsed.get("current_engine_rpm", 0))
-        ptype = parsed.get("_packet_type", "telemetry")
-        _debug_push(f"{ts} [UDP OK]  {self.game} {len(data)}B  {speed:.0f}mph  rpm={rpm:.0f}  gear={gear}  type={ptype}")
-
-        driving = _is_driving(parsed)
-
-        if self.game not in active_sessions:
-            if not driving:
-                return  # don't create a session from an idle broadcast
-            session = Session(self.game, datetime.now())
-            active_sessions[self.game] = session
-            if self.game == "forza_motorsport":
-                fmt_label = "FH5 (331-byte, track ordinal available)" if len(data) == FM_PACKET_SIZE_FH else "FM2023 (311-byte, no track in UDP)"
-                log.info(f"Forza packet format detected: {fmt_label}")
-
-        session = active_sessions[self.game]
-
-        if not driving:
-            session.last_packet = time.time()
-            ptype = parsed.get("_packet_type")
-            # F1 Motion / MotionEx — always cache so next driving telemetry sees slip data
-            if ptype == "motion":
-                session._motion_cache.update(
-                    {k: v for k, v in parsed.items() if not k.startswith("_") and v is not None}
-                )
-            # F1 LapData — cache for merging into next telemetry packet
-            elif ptype == "lap_data":
-                session._lap_cache.update(
-                    {k: v for k, v in parsed.items() if not k.startswith("_") and v is not None}
-                )
-                rp = parsed.get("race_position")
-                if rp is not None and rp > 0:
-                    session._race_positions.append(rp)
-            # ACC Graphics — update session metadata (ingest() never called for non-driving packets)
-            elif ptype == "graphics":
-                st = parsed.get("session_type", "unknown")
-                if st and st != "unknown":
-                    session.session_type = st
-                rp = parsed.get("race_position")
-                if rp is not None and rp > 0:
-                    session._race_positions.append(rp)
-            update_state(self.game, session, parsed)
-            return  # don't record idle packets as lap samples
-
-        # Pre-merge motion and lap caches so both ingest() and update_state() see the data.
-        # ingest() does the same merges internally but they're local rebinds, not visible here.
-        if parsed.get("_packet_type") == "telemetry":
-            if session._motion_cache:
-                parsed = {**parsed, **session._motion_cache}
-                session._motion_cache = {}
-            if session._lap_cache:
-                parsed = {**session._lap_cache, **parsed}  # telemetry fields take precedence
-                session._lap_cache = {}
-
-        session.ingest(data, parsed)
-        update_state(self.game, session, parsed)
-
-    def error_received(self, exc):
-        log.error(f"[{self.game}] UDP error: {exc}")
-
-    def connection_lost(self, exc):
-        log.warning(f"[{self.game}] Connection lost: {exc}")
-
-# ─── Session Watchdog ─────────────────────────────────────────────────────────
-
-async def _clear_race_ended():
-    await asyncio.sleep(30)
-    # Only clear if still showing race_ended AND no sessions went live in the meantime
-    if state["status"] == "race_ended" and not active_sessions:
-        state["status"] = "idle"
-
-
-async def session_watchdog():
-    while True:
-        await asyncio.sleep(2)
-        to_close = []
-        for game, session in active_sessions.items():
-            if session.is_timed_out():
-                to_close.append((game, "no packets"))
-            elif session.is_idle_timed_out():
-                to_close.append((game, "idle"))
-        for game, reason in to_close:
-            session = active_sessions.pop(game)
-            log.info(f"[{game}] Closing session — {reason} for >{IDLE_TIMEOUT_S if reason == 'idle' else SESSION_TIMEOUT_S}s")
-            session.close()
-            if not active_sessions:
-                state["status"] = "race_ended"
-                state["game"]   = None
-                state["session_id"] = None
-                log.info("All sessions closed. Listening...")
-                asyncio.create_task(_clear_race_ended())
 
 # ─── Admin Packet Injection ───────────────────────────────────────────────────
 
@@ -459,7 +335,7 @@ async def main(demo_mode: bool = False):
         for game, port in PORTS.items():
             try:
                 await loop.create_datagram_endpoint(
-                    lambda g=game, p=parsers[game]: TelemetryProtocol(g, p),
+                    lambda g=game, p=parsers[game]: TelemetryProtocol(g, p, _debug_push),
                     local_addr=("0.0.0.0", port),
                 )
                 state["bound_ports"][game] = port
