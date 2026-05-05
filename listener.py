@@ -935,7 +935,11 @@ class Session:
         if parsed.get("track_ordinal") is not None and self.track_ordinal is None:
             self.track_ordinal = parsed["track_ordinal"]
         if parsed.get("car_class") is not None and self.car_class is None:
-            self.car_class = int(parsed["car_class"])
+            _ordinal = parsed.get("car_ordinal")
+            # Only trust the broadcast class when the ordinal is confirmed in our CSV.
+            # Unknown ordinals can broadcast a wrong class (e.g. X instead of R).
+            if _ordinal is None or _ordinal in FORZA_CARS:
+                self.car_class = int(parsed["car_class"])
         if parsed.get("car_performance_index") is not None and self.car_pi is None:
             self.car_pi = int(parsed["car_performance_index"])
         if parsed.get("weather_condition") and self.weather_condition is None:
@@ -4220,30 +4224,20 @@ async function init(){
 function renderLeftRail(){
   const items=document.getElementById('lr-items');
   const pills=document.getElementById('lr-pills');
-  // For Forza, show full circuit list; supplement with DB tracks for session counts
-  let allCircuits=[];
-  if(_game==='forza_motorsport'&&typeof FORZA_TRACK_NAMES!=='undefined'){
-    const dbByName=Object.fromEntries(_allTracks.filter(t=>t.track!=='unknown').map(t=>[t.track,t]));
-    allCircuits=FORZA_TRACK_NAMES.map(n=>dbByName[n]||{track:n,session_count:0});
-    const unk=_allTracks.filter(t=>t.track==='unknown');
-    if(unk.length)allCircuits=[...allCircuits,...unk];
-  } else {
-    const known=_allTracks.filter(t=>t.track!=='unknown');
-    const unk=_allTracks.filter(t=>t.track==='unknown');
-    allCircuits=[...known,...unk];
-  }
-  items.innerHTML=allCircuits.map(t=>{
+  const known=_allTracks.filter(t=>t.track!=='unknown');
+  const unk=_allTracks.filter(t=>t.track==='unknown');
+  const sorted=[...known,...unk];
+  items.innerHTML=sorted.map(t=>{
     const isUnk=t.track==='unknown';
-    const isEmpty=!isUnk&&!t.session_count;
     const label=isUnk?`Unidentified (${t.session_count})`:t.track;
     const active=t.track===_track;
     const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
-    return`<a class="lr-item${active?' active':''}${isUnk?' lr-item-unk':''}${isEmpty?' lr-item-empty':''}" href="${href}">
+    return`<a class="lr-item${active?' active':''}${isUnk?' lr-item-unk':''}" href="${href}">
       <div class="lr-name">${label}</div>
-      ${t.session_count?'<div class="lr-sub">'+t.session_count+' session'+(t.session_count===1?'':'s')+'</div>':''}
+      ${isUnk?'':'<div class="lr-sub">'+t.session_count+' session'+(t.session_count===1?'':'s')+'</div>'}
     </a>`;
   }).join('');
-  pills.innerHTML=allCircuits.filter(t=>t.session_count>0||t.track===_track).map(t=>{
+  pills.innerHTML=sorted.map(t=>{
     const isUnk=t.track==='unknown';
     const active=t.track===_track;
     const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
@@ -7559,14 +7553,27 @@ async def handle_status(reader, writer):
             else:
                 sess_dict = dict(sess_row)
                 laps_file = storage_path() / "sessions" / f"{sid}_laps.json"
+                _debug = {
+                    "sid": sid,
+                    "laps_file": str(laps_file),
+                    "file_exists": laps_file.exists(),
+                }
                 try:
                     raw_laps = json.loads(laps_file.read_text())
-                    log.info(f"[session/data] {sid}: _laps.json found, {len(raw_laps)} laps, "
+                    _debug["raw_lap_count"] = len(raw_laps)
+                    _debug["first_lap_keys"] = list(raw_laps[0].keys()) if raw_laps else []
+                    log.info(f"[session/data] {sid}: {laps_file} exists={_debug['file_exists']}, "
+                             f"{len(raw_laps)} raw laps, "
                              f"finish_pos={sess_dict.get('finish_pos')} race_type={sess_dict.get('race_type')} "
                              f"session_type={sess_dict.get('session_type')}")
                 except OSError:
                     raw_laps = []
+                    _debug["error"] = "OSError — file not found or unreadable"
                     log.warning(f"[session/data] {sid}: _laps.json NOT FOUND at {laps_file}")
+                except Exception as exc:
+                    raw_laps = []
+                    _debug["error"] = str(exc)
+                    log.error(f"[session/data] {sid}: error reading _laps.json: {exc}")
                 computed_laps = []
                 for lap in raw_laps:
                     samples  = lap.get("samples", [])
@@ -7594,9 +7601,11 @@ async def handle_status(reader, writer):
                         row["avg_throttle"] = row["avg_brake"] = None
                         row["avg_slip"] = row["peak_slip"] = row["slip_above_pct"] = None
                     computed_laps.append(row)
+                _debug["computed_lap_count"] = len(computed_laps)
                 log.info(f"[session/data] {sid}: returning {len(computed_laps)} computed laps")
                 writer.write(_http_response("200 OK", "application/json",
-                                            json.dumps({"session": sess_dict, "laps": computed_laps}).encode()))
+                                            json.dumps({"session": sess_dict, "laps": computed_laps,
+                                                        "_debug": _debug}).encode()))
 
         elif path == "/sessions/laps":
             qs = {k: urllib.parse.unquote_plus(v)
