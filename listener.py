@@ -3099,18 +3099,8 @@ a{color:inherit;text-decoration:none}
 .kpi-val.amber{color:var(--color-amber)}
 .kpi-val.red{color:var(--color-red)}
 .kpi-val.muted{color:var(--color-text-muted)}
-/* ── Trend Spark ────────────────────────────────────────────── */
-.trend-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-6);min-height:100px;display:flex;align-items:center;gap:20px}
-.trend-meta{min-width:130px}
-.trend-label{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
-.trend-direction{font-size:var(--text-md);font-weight:var(--fw-bold)}
-.trend-direction.up{color:var(--color-green)}
-.trend-direction.dn{color:var(--color-red)}
-.trend-direction.fl{color:var(--color-text-muted)}
-.trend-empty{font-size:var(--text-sm);color:var(--color-text-muted);text-align:center;flex:1}
-.trend-empty small{display:block;font-size:var(--text-xs);color:var(--color-text-dim);margin-top:4px}
-.trend-spark{flex:1;height:44px;min-width:0}
-.trend-spark svg{width:100%;height:100%}
+/* ── Form spark ─────────────────────────────────────────────── */
+.form-spark{height:44px;margin-bottom:12px}
 /* ── Form Card ──────────────────────────────────────────────── */
 .form-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-6);min-height:100px;display:flex;gap:32px;flex-wrap:wrap}
 .form-left{min-width:180px}
@@ -3141,6 +3131,7 @@ a{color:inherit;text-decoration:none}
 .pill:hover{border-color:var(--color-text-dim)}
 .pill-circuit{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
 .pill-time{font-size:var(--text-lg);font-weight:var(--fw-bold);color:var(--color-accent)}
+.pill.unresolved{opacity:.55;border-style:dashed}.pill.unresolved .pill-time{color:var(--color-text-muted)}
 /* ── Circuit Table ──────────────────────────────────────────── */
 .table-section{margin-bottom:var(--space-6)}
 .table-label{font-size:var(--text-xs);color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
@@ -3235,16 +3226,7 @@ a{color:inherit;text-decoration:none}
     <div class="kpi"><div class="kpi-label">Total Laps</div><div class="kpi-val muted" id="kv-laps">—</div><div class="kpi-sub" id="ks-circuits">&nbsp;</div></div>
   </div>
 
-  <!-- Performance Trend Spark -->
-  <div class="trend-card">
-    <div class="trend-meta">
-      <div class="trend-label">Performance Trend</div>
-      <div class="trend-direction fl" id="trend-dir">—</div>
-    </div>
-    <div class="trend-spark" id="trend-spark"></div>
-  </div>
-
-  <!-- Current Form -->
+  <!-- Current Form + Trend -->
   <div class="form-card">
     <div class="form-left">
       <div class="form-sect-label">Current Form</div>
@@ -3253,6 +3235,7 @@ a{color:inherit;text-decoration:none}
       <div class="form-note" id="form-note"></div>
     </div>
     <div class="form-right">
+      <div class="form-spark" id="trend-spark"></div>
       <div class="form-filters">
         <div class="filter-group" id="type-filters">
           <button class="ftog on" data-val="real">Real</button>
@@ -3348,37 +3331,27 @@ function posToPercentile(fp){if(fp==null)return null;return Math.max(5,Math.min(
 function renderTrendSpark(){
   const data=_allFormData;
   const el=document.getElementById('trend-spark');
-  const dir=document.getElementById('trend-dir');
   const withPos=data.filter(s=>s.finish_pos!=null);
-  if(withPos.length<2){
-    el.innerHTML='<div class="trend-empty">No race data<small>Finish position data needed — check session race_type classification.</small></div>';
-    dir.textContent='';dir.className='trend-direction fl';
-    return;
-  }
+  if(withPos.length<2){el.innerHTML='';return;}
   const pcts=withPos.map(s=>posToPercentile(s.finish_pos));
   const w=400,h=44,pad=3;
   const mn=Math.min(...pcts),mx=Math.max(...pcts);
-  const span=Math.max(mx-mn,15); // at least 15-point span so gentle improvement shows gently
-  const lo=Math.max(0,mn-span*0.10), hi=Math.min(100,mx+span*0.10);
+  const span=Math.max(mx-mn,15);
+  const lo=Math.max(0,mn-span*0.10),hi=Math.min(100,mx+span*0.10);
   const rng=hi-lo;
   const xs=pcts.map((_,i)=>pad+(w-pad*2)*i/Math.max(pcts.length-1,1));
   const ys=pcts.map(v=>h-pad-(h-pad*2)*(v-lo)/rng);
   const pts=xs.map((x,i)=>x.toFixed(1)+','+ys[i].toFixed(1)).join(' ');
-  // gradient: first half avg vs second half avg
   const half=Math.floor(pcts.length/2);
   const a1=pcts.slice(0,half).reduce((a,b)=>a+b,0)/(half||1);
   const a2=pcts.slice(half).reduce((a,b)=>a+b,0)/((pcts.length-half)||1);
   const diff=a2-a1;
   const col=diff>4?'#22c55e':diff<-4?'#ef4444':'#888';
-  // last dot
   const lx=xs[xs.length-1],ly=ys[ys.length-1];
   el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%">
     <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
     <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3" fill="${col}" opacity=".9"/>
   </svg>`;
-  if(diff>4){dir.textContent='▲ Improving';dir.className='trend-direction up';}
-  else if(diff<-4){dir.textContent='▼ Declining';dir.className='trend-direction dn';}
-  else{dir.textContent='— Steady';dir.className='trend-direction fl';}
 }
 
 // ── Form chart ────────────────────────────────────────────────
@@ -3449,7 +3422,8 @@ function renderTracks(){
   pr.innerHTML=withLap.length?withLap.map(t=>{
     const esc=encodeURIComponent(t.track);
     const label=t.track==='unknown'?'Unknown Track':t.track;
-    return`<div class="pill" onclick="location.href='/sessions/track?name=${esc}'">
+    const unres=/^Track #\d+$/.test(t.track);
+    return`<div class="pill${unres?' unresolved':''}" onclick="location.href='/sessions/track?name=${esc}'">
       <div class="pill-circuit">${label}</div>
       <div class="pill-time">${fmtLap(t.best_lap_time_s)}</div>
     </div>`;
@@ -3581,28 +3555,6 @@ a{color:inherit;text-decoration:none}
 .gtab.active{color:var(--color-text-primary);font-weight:var(--fw-bold);border-bottom-color:var(--color-accent)}
 .gtab .cnt{font-size:var(--text-xs);color:var(--color-text-dim);margin-left:5px;font-weight:var(--fw-normal)}
 .gtab.active .cnt{color:var(--color-text-muted)}
-/* ── Layout: left rail + main ── */
-.layout{display:flex;min-height:calc(100vh - 94px)}
-.left-rail{width:190px;flex-shrink:0;border-right:1px solid var(--color-border);overflow-y:auto;position:sticky;top:94px;max-height:calc(100vh - 94px);scrollbar-width:thin;scrollbar-color:var(--color-border) transparent}
-.left-rail::-webkit-scrollbar{width:4px}.left-rail::-webkit-scrollbar-thumb{background:var(--color-border)}
-.lr-section{font-size:.6rem;color:var(--color-text-muted);letter-spacing:.15em;text-transform:uppercase;padding:10px 14px 4px}
-.lr-item{display:block;padding:7px 14px;cursor:pointer;border-left:2px solid transparent;transition:background .1s,border-color .1s;text-decoration:none;color:inherit;position:relative}
-.lr-item:hover{background:var(--color-surface);border-left-color:var(--color-accent)}
-.lr-item.active{border-left-color:var(--color-accent);background:var(--color-surface)}
-.lr-name{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lr-sub{font-size:.62rem;color:var(--color-text-muted);margin-top:1px}
-/* ── Flyout panel ── */
-.flyout{position:fixed;left:190px;top:0;width:220px;background:var(--color-surface-2);border:1px solid var(--color-border);border-left:none;padding:14px 16px;z-index:100;pointer-events:none;opacity:0;transition:opacity .1s;box-shadow:4px 0 20px rgba(0,0,0,.4)}
-.flyout.show{opacity:1;pointer-events:auto}
-.flyout-name{font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--color-text-primary);margin-bottom:6px;line-height:1.3}
-.flyout-best{font-size:var(--text-xl);font-weight:var(--fw-black);color:var(--color-accent);font-variant-numeric:tabular-nums;margin-bottom:2px}
-.flyout-bestlbl{font-size:.6rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
-.flyout-laps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.flyout-lap{font-size:.65rem;background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text-secondary);padding:2px 6px;border-radius:3px;font-variant-numeric:tabular-nums}
-.flyout-link{font-size:.65rem;color:var(--color-accent);text-transform:uppercase;letter-spacing:.08em;text-decoration:none}
-.flyout-link:hover{text-decoration:underline}
-/* ── Main content ── */
-.main-content{flex:1;min-width:0}
 /* ── Game KPIs strip ── */
 .kpi-strip{display:flex;gap:0;border-bottom:1px solid var(--color-border-subtle);padding:14px var(--space-4);flex-wrap:wrap;gap:var(--space-6)}
 .kpi-item{text-align:left}
@@ -3640,7 +3592,6 @@ a{color:inherit;text-decoration:none}
 .cc-R{background:#06b6d415;color:#06b6d4;border:1px solid #06b6d440}
 .cc-P{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf640}
 .empty-state{color:var(--n-500);font-size:.85rem;padding:48px var(--space-4);text-align:center}
-@media(max-width:700px){.left-rail{display:none}.main-content{width:100%}}
 /* ── Game overview sections ─────────────────────────────────── */
 .ov{padding:18px var(--space-4) 0}
 .kpi-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;scrollbar-width:none}
@@ -3711,20 +3662,6 @@ a{color:inherit;text-decoration:none}
   <a class="gtab" href="/sessions/game?name=acc" id="tab-acc">ACC<span class="cnt" id="cnt-acc"></span></a>
   <a class="gtab" href="/sessions/game?name=f1" id="tab-f1">F1<span class="cnt" id="cnt-f1"></span></a>
 </div>
-<!-- Flyout panel (shared, moved by JS) -->
-<div class="flyout" id="flyout">
-  <div class="flyout-name" id="fo-name"></div>
-  <div class="flyout-best" id="fo-best"></div>
-  <div class="flyout-bestlbl">Best Lap</div>
-  <div class="flyout-laps" id="fo-laps"></div>
-  <a class="flyout-link" id="fo-link">View all →</a>
-</div>
-<div class="layout">
-  <nav class="left-rail" id="left-rail">
-    <div class="lr-section">Circuits</div>
-    <div id="lr-items"></div>
-  </nav>
-  <div class="main-content">
     <!-- Game overview — shown only when ?name= is set -->
     <div id="game-overview" style="display:none">
       <div class="ov">
@@ -3782,8 +3719,6 @@ a{color:inherit;text-decoration:none}
       <span class="count" id="count"></span>
     </div>
     <div class="tracks-list" id="list"><div class="empty-state">Loading&hellip;</div></div>
-  </div>
-</div>
 <script>
 const GAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
 const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
@@ -3946,55 +3881,18 @@ document.getElementById('gf-last').addEventListener('click',e=>{
   b.classList.add('on');_gfLast=+b.dataset.val;renderGameForm();
 });
 
-// ── Left rail flyout ─────────────────────────────────────────
-let _flyTimer=null;
-const _fo=document.getElementById('flyout');
-function showFlyout(el,track){
-  clearTimeout(_flyTimer);
-  _flyTimer=setTimeout(()=>{
-    const rect=el.getBoundingClientRect();
-    _fo.style.top=Math.max(0,rect.top)+'px';
-    document.getElementById('fo-name').textContent=track.track==='unknown'?'Unknown Track':track.track;
-    document.getElementById('fo-best').textContent=fmtLap(track.best_lap_time_s);
-    const laps=(track.spark_laps||[]).slice(-3);
-    document.getElementById('fo-laps').innerHTML=laps.map(t=>`<span class="flyout-lap">${fmtLap(t)}</span>`).join('');
-    const href='/sessions/track?name='+encodeURIComponent(track.track)+(_game?'&game='+encodeURIComponent(_game):'');
-    const foLink=document.getElementById('fo-link');foLink.href=href;
-    _fo.classList.add('show');
-  },150);
-}
-function hideFlyout(){clearTimeout(_flyTimer);_fo.classList.remove('show');}
-
 let _tracks=[];
 async function init(){
   const label=GAME_LABELS[_game]||_game||'All';
   document.getElementById('page-title').textContent=label?label+' Circuits':'All Circuits';
   document.title='Pacefinder · '+(label||'Sessions');
   const url='/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'');
-  if(_game) loadGameOverview(); // fire in parallel
+  if(_game) loadGameOverview();
   try{_tracks=await fetch(url).then(r=>r.json());}catch(e){_tracks=[];}
   document.getElementById('count').textContent=_tracks.length+' circuit'+(_tracks.length!==1?'s':'');
-  // Left rail
   const withLap=_tracks.filter(t=>t.best_lap_time_s&&t.track!=='unknown');
   const noLap=_tracks.filter(t=>!t.best_lap_time_s&&t.track!=='unknown');
   const unk=_tracks.filter(t=>t.track==='unknown');
-  const sorted=[...withLap,...noLap,...unk];
-  const lrItems=document.getElementById('lr-items');
-  lrItems.innerHTML=sorted.map(t=>{
-    const label=t.track==='unknown'?`Unidentified (${t.session_count})`:esc(t.track);
-    const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
-    return`<a class="lr-item${t.track==='unknown'?' lr-item-unk':''}" href="${href}" data-idx="${sorted.indexOf(t)}">
-      <div class="lr-name">${label}</div>
-      <div class="lr-sub">${t.session_count} sess${t.session_count===1?'':'.'}</div>
-    </a>`;
-  }).join('');
-  // Attach flyout events
-  lrItems.querySelectorAll('.lr-item').forEach((el,i)=>{
-    el.addEventListener('mouseenter',()=>showFlyout(el,sorted[i]));
-    el.addEventListener('mouseleave',hideFlyout);
-  });
-  _fo.addEventListener('mouseenter',()=>clearTimeout(_flyTimer));
-  _fo.addEventListener('mouseleave',hideFlyout);
   // Main track list
   const list=document.getElementById('list');
   if(!_tracks.length){list.innerHTML='<div class="empty-state">No sessions recorded yet</div>';return;}
@@ -4073,6 +3971,8 @@ a{color:inherit;text-decoration:none}
 .lr-item.active{border-left-color:var(--color-accent);background:var(--color-surface)}
 .lr-item-unk{opacity:.45}
 .lr-item-unk:hover{opacity:.7}
+.lr-item-empty{opacity:.3}
+.lr-item-empty:hover{opacity:.6}
 .lr-pill-unk{opacity:.4}
 .lr-name{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lr-sub{font-size:.65rem;color:var(--color-text-muted);margin-top:2px}
@@ -4247,6 +4147,8 @@ td.date-col{color:var(--text)}
   </div>
 </div>
 <script>
+const FORZA_TRACK_NAMES=
+""" + json.dumps(FM2023_TRACKS, ensure_ascii=False) + """;
 const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Real Race',ai:'AI Race'};
 const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
 const GAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
@@ -4318,20 +4220,30 @@ async function init(){
 function renderLeftRail(){
   const items=document.getElementById('lr-items');
   const pills=document.getElementById('lr-pills');
-  const known=_allTracks.filter(t=>t.track!=='unknown');
-  const unk=_allTracks.filter(t=>t.track==='unknown');
-  const sorted=[...known,...unk];
-  items.innerHTML=sorted.map(t=>{
+  // For Forza, show full circuit list; supplement with DB tracks for session counts
+  let allCircuits=[];
+  if(_game==='forza_motorsport'&&typeof FORZA_TRACK_NAMES!=='undefined'){
+    const dbByName=Object.fromEntries(_allTracks.filter(t=>t.track!=='unknown').map(t=>[t.track,t]));
+    allCircuits=FORZA_TRACK_NAMES.map(n=>dbByName[n]||{track:n,session_count:0});
+    const unk=_allTracks.filter(t=>t.track==='unknown');
+    if(unk.length)allCircuits=[...allCircuits,...unk];
+  } else {
+    const known=_allTracks.filter(t=>t.track!=='unknown');
+    const unk=_allTracks.filter(t=>t.track==='unknown');
+    allCircuits=[...known,...unk];
+  }
+  items.innerHTML=allCircuits.map(t=>{
     const isUnk=t.track==='unknown';
+    const isEmpty=!isUnk&&!t.session_count;
     const label=isUnk?`Unidentified (${t.session_count})`:t.track;
     const active=t.track===_track;
     const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
-    return`<a class="lr-item${active?' active':''}${isUnk?' lr-item-unk':''}" href="${href}">
+    return`<a class="lr-item${active?' active':''}${isUnk?' lr-item-unk':''}${isEmpty?' lr-item-empty':''}" href="${href}">
       <div class="lr-name">${label}</div>
-      ${isUnk?'':'<div class="lr-sub">'+t.session_count+' session'+(t.session_count===1?'':'s')+'</div>'}
+      ${t.session_count?'<div class="lr-sub">'+t.session_count+' session'+(t.session_count===1?'':'s')+'</div>':''}
     </a>`;
   }).join('');
-  pills.innerHTML=sorted.map(t=>{
+  pills.innerHTML=allCircuits.filter(t=>t.session_count>0||t.track===_track).map(t=>{
     const isUnk=t.track==='unknown';
     const active=t.track===_track;
     const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
@@ -5606,6 +5518,21 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .chart-svg{display:block;width:100%;overflow:visible}
 #cmp-crosshair{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.2);pointer-events:none;display:none}
 #cmp-tooltip{position:absolute;top:4px;background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap}
+/* ── Edit modal ── */
+.edit-ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center}
+.edit-ovl.open{display:flex}
+.edit-panel{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:24px 28px;min-width:320px;max-width:90vw}
+.edit-ttl{font-size:var(--text-sm);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.1em;color:var(--color-text-secondary);margin-bottom:16px}
+.edit-row{margin-bottom:12px}
+.edit-lbl{display:block;font-size:.6rem;color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.edit-sel{width:100%;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);font-family:var(--font-mono);font-size:var(--text-sm);padding:6px 8px;border-radius:var(--radius-sm)}
+.edit-chips{display:flex;flex-wrap:wrap;gap:6px}
+.etype{background:none;border:1px solid var(--color-border);color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--text-xs);padding:4px 10px;border-radius:var(--radius-sm);cursor:pointer;letter-spacing:.5px;transition:all .12s}
+.etype:hover{border-color:var(--color-text-dim);color:var(--color-text-secondary)}
+.etype.sel{border-color:var(--color-accent);color:var(--color-accent);background:rgba(245,158,11,.08)}
+.edit-btns{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
+.edit-save{background:var(--color-accent);color:#000;border:none;font-family:var(--font-mono);font-size:var(--text-xs);font-weight:var(--fw-bold);padding:6px 18px;border-radius:var(--radius-sm);cursor:pointer;letter-spacing:.5px}
+.edit-cancel{background:none;border:1px solid var(--color-border);color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--text-xs);padding:6px 18px;border-radius:var(--radius-sm);cursor:pointer}
 </style>
 </head>
 <body>
@@ -5634,60 +5561,109 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
   <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
   <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
   <span class="type-chip" id="hdr-type" style="display:none"></span>
-  <a id="tele-link" href="#" style="font-size:var(--text-xs);color:var(--accent-bd2);border:1px solid var(--accent-bd);padding:4px 12px;border-radius:var(--radius-sm);letter-spacing:.5px;display:none">Telemetry &rarr;</a>
+  <button class="btn-re" onclick="openEdit()" style="font-size:var(--text-xs);padding:4px 12px">Edit</button>
 </div>
-<div class="section">
-  <div class="section-lbl">Lap Times</div>
-  <table>
-    <thead><tr>
-      <th>Lap</th>
-      <th>Time</th>
-      <th>Max Spd</th>
-      <th>Thr%</th>
-      <th>Brk%</th>
-      <th>Avg Slip</th>
-      <th>Peak Slip</th>
-      <th>Slip&gt;0.1%</th>
-      <th></th>
-    </tr></thead>
-    <tbody id="lap-tbody"></tbody>
-  </table>
-</div>
-<div class="ai-section">
-  <div class="ai-lbl">AI Coaching</div>
-  <div>
-    <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
-    <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
-    <span class="ai-meta" id="ai-meta"></span>
-  </div>
-  <div class="ai-body" id="ai-body"></div>
-  <div class="ai-err" id="ai-err"></div>
-</div>
-<div class="cmp-panel" id="cmp-panel" style="display:none">
-  <div class="cmp-hdr">
-    <span class="cmp-meta" id="cmp-meta">Loading&hellip;</span>
-    <button class="cmp-close" onclick="closeCompare()" title="Close">&times;</button>
-  </div>
-  <div class="cmp-ctrl">
-    <select class="cmp-sel" id="cmp-lap-sel" onchange="onLapSelChange()"></select>
-    <select class="cmp-sel" id="cmp-ref-sel" onchange="onRefSelChange()"></select>
-    <div class="cmp-togg">
-      <label class="cmp-tog"><input type="checkbox" id="tog-throttle" checked onchange="renderCharts()"> Throttle</label>
-      <label class="cmp-tog"><input type="checkbox" id="tog-brake" checked onchange="renderCharts()"> Brake</label>
-      <label class="cmp-tog"><input type="checkbox" id="tog-speed" checked onchange="renderCharts()"> Speed</label>
-      <label class="cmp-tog"><input type="checkbox" id="tog-slip" checked onchange="renderCharts()"> Slip RL</label>
+<!-- Edit modal -->
+<div class="edit-ovl" id="edit-ovl">
+  <div class="edit-panel">
+    <div class="edit-ttl">Edit Session</div>
+    <div class="edit-row"><label class="edit-lbl">Track</label>
+      <select class="edit-sel" id="edit-track"></select></div>
+    <div class="edit-row"><label class="edit-lbl">Type</label>
+      <div class="edit-chips">
+        <button class="etype" data-val="practice" onclick="editSelType(this)">Practice</button>
+        <button class="etype" data-val="qualifying" onclick="editSelType(this)">Qualifying</button>
+        <button class="etype" data-val="race" onclick="editSelType(this)">Race</button>
+        <button class="etype" data-val="race_ai" onclick="editSelType(this)">AI Race</button>
+        <button class="etype" data-val="hot_lap" onclick="editSelType(this)">Hot Lap</button>
+        <button class="etype" data-val="time_trial" onclick="editSelType(this)">Time Trial</button>
+      </div>
+    </div>
+    <div class="edit-btns">
+      <button class="edit-save" onclick="saveEdit()">Save</button>
+      <button class="edit-cancel" onclick="closeEdit()">Cancel</button>
     </div>
   </div>
-  <div class="cmp-charts-wrap" id="cmp-charts-wrap">
-    <div id="cmp-crosshair"></div>
-    <div id="cmp-tooltip"></div>
-    <div id="cmp-charts-inner"></div>
-    <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">
-      <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+</div>
+<!-- Tab bar -->
+<div class="sess-tab-bar">
+  <button class="sess-tab active" id="st-overview" onclick="switchTab('overview')">Overview</button>
+  <button class="sess-tab" id="st-telemetry" onclick="switchTab('telemetry')">Telemetry</button>
+</div>
+<!-- Layout -->
+<div class="layout">
+  <nav class="left-rail" id="left-rail">
+    <div class="lr-section-lbl">Circuits</div>
+    <div id="lr-items"></div>
+    <div class="lr-divider"></div>
+    <div class="lr-this" id="lr-this" style="display:none">
+      <div class="lr-this-lbl">This Session</div>
+      <div class="lr-this-car" id="lr-car"></div>
+      <div class="lr-this-badges" id="lr-badges"></div>
+    </div>
+  </nav>
+  <div class="main-content">
+    <div class="lr-pills" id="lr-pills"></div>
+    <div id="tab-overview">
+      <div class="section">
+        <div class="section-lbl">Lap Times</div>
+        <table>
+          <thead><tr>
+            <th>Lap</th>
+            <th>Time</th>
+            <th>Max Spd</th>
+            <th>Thr%</th>
+            <th>Brk%</th>
+            <th>Avg Slip</th>
+            <th>Peak Slip</th>
+            <th>Slip&gt;0.1%</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="lap-tbody"></tbody>
+        </table>
+      </div>
+      <div class="ai-section">
+        <div class="ai-lbl">AI Coaching</div>
+        <div>
+          <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
+          <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
+          <span class="ai-meta" id="ai-meta"></span>
+        </div>
+        <div class="ai-body" id="ai-body"></div>
+        <div class="ai-err" id="ai-err"></div>
+      </div>
+    </div>
+    <div id="tab-telemetry" style="display:none">
+      <div class="cmp-panel" id="cmp-panel">
+        <div class="cmp-hdr">
+          <span class="cmp-meta" id="cmp-meta">Loading&hellip;</span>
+          <button class="cmp-close" onclick="closeCompare()" title="Close">&times;</button>
+        </div>
+        <div class="cmp-ctrl">
+          <select class="cmp-sel" id="cmp-lap-sel" onchange="onLapSelChange()"></select>
+          <select class="cmp-sel" id="cmp-ref-sel" onchange="onRefSelChange()"></select>
+          <div class="cmp-togg">
+            <label class="cmp-tog"><input type="checkbox" id="tog-throttle" checked onchange="renderCharts()"> Throttle</label>
+            <label class="cmp-tog"><input type="checkbox" id="tog-brake" checked onchange="renderCharts()"> Brake</label>
+            <label class="cmp-tog"><input type="checkbox" id="tog-speed" checked onchange="renderCharts()"> Speed</label>
+            <label class="cmp-tog"><input type="checkbox" id="tog-slip" checked onchange="renderCharts()"> Slip RL</label>
+          </div>
+        </div>
+        <div class="cmp-charts-wrap" id="cmp-charts-wrap">
+          <div id="cmp-crosshair"></div>
+          <div id="cmp-tooltip"></div>
+          <div id="cmp-charts-inner"></div>
+          <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">
+            <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 <script>
+const TRACK_NAMES=
+""" + json.dumps(FM2023_TRACKS, ensure_ascii=False) + """;
 const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}
@@ -6032,6 +6008,38 @@ async function onRefSelChange(){
 }
 function closeCompare(){document.getElementById('cmp-panel').style.display='none';}
 // ── End lap comparison ─────────────────────────────────────────────────────
+
+// ── Edit modal ────────────────────────────────────────────────
+let _editTrack='',_editRaceType=null;
+function openEdit(){
+  if(!_sess)return;
+  const cur=_sess.track&&_sess.track!=='unknown'?_sess.track:'';
+  const allTracks=TRACK_NAMES.includes(cur)||!cur?TRACK_NAMES:[...TRACK_NAMES,cur].sort();
+  const sel=document.getElementById('edit-track');
+  sel.innerHTML='<option value="">— Unknown —</option>'+allTracks.map(t=>`<option value="${t}"${t===cur?' selected':''}>${t}</option>`).join('');
+  _editTrack=cur;
+  _editRaceType=_sess.race_type||_sess.session_type||null;
+  document.querySelectorAll('#edit-ovl .etype').forEach(c=>c.classList.toggle('sel',c.dataset.val===_editRaceType));
+  document.getElementById('edit-ovl').classList.add('open');
+}
+function closeEdit(){document.getElementById('edit-ovl').classList.remove('open');}
+function editSelType(el){
+  document.querySelectorAll('#edit-ovl .etype').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  _editRaceType=el.dataset.val;
+}
+async function saveEdit(){
+  if(!_id)return;
+  const body={id:_id};
+  const track=document.getElementById('edit-track').value;
+  if(track)body.track=track;
+  if(_editRaceType)body.race_type=_editRaceType;
+  await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  closeEdit();
+  const d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());
+  if(d.session){_sess=d.session;_laps=d.laps||[];renderHeader();}
+}
+
 init();
 </script>
 </body>
