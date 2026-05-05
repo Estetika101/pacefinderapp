@@ -5505,13 +5505,25 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .ai-meta{font-size:.72rem;color:var(--n-300);margin-left:var(--sp-3)}
 .ai-body{font-size:var(--text-sm);line-height:1.75;color:var(--color-text-primary);white-space:pre-wrap;margin-top:18px;padding-top:18px;border-top:1px solid var(--color-border-subtle);display:none}
 .ai-err{color:var(--danger);font-size:.8rem;margin-top:var(--sp-3);display:none}
-.btn-cmp{background:none;border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:inherit;font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-sm);cursor:pointer;letter-spacing:.5px;white-space:nowrap}
-.btn-cmp:hover{border-color:var(--n-300);color:var(--text)}
 .chart-row{margin-bottom:6px}
 .chart-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px}
 .chart-svg{display:block;width:100%;overflow:visible}
-#cmp-crosshair{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.2);pointer-events:none;display:none}
-#cmp-tooltip{position:absolute;top:4px;background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-size:.7rem;padding:3px 8px;border-radius:3px;pointer-events:none;display:none;white-space:nowrap}
+/* ── Telemetry tab ── */
+.tele-layout{display:flex;gap:var(--space-6);padding:var(--sp-5) var(--sp-6)}
+.tele-sidebar{width:160px;flex-shrink:0}
+.tele-sb-lbl{font-size:.6rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;margin-top:14px}
+.tele-sb-lbl:first-child{margin-top:0}
+.tele-lap-item{display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:var(--text-sm);color:var(--color-text-secondary)}
+.tele-lap-best{color:var(--color-accent)}
+.tele-lap-time{margin-left:auto;color:var(--color-text-dim);font-size:var(--text-xs)}
+.tele-refsel{width:100%;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-secondary);font-family:var(--font-mono);font-size:var(--text-xs);padding:4px 6px;border-radius:var(--radius-sm)}
+.tele-xax{display:flex;gap:4px}
+.txa{background:none;border:1px solid var(--color-border);color:var(--color-text-muted);font-family:inherit;font-size:var(--text-xs);padding:3px 10px;border-radius:var(--radius-sm);cursor:pointer;transition:border-color .12s,color .12s}
+.txa.active{border-color:var(--color-accent);color:var(--color-accent)}
+.tele-main{flex:1;min-width:0}
+.tele-status{font-size:var(--text-sm);color:var(--color-text-muted);padding:32px;text-align:center}
+.tele-channel{margin-bottom:14px}
+.tele-ch-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px}
 /* ── Edit modal ── */
 .edit-ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center}
 .edit-ovl.open{display:flex}
@@ -5611,7 +5623,6 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
             <th>Avg Slip</th>
             <th>Peak Slip</th>
             <th>Slip&gt;0.1%</th>
-            <th></th>
           </tr></thead>
           <tbody id="lap-tbody"></tbody>
         </table>
@@ -5628,28 +5639,21 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
       </div>
     </div>
     <div id="tab-telemetry" style="display:none">
-      <div class="cmp-panel" id="cmp-panel">
-        <div class="cmp-hdr">
-          <span class="cmp-meta" id="cmp-meta">Loading&hellip;</span>
-          <button class="cmp-close" onclick="closeCompare()" title="Close">&times;</button>
-        </div>
-        <div class="cmp-ctrl">
-          <select class="cmp-sel" id="cmp-lap-sel" onchange="onLapSelChange()"></select>
-          <select class="cmp-sel" id="cmp-ref-sel" onchange="onRefSelChange()"></select>
-          <div class="cmp-togg">
-            <label class="cmp-tog"><input type="checkbox" id="tog-throttle" checked onchange="renderCharts()"> Throttle</label>
-            <label class="cmp-tog"><input type="checkbox" id="tog-brake" checked onchange="renderCharts()"> Brake</label>
-            <label class="cmp-tog"><input type="checkbox" id="tog-speed" checked onchange="renderCharts()"> Speed</label>
-            <label class="cmp-tog"><input type="checkbox" id="tog-slip" checked onchange="renderCharts()"> Slip RL</label>
+      <div class="tele-layout">
+        <div class="tele-sidebar">
+          <div class="tele-sb-lbl">Laps</div>
+          <div id="tele-lap-list"></div>
+          <div class="tele-sb-lbl">Reference</div>
+          <select class="tele-refsel" id="tele-ref-sel" onchange="onTeleRefChange()"></select>
+          <div class="tele-sb-lbl">X Axis</div>
+          <div class="tele-xax">
+            <button id="txa-dist" class="txa active" onclick="setTeleXAxis('distance')">Dist</button>
+            <button id="txa-time" class="txa" onclick="setTeleXAxis('time')">Time</button>
           </div>
         </div>
-        <div class="cmp-charts-wrap" id="cmp-charts-wrap">
-          <div id="cmp-crosshair"></div>
-          <div id="cmp-tooltip"></div>
-          <div id="cmp-charts-inner"></div>
-          <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--n-400);margin-top:2px">
-            <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
-          </div>
+        <div class="tele-main">
+          <div class="tele-status" id="tele-status" style="display:none"></div>
+          <div id="tele-charts-inner"></div>
         </div>
       </div>
     </div>
@@ -5758,18 +5762,6 @@ function renderHeader(){
   document.getElementById('hdr-laps').textContent=_laps.length;
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   if(effType){const el=document.getElementById('hdr-type');el.textContent=TYPE_LABELS[effType]||effType;el.style.display='';}
-  if(s.track_temp_c!=null){
-    document.getElementById('hdr-temp').textContent=s.track_temp_c.toFixed(1)+'°C';
-    document.getElementById('hdr-temp-stat').style.display='';
-  }
-  const wb=document.getElementById('hdr-weather');
-  if(s.weather_condition){
-    const WX={'Clear':'☀ Clear','LightCloud':'⛅ Lt Cloud','Overcast':'☁ Overcast',
-              'LightRain':'🌦 Lt Rain','Rain':'🌧 Rain','HeavyRain':'⛈ Heavy Rain','Thunderstorm':'⛈ Storm'};
-    wb.textContent=WX[s.weather_condition]||s.weather_condition;wb.style.display='';
-  }
-  const editBtn=document.getElementById('edit-sess-btn');
-  editBtn.href='/?edit='+encodeURIComponent(_id);editBtn.style.display='';
 }
 function renderLaps(){
   const best=_sess.best_lap_time_s;
@@ -5792,7 +5784,6 @@ function renderLaps(){
       <td class="${scls(l.avg_slip||0)}">${l.avg_slip!=null?l.avg_slip.toFixed(4):'—'}</td>
       <td class="${scls(l.peak_slip||0)}">${l.peak_slip!=null?l.peak_slip.toFixed(4):'—'}</td>
       <td>${l.slip_above_pct!=null?l.slip_above_pct.toFixed(1)+'%':'—'}</td>
-      <td><button class="btn-cmp" title="Compare lap ${l.lap_number}" onclick="openCompare(${l.lap_number})">⇄</button></td>
     </tr>`;
   }).join('');
 }
@@ -5984,24 +5975,22 @@ function renderTeleCharts(){
     inner.innerHTML='<div style="color:var(--color-text-muted);padding:40px;text-align:center">No sample data — samples are only stored for laps within 102% of session best.</div>';
     return;
   }
-  if(!refD||!refD.length){
-    inner.innerHTML='<div style="color:var(--n-400);padding:20px;text-align:center">No reference data for this track yet. Close more sessions at this track to build references.</div>';
-    return;
+  const xMax=_teleXMax();
+  const CHANNELS=[
+    {field:'throttle_pct',label:'Throttle',h:60},
+    {field:'brake_pct',label:'Brake',h:60},
+    {field:'speed_mph',label:'Speed',h:80},
+    {field:'slip_rl',label:'Slip RL',h:60},
+  ];
+  let html='';
+  for(const ch of CHANNELS){
+    const[mn,mx]=_teleAutoRange(ch.field,lapNums,_teleRefSamples);
+    html+=`<div class="tele-channel"><div class="tele-ch-lbl">${ch.label}</div>${_teleChannelSVG(ch.field,ch.h,mn,mx,xMax,lapNums)}</div>`;
   }
-  _cmpLapSamples=lapD;_cmpRefSamples=refD;
-  renderCharts();
+  inner.innerHTML=html;
 }
 
-async function onLapSelChange(){
-  _cmpLapN=parseInt(document.getElementById('cmp-lap-sel').value);
-  await _loadAndRender();
-}
-async function onRefSelChange(){
-  _cmpRefType=document.getElementById('cmp-ref-sel').value;
-  await _loadAndRender();
-}
-function closeCompare(){document.getElementById('cmp-panel').style.display='none';}
-// ── End lap comparison ─────────────────────────────────────────────────────
+// ── End telemetry tab ─────────────────────────────────────────────────────
 
 // ── Edit modal ────────────────────────────────────────────────
 let _editTrack='',_editRaceType=null;
