@@ -18,6 +18,14 @@ const LAP_COLORS=['#4a9aef','#22c55e','#f59e0b','#a855f7'];
 const REF_COL='#444444';
 const W=1000;
 const $=id=>document.getElementById(id);
+// True when a selected lap IS the active reference lap (so its delta is 0 by definition).
+// Only `best_lap` references map to a real lap; theoretical is a virtual composite.
+function isRefLap(lapNum){
+  if(_refType!=='best_lap')return false;
+  if(!_refMeta||!_refMeta.best_lap)return false;
+  if(_refMeta.best_lap.session_id!==_id)return false;
+  return _refMeta.best_lap.lap_number===lapNum;
+}
 // ── X value of a sample (distance or time-normalised) ────────────────────
 function xv(s){return _xMode==='distance'?s.distance_norm:(s.t/_maxT);}
 // ── Interpolate field at normalised X position ────────────────────────────
@@ -49,27 +57,40 @@ function buildDelta(lapS,refS,N=500){
   }
   return out;
 }
-function deltaSVG(delta,H=32){
+// Renders cumulative DELTA. Accepts an array of laps: [{ln, col, d:[{pos,d},...]}, ...]
+// Single-lap: sign-colored fill polygons (green=faster, red=slower) — most informative.
+// Multi-lap: per-lap colored polylines.
+function deltaSVG(lapDeltas,H=32){
   const zY=H/2;
-  const maxA=Math.max(...delta.map(d=>Math.abs(d.d)),0.001);
+  let maxA=0.001;
+  lapDeltas.forEach(({d})=>d.forEach(p=>{if(Math.abs(p.d)>maxA)maxA=Math.abs(p.d);}));
   const sc=(H/2-4)/maxA;
-  const pts=delta.map(d=>({x:normToSX(d.pos).toFixed(1),y:(zY-d.d*sc).toFixed(1)}));
-  let segs=[],cur=null;
-  for(let i=0;i<delta.length;i++){
-    const sg=delta[i].d<0?'g':'r';
-    if(!cur||cur.sg!==sg){if(cur)segs.push(cur);cur={sg,idx:[i]};}
-    else cur.idx.push(i);
+  let body='';
+  if(lapDeltas.length===1){
+    const delta=lapDeltas[0].d;
+    const pts=delta.map(p=>({x:normToSX(p.pos).toFixed(1),y:(zY-p.d*sc).toFixed(1)}));
+    let segs=[],cur=null;
+    for(let i=0;i<delta.length;i++){
+      const sg=delta[i].d<0?'g':'r';
+      if(!cur||cur.sg!==sg){if(cur)segs.push(cur);cur={sg,idx:[i]};}
+      else cur.idx.push(i);
+    }
+    if(cur)segs.push(cur);
+    body=segs.map(s=>{
+      const fc=s.sg==='g'?'#22c55e':'#ef4444';
+      const tr=s.idx.map(i=>`${pts[i].x},${pts[i].y}`);
+      const cl=[`${pts[s.idx[s.idx.length-1]].x},${zY}`,`${pts[s.idx[0]].x},${zY}`];
+      return`<polygon points="${[...tr,...cl].join(' ')}" fill="${fc}55" stroke="${fc}" stroke-width="1.2" stroke-linejoin="round"/>`;
+    }).join('');
+  }else{
+    body=lapDeltas.map(({col,d})=>{
+      const pts=d.map(p=>`${normToSX(p.pos).toFixed(1)},${(zY-p.d*sc).toFixed(1)}`).join(' ');
+      return`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" opacity=".9"/>`;
+    }).join('');
   }
-  if(cur)segs.push(cur);
-  const polys=segs.map(s=>{
-    const fc=s.sg==='g'?'#22c55e':'#ef4444';
-    const tr=s.idx.map(i=>`${pts[i].x},${pts[i].y}`);
-    const cl=[`${pts[s.idx[s.idx.length-1]].x},${zY}`,`${pts[s.idx[0]].x},${zY}`];
-    return`<polygon points="${[...tr,...cl].join(' ')}" fill="${fc}55" stroke="${fc}" stroke-width="1.2" stroke-linejoin="round"/>`;
-  }).join('');
   return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">
     <line x1="0" y1="${zY}" x2="${W}" y2="${zY}" stroke="#1e1e1e" stroke-width="1"/>
-    ${secLine(1/3,H)}${secLine(2/3,H)}${polys}
+    ${secLine(1/3,H)}${secLine(2/3,H)}${body}
     ${secLabel(0,'S1',H)}${secLabel(1/3,'S2',H)}${secLabel(2/3,'S3',H)}
   </svg>`;
 }
@@ -247,37 +268,43 @@ function secTime(samples,lo,hi){
 }
 // ── Sector header ─────────────────────────────────────────────────────────
 function renderSectorHdr(){
-  const lapEntries=_selectedLaps.map(ln=>({ln,s:_lapSamples[ln],col:LAP_COLORS[_selectedLaps.indexOf(ln)],lbl:'L'+ln,isRef:false}));
-  const hasRef=!!_refSamples;
+  const lapEntries=_selectedLaps.map(ln=>({ln,s:_lapSamples[ln],col:LAP_COLORS[_selectedLaps.indexOf(ln)],lbl:'L'+ln,isRef:isRefLap(ln)}));
+  const nonRefCount=lapEntries.filter(l=>!l.isRef).length;
+  const showDelta=!!_refSamples&&nonRefCount>0;
   const secs=[[0,1/3,'S1'],[1/3,2/3,'S2'],[2/3,1,'S3']];
-  const refTimes=hasRef?secs.map(([lo,hi])=>secTime(_refSamples,lo,hi)):null;
+  const refTimes=_refSamples?secs.map(([lo,hi])=>secTime(_refSamples,lo,hi)):null;
   const lapTimes=secs.map(([lo,hi,nm])=>{
     const ts=lapEntries.map(l=>secTime(l.s,lo,hi));
     const best=Math.min(...ts.filter(t=>t!=null));
     return{nm,ts,best};
   });
   let html=`<div class="s-hdr-row"><span class="s-row-lbl"></span>`;
-  lapEntries.forEach(l=>html+=`<span class="s-cell-hd" style="color:${l.col}">${l.lbl}</span>`);
-  if(hasRef)html+=`<span class="s-cell-hd" style="color:${REF_COL}">DELTA</span>`;
+  lapEntries.forEach(l=>{
+    html+=`<span class="s-cell-hd" style="color:${l.col}">${l.lbl}</span>`;
+    if(showDelta)html+=`<span class="s-cell-hd s-cell-d" style="color:${l.col}">Δ</span>`;
+  });
   html+='</div>';
   lapTimes.forEach(({nm,ts,best},si)=>{
     html+=`<div class="s-hdr-row"><span class="s-row-lbl">${nm}</span>`;
     ts.forEach((t,i)=>{
       const isBest=t!=null&&Math.abs(t-best)<0.001;
       html+=`<span class="s-cell${isBest?' best':''}" style="color:${lapEntries[i].col}">${t!=null?fmtLap(t):'—'}</span>`;
-    });
-    if(hasRef){
-      const rt=refTimes?refTimes[si]:null;
-      const pt=lapEntries.length>0?ts[0]:null;
-      if(rt!=null&&pt!=null){
-        const d=pt-rt;
-        const sign=d<0?'−':'+';
-        const cls=d<0?'delta-neg':'delta-pos';
-        html+=`<span class="s-cell ${cls}">${sign}${Math.abs(d).toFixed(3)}</span>`;
-      }else{
-        html+=`<span class="s-cell" style="color:${REF_COL}">—</span>`;
+      if(showDelta){
+        const rt=refTimes?refTimes[si]:null;
+        if(rt!=null&&t!=null){
+          const d=t-rt;
+          if(Math.abs(d)<0.0005){
+            html+=`<span class="s-cell s-cell-d" style="color:${REF_COL}">0.000</span>`;
+          }else{
+            const sign=d<0?'−':'+';
+            const cls=d<0?'delta-neg':'delta-pos';
+            html+=`<span class="s-cell s-cell-d ${cls}">${sign}${Math.abs(d).toFixed(3)}</span>`;
+          }
+        }else{
+          html+=`<span class="s-cell s-cell-d" style="color:${REF_COL}">—</span>`;
+        }
       }
-    }
+    });
     html+='</div>';
   });
   $('sector-hdr').innerHTML=html;
@@ -362,14 +389,25 @@ function updateTrackDot(pos){
 // ── Main render ───────────────────────────────────────────────────────────
 function renderAll(){
   if(!_primaryLap||!_lapSamples[_primaryLap])return;
-  let deltaHtml='';
-  if(_refSamples&&_lapSamples[_primaryLap]){
-    deltaHtml=deltaSVG(buildDelta(_lapSamples[_primaryLap],_refSamples));
+  let deltaHtml='',showDeltaPanel=true;
+  if(_refSamples){
+    const nonRefLaps=_selectedLaps.filter(ln=>_lapSamples[ln]&&!isRefLap(ln));
+    if(nonRefLaps.length>0){
+      const lapDeltas=nonRefLaps.map(ln=>({
+        ln,
+        col:LAP_COLORS[_selectedLaps.indexOf(ln)],
+        d:buildDelta(_lapSamples[ln],_refSamples)
+      }));
+      deltaHtml=deltaSVG(lapDeltas);
+    }else{
+      // Reference set but only the reference lap is selected — nothing useful to show.
+      showDeltaPanel=false;
+    }
   }else{
     deltaHtml=`<svg viewBox="0 0 ${W} 32" preserveAspectRatio="none" width="100%" height="32">
       <text x="${W/2}" y="20" text-anchor="middle" fill="#282828" font-size="18" font-family="monospace">Select a reference to see delta</text></svg>`;
   }
-  setPanel('panel-delta','DELTA — CUMULATIVE TIME VS REFERENCE  (GREEN=FASTER · RED=SLOWER)',deltaHtml,true);
+  setPanel('panel-delta','DELTA — CUMULATIVE TIME VS REFERENCE  (GREEN=FASTER · RED=SLOWER)',deltaHtml,showDeltaPanel);
   setPanel('panel-speed','SPEED mph — ▽ corner minimum speed',speedSVG(),$('ch-speed').checked);
   setPanel('panel-throttle','THROTTLE % — amber band = 50-70% dwell zone',throttleSVG(),$('ch-throttle').checked);
   setPanel('panel-brake','BRAKE % — ● peak points',brakeSVG(),$('ch-brake').checked);
@@ -414,10 +452,15 @@ function setupInteraction(){
       const g=Math.round(interpAt(s,pos,'gear'));
       lines.push(`L${ln}  ${sp}mph  G${g}  T${th}%  B${br}%  Sl${sl}`);
     });
-    if(_refSamples&&_lapSamples[_primaryLap]){
-      const d=interpAt(_lapSamples[_primaryLap],pos,'t')-interpAt(_refSamples,pos,'t');
-      const sign=d<0?'−':'+';
-      lines.push(`Δ ${sign}${Math.abs(d).toFixed(3)}s  @${(pos*100).toFixed(1)}%`);
+    if(_refSamples){
+      _selectedLaps.forEach(ln=>{
+        if(isRefLap(ln))return;
+        const s=_lapSamples[ln];if(!s)return;
+        const d=interpAt(s,pos,'t')-interpAt(_refSamples,pos,'t');
+        const sign=d<0?'−':'+';
+        lines.push(`Δ L${ln}: ${sign}${Math.abs(d).toFixed(3)}s`);
+      });
+      lines.push(`@${(pos*100).toFixed(1)}%`);
     }
     tip.textContent=lines.join('\\n');
     tip.style.left=Math.min(e.clientX+14,window.innerWidth-180)+'px';
