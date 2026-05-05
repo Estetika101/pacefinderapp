@@ -1564,7 +1564,7 @@ _CSS_TOKENS = """
 }
 """
 
-_PAGE_STYLE = "<style>" + _CSS_TOKENS + """
+_PAGE_STYLE = '<link rel="stylesheet" href="/static/tokens.css"><style>' + """
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);padding:var(--space-4);max-width:860px}
   a{color:var(--n-100);text-decoration:none}
@@ -1674,10 +1674,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Pacefinder</title>
+<link rel="stylesheet" href="/static/tokens.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;max-width:100vw}
-""" + _CSS_TOKENS + """
 body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);display:flex;flex-direction:column;width:100dvw;height:100dvh;overflow:hidden;overflow-x:hidden;user-select:none}
 
 /* ── topbar ── */
@@ -3096,8 +3096,8 @@ GAMES_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Pacefinder &middot; Sessions</title>
+<link rel="stylesheet" href="/static/tokens.css">
 <style>
-""" + _CSS_TOKENS + """
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);min-height:100vh}
 a{color:inherit;text-decoration:none}
@@ -3567,8 +3567,8 @@ TRACKS_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Pacefinder &middot; Tracks</title>
+<link rel="stylesheet" href="/static/tokens.css">
 <style>
-""" + _CSS_TOKENS + """
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);min-height:100vh}
 a{color:inherit;text-decoration:none}
@@ -3972,8 +3972,8 @@ TRACK_DETAIL_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Pacefinder &middot; Track</title>
+<link rel="stylesheet" href="/static/tokens.css">
 <style>
-""" + _CSS_TOKENS + """
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);min-height:100vh}
 a{color:inherit;text-decoration:none}
@@ -4642,8 +4642,8 @@ TELEMETRY_HTML = """<!DOCTYPE html>
 <head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Pacefinder &middot; Telemetry</title>
+<link rel="stylesheet" href="/static/tokens.css">
 <style>
-""" + _CSS_TOKENS + """
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);min-height:100vh;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
@@ -5472,8 +5472,8 @@ SESSION_DETAIL_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Pacefinder &middot; Session</title>
+<link rel="stylesheet" href="/static/tokens.css">
 <style>
-""" + _CSS_TOKENS + """
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);min-height:100vh}
 a{color:inherit;text-decoration:none}
@@ -7204,7 +7204,17 @@ async def handle_status(reader, writer):
 
         raw_body = body_buf.decode("utf-8", errors="ignore")
 
-        if path in ("/", "/dashboard"):
+        if path.startswith("/static/"):
+            rel = path[len("/static/"):]
+            static_file = Path(__file__).parent / "static" / rel
+            if static_file.is_file() and static_file.resolve().is_relative_to((Path(__file__).parent / "static").resolve()):
+                ext = static_file.suffix.lower()
+                mime = {"css": "text/css", "js": "application/javascript"}.get(ext.lstrip("."), "application/octet-stream")
+                writer.write(_http_response("200 OK", mime, static_file.read_bytes()))
+            else:
+                writer.write(_http_response("404 Not Found", "text/plain", b"Not found"))
+
+        elif path in ("/", "/dashboard"):
             writer.write(_http_response("200 OK", "text/html", DASHBOARD_HTML.encode()))
 
         elif path == "/setup":
