@@ -10,9 +10,8 @@ DEFAULTS: dict = {
     "idle_timeout_s":    30,
     "status_port":       8000,
     "ports": {
+        # ACC (9996) and F1 (20777) are PARKED — see docs/specs/park-acc-f1.md
         "forza_motorsport": 5300,
-        "acc":              9996,
-        "f1":               20777,
     },
     "anthropic_api_key": "",
     "anthropic_model":   "claude-sonnet-4-6",
@@ -24,7 +23,10 @@ def load_config() -> dict:
         try:
             saved = json.loads(CONFIG_FILE.read_text())
             merged = {**DEFAULTS, **saved}
-            merged["ports"] = {**DEFAULTS["ports"], **saved.get("ports", {})}
+            # Only honor saved port overrides for known/active games.
+            # Stale acc/f1 keys in user configs are ignored (parked).
+            saved_ports = {k: v for k, v in saved.get("ports", {}).items() if k in DEFAULTS["ports"]}
+            merged["ports"] = {**DEFAULTS["ports"], **saved_ports}
             return merged
         except Exception:
             pass

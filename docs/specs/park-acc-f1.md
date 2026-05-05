@@ -54,8 +54,8 @@ Pacefinder currently tries to support three games (Forza, ACC, F1). In practice 
 - `pacefinderapp`: listener config + UI consolidation + DB queries
 - `pacefindermarketing`: marketing copy update (separate PR; can lag the product change by a day or two without harm)
 
-## Open questions
-- **Marketing strategy:** drop ACC/F1 entirely vs. "coming soon" badge? Recommend dropping — clearer to visitors, easy to add back. But if you want to signal "roadmap exists", a badge is fine.
-- **`/sessions/game?name=forza_motorsport` URL:** redirect to `/sessions` (preserves bookmarks) or just keep as-is (no harm in two URLs serving the same content)? Recommend redirect for one-canonical-URL hygiene.
-- **Existing ACC/F1 sessions in DB:** filter out (recommended) or leave visible? If you've never raced ACC/F1 there are zero such rows and it doesn't matter; but worth confirming with `SELECT game, COUNT(*) FROM sessions GROUP BY game`.
-- **Un-parking trigger:** what's the bar for resurrecting ACC or F1? Worth writing down (e.g. "ship Forza features X/Y/Z first") so future-you knows when to revisit.
+## Resolved decisions
+- **Marketing strategy:** drop ACC/F1 product cards/copy from the main site; add a small "ACC and F1 support coming soon" line as roadmap signal.
+- **`/sessions/game?name=forza_motorsport` URL:** 301 redirect to `/sessions`. One canonical URL.
+- **Existing ACC/F1 sessions in DB:** filter out of all UI listings (`WHERE game LIKE 'forza%'` or equivalent on home-page queries). Rows stay in DB for future restoration.
+- **Un-parking trigger:** "When Forza is rock solid" — qualitative, no pre-defined feature gate. Decision left to a future call.

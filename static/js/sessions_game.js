@@ -26,21 +26,8 @@ function sparkSVG(vals){
     <polyline points="${pts}" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
   </svg>`;
 }
-const _game=new URLSearchParams(location.search).get('name')||'';
-const tabMap={'forza_motorsport':'tab-forza','acc':'tab-acc','f1':'tab-f1'};
-if(_game&&tabMap[_game])document.getElementById(tabMap[_game]).classList.add('active');
-else document.getElementById('tab-all').classList.add('active');
-
-// ── Tab counts ────────────────────────────────────────────────
-(async()=>{
-  let games=[];try{games=await fetch('/sessions/games').then(r=>r.json());}catch(e){}
-  let all=0;
-  games.forEach(g=>{const n=g.session_count||0;all+=n;
-    const m={'forza_motorsport':'cnt-forza','acc':'cnt-acc','f1':'cnt-f1'}[g.game];
-    if(m){const el=document.getElementById(m);if(el&&n)el.textContent='('+n+')';}
-  });
-  const ca=document.getElementById('cnt-all');if(ca&&all)ca.textContent='('+all+')';
-})();
+// Forza is the only active game; ACC + F1 are parked. See docs/specs/park-acc-f1.md.
+const _game=new URLSearchParams(location.search).get('name')||'forza_motorsport';
 
 // ── Game Overview (only when ?name= is set) ───────────────────
 let _gfType='real',_gfLast=10,_gfFormData=[];
