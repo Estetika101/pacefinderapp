@@ -4189,6 +4189,7 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
 </div>
 </div>
 <div id="tele-tip"></div>
+<script src="/static/js/charts.js"></script>
 <script src="/static/js/telemetry.js"></script>
 </body>
 </html>
