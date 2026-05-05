@@ -859,6 +859,7 @@ class Session:
         self.current_lap: Optional[LapRecord] = None
         self.completed_laps: list[LapRecord] = []
         self.best_lap_time_s: Optional[float] = None
+        self._last_seen_lap_time: Optional[float] = None  # last_lap_time field from packets
 
         # Motion cache (F1 motion packets arrive separately from telemetry)
         self._motion_cache: dict = {}
@@ -966,6 +967,11 @@ class Session:
         if rp is not None and rp > 0:
             self._race_positions.append(rp)
 
+        # Track last_lap_time for end-of-race recovery (is_race_on may drop before lap_number increments)
+        llt = parsed.get("last_lap_time")
+        if llt and 0 < llt < 600:
+            self._last_seen_lap_time = llt
+
         # Forza: lap transitions via lap_number field
         lap_num = parsed.get("lap_number", 0)
         if lap_num and lap_num != self.current_lap_num:
@@ -1027,9 +1033,32 @@ class Session:
             except OSError:
                 pass
 
-        # Close current lap
+        # Close current lap — attempt to recover the actual lap time when
+        # is_race_on dropped to 0 before lap_number incremented (e.g. Forza race end).
+        # Priority: (1) last_lap_time seen in packets if not already used for a prior lap,
+        #           (2) current_lap_time from the last sample (close approximation),
+        #           (3) wall-clock fallback (marked as unreliable by being absent from best).
         if self.current_lap and self.current_lap.samples:
-            self.current_lap.close()
+            inferred_time: Optional[float] = None
+            last_completed_time = (self.completed_laps[-1].lap_time_s
+                                   if self.completed_laps else None)
+            llt = self._last_seen_lap_time
+            if (llt and 0 < llt < 600 and
+                    (last_completed_time is None or abs(llt - last_completed_time) > 0.01)):
+                inferred_time = llt
+            elif self.current_lap.samples:
+                # Use the current_lap_time from the last sample as approximation
+                t = self.current_lap.samples[-1].get("t", 0)
+                if t and t > 1:
+                    inferred_time = round(t, 3)
+            self.current_lap.close(inferred_time)
+            if inferred_time:
+                if self.best_lap_time_s is None or inferred_time < self.best_lap_time_s:
+                    self.best_lap_time_s = inferred_time
+                log.info(
+                    f"[{self.game}] Final lap {self.current_lap.lap_number} recovered "
+                    f"| time={inferred_time:.3f}s (source={'last_lap_time' if llt and abs(llt-inferred_time)<0.01 else 'current_lap_time'})"
+                )
             self.completed_laps.append(self.current_lap)
 
         laps_summary = [
