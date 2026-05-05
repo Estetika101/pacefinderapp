@@ -46,7 +46,7 @@ from session.manager import (
     _is_driving, Session, state, active_sessions, update_state,
 )
 from session.protocol import TelemetryProtocol
-from session.watchdog import session_watchdog
+from session.watchdog import session_watchdog, _clear_race_ended
 from config import (
     load_config, save_config, config, storage_path,
     PORTS, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, STATUS_PORT, LOG_LEVEL,
