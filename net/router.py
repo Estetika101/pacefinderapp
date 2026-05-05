@@ -172,10 +172,27 @@ def make_handler(ctx: dict):
                 writer.write(_http_response("200 OK", "application/json", json.dumps(state, indent=2).encode()))
 
             elif path in ("/sessions", "/sessions/"):
-                writer.write(_http_response("200 OK", "text/html", GAMES_HTML.encode()))
+                # Forza is the only active game; serve the per-game overview as the home page.
+                # See docs/specs/park-acc-f1.md.
+                writer.write(_http_response("200 OK", "text/html", TRACKS_HTML.encode()))
 
             elif path == "/sessions/game":
-                writer.write(_http_response("200 OK", "text/html", TRACKS_HTML.encode()))
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                name = qs.get("name", "")
+                if name in ("acc", "f1"):
+                    # ACC + F1 are parked — see docs/specs/park-acc-f1.md
+                    writer.write(_http_response(
+                        "404 Not Found", "text/plain",
+                        b"This game's support is currently parked.",
+                    ))
+                else:
+                    # forza_motorsport (or missing) → 301 to canonical /sessions
+                    writer.write(_http_response(
+                        "301 Moved Permanently", "text/plain", b"",
+                        "Location: /sessions\r\n",
+                    ))
 
             elif path == "/sessions/track":
                 writer.write(_http_response("200 OK", "text/html", TRACK_DETAIL_HTML.encode()))

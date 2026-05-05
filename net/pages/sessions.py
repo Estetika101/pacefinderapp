@@ -121,12 +121,6 @@ TRACKS_HTML = """<!DOCTYPE html>
   </nav>
 </div>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
-<div class="gtab-bar" id="gtab-bar">
-  <a class="gtab" href="/sessions" id="tab-all">All Sessions<span class="cnt" id="cnt-all"></span></a>
-  <a class="gtab" href="/sessions/game?name=forza_motorsport" id="tab-forza">Forza<span class="cnt" id="cnt-forza"></span></a>
-  <a class="gtab" href="/sessions/game?name=acc" id="tab-acc">ACC<span class="cnt" id="cnt-acc"></span></a>
-  <a class="gtab" href="/sessions/game?name=f1" id="tab-f1">F1<span class="cnt" id="cnt-f1"></span></a>
-</div>
     <!-- Game overview — shown only when ?name= is set -->
     <div id="game-overview" style="display:none">
       <div class="ov">
@@ -210,12 +204,6 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
   </nav>
 </div>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
-<div class="gtab-bar" id="gtab-bar">
-  <a class="gtab" href="/sessions" id="tab-all">All Sessions<span class="cnt" id="cnt-all"></span></a>
-  <a class="gtab" href="#" id="tab-forza">Forza<span class="cnt" id="cnt-forza"></span></a>
-  <a class="gtab" href="#" id="tab-acc">ACC<span class="cnt" id="cnt-acc"></span></a>
-  <a class="gtab" href="#" id="tab-f1">F1<span class="cnt" id="cnt-f1"></span></a>
-</div>
 <div class="breadcrumb"><a href="/sessions">Sessions</a> &rsaquo; <a href="#" id="bc-game" style="display:none"></a><span id="bc-sep" style="display:none"> &rsaquo; </span><span id="bc-track">Track</span></div>
 <div class="lr-pills" id="lr-pills"></div>
 <div class="trk-tab-bar">

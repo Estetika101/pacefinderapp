@@ -125,16 +125,7 @@ SETUP_HTML = """<!DOCTYPE html>
       <div class="udp-status"><div class="udp-dot" id="dot-forza"></div><span class="udp-count" id="cnt-forza">0 packets</span></div>
       <div class="udp-last" id="last-forza">—</div>
     </div>
-    <div class="udp-card" id="udp-acc">
-      <div class="udp-game">ACC</div>
-      <div class="udp-status"><div class="udp-dot" id="dot-acc"></div><span class="udp-count" id="cnt-acc">0 packets</span></div>
-      <div class="udp-last" id="last-acc">—</div>
-    </div>
-    <div class="udp-card" id="udp-f1">
-      <div class="udp-game">F1</div>
-      <div class="udp-status"><div class="udp-dot" id="dot-f1"></div><span class="udp-count" id="cnt-f1">0 packets</span></div>
-      <div class="udp-last" id="last-f1">—</div>
-    </div>
+    <!-- ACC + F1 cards parked — see docs/specs/park-acc-f1.md -->
   </div>
 </div>
 
@@ -178,14 +169,7 @@ SETUP_HTML = """<!DOCTYPE html>
       <label>Forza Motorsport</label>
       <input type="number" id="port_forza" min="1024" max="65535">
     </div>
-    <div class="field">
-      <label>ACC</label>
-      <input type="number" id="port_acc" min="1024" max="65535">
-    </div>
-    <div class="field">
-      <label>F1 (Codemasters)</label>
-      <input type="number" id="port_f1" min="1024" max="65535">
-    </div>
+    <!-- ACC + F1 port fields parked — see docs/specs/park-acc-f1.md -->
   </div>
 </div>
 
@@ -288,8 +272,7 @@ async function loadIps() {
     const ports = d.ports || {};
     const games = [
       { label: 'Forza Motorsport', value: `IP: ${primary}  Port: ${ports.forza_motorsport || 5300}  Format: Car Dash` },
-      { label: 'ACC', value: `IP: ${primary}  Port: ${ports.acc || 9996}` },
-      { label: 'F1 2023/2024', value: `IP: ${primary}  Port: ${ports.f1 || 20777}` },
+      // ACC + F1 entries parked — see docs/specs/park-acc-f1.md
     ];
     gsEl.style.display = '';
     gsEl.innerHTML = games.map(g => `
@@ -439,8 +422,6 @@ async function load() {
   document.getElementById('storage_path').value      = d.storage_path || '';
   document.getElementById('session_timeout_s').value = d.session_timeout_s || 10;
   document.getElementById('port_forza').value        = (d.ports || {}).forza_motorsport || 5300;
-  document.getElementById('port_acc').value          = (d.ports || {}).acc || 9996;
-  document.getElementById('port_f1').value           = (d.ports || {}).f1 || 20777;
   document.getElementById('anthropic_api_key').value = d.anthropic_api_key || '';
   const modelSel = document.getElementById('anthropic_model');
   if (d.anthropic_model) modelSel.value = d.anthropic_model;
@@ -466,8 +447,6 @@ async function save() {
     session_timeout_s: parseInt(document.getElementById('session_timeout_s').value, 10),
     ports: {
       forza_motorsport: parseInt(document.getElementById('port_forza').value, 10),
-      acc:              parseInt(document.getElementById('port_acc').value, 10),
-      f1:               parseInt(document.getElementById('port_f1').value, 10),
     },
     anthropic_api_key: document.getElementById('anthropic_api_key').value.trim(),
     anthropic_model:   document.getElementById('anthropic_model').value,

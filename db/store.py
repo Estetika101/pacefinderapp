@@ -489,8 +489,11 @@ def _db_sessions_list(limit: int = 100) -> list:
 
 
 def _db_games_index() -> list:
-    """Return per-game aggregate stats, newest-first."""
-    all_games = ["forza_motorsport", "acc", "f1"]
+    """Return per-game aggregate stats, newest-first.
+
+    Only Forza is active. ACC + F1 are parked — see docs/specs/park-acc-f1.md.
+    """
+    all_games = ["forza_motorsport"]
     with _db_lock:
         conn = _db_connect()
         try:
