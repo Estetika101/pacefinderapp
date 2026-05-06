@@ -375,8 +375,14 @@ def make_handler(ctx: dict):
                                                 json.dumps({"error": "Session not found"}).encode()))
                 else:
                     cd_dict = dict(cd_row)
-                    all_tracks = effective_tracks()
-                    track_names = sorted(set(all_tracks.values()))
+                    # Merge FM2023's hardcoded canonical circuits with the CSV-backed
+                    # FORZA_TRACKS so the post-race dropdown shows every known track,
+                    # not just the FH5 ordinals. Same source-of-truth as
+                    # /sessions/track-options. See docs/specs/post-race-track-dropdown.md.
+                    names = set(FM2023_TRACKS)
+                    names.update(effective_tracks().values())
+                    names.discard("unknown")
+                    track_names = sorted(names)
                     writer.write(_http_response("200 OK", "application/json", json.dumps({
                         "session":       cd_dict,
                         "track_list":    track_names,
