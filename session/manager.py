@@ -551,10 +551,17 @@ state = {
 
 active_sessions: dict = {}
 
+# Latest fully-parsed packet, exposed via /debug/raw for live field inspection.
+# Mutable dict so the router can read it without an import cycle.
+last_parsed: dict = {}
+
 
 def update_state(game: str, session: Session, parsed: dict):
     if "_packet_type" in parsed and parsed["_packet_type"] in ("motion", "lap_data", "graphics"):
         return
+    # Snapshot the raw parsed packet for the /debug/raw inspector.
+    last_parsed.clear()
+    last_parsed.update({"_game": game, **parsed})
     state["status"]       = "receiving" if session._is_driving(parsed) else "idle"
     state["game"]         = game
     state["session_id"]   = session.session_id

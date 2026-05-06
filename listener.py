@@ -28,6 +28,7 @@ from net.pages.sessions import (
     SESSION_DETAIL_HTML_PRE, SESSION_DETAIL_HTML_POST,
 )
 from net.pages.telemetry import TELEMETRY_HTML
+from net.pages.debug import DEBUG_RAW_HTML
 from net.router import make_handler
 from net.api import (
     build_inject_packets as _build_inject_packets_core,
@@ -43,7 +44,7 @@ from reference.loader import (
     load_forza_reference_data, parse_forza,
 )
 from session.manager import (
-    _is_driving, Session, state, active_sessions, update_state,
+    _is_driving, Session, state, last_parsed, active_sessions, update_state,
 )
 from session.protocol import TelemetryProtocol
 from session.watchdog import session_watchdog, _clear_race_ended
@@ -348,6 +349,7 @@ async def main(demo_mode: bool = False):
 
     _ctx = {
         "state": state,
+        "last_parsed": last_parsed,
         "config": config,
         "log": log,
         "PORTS": PORTS,
@@ -364,6 +366,7 @@ async def main(demo_mode: bool = False):
         "TRACK_DETAIL_HTML": TRACK_DETAIL_HTML,
         "SESSION_DETAIL_HTML": SESSION_DETAIL_HTML,
         "TELEMETRY_HTML": TELEMETRY_HTML,
+        "DEBUG_RAW_HTML": DEBUG_RAW_HTML,
         "get_local_ips": _get_local_ips,
         "disk_info": disk_info,
         "save_config": save_config,
