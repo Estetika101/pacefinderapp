@@ -21,7 +21,7 @@ let _tmCx=null,_tmCy=null;
 // moves away. Click again on a chart (or hit Esc) to unlock. ←/→ to nudge.
 let _cursorLocked=false,_cursorXFrac=null,_cursorTipX=null,_cursorTipY=null;
 const LAP_COLORS=['#4a9aef','#22c55e','#f59e0b','#a855f7'];
-const REF_COL='#444444';
+const REF_COL='#e5e7eb';  // bright neutral so the dashed reference line reads on a dark bg
 const W=1000;
 const $=id=>document.getElementById(id);
 // True when a selected lap IS the active reference lap (so its delta is 0 by
@@ -131,12 +131,20 @@ function localMaxes(samples,field,thresh){
   return out.filter((m,i)=>i===0||(xv(sl[m.i])-xv(sl[out[i-1].i]))>0.04);
 }
 // ── Panel builder ─────────────────────────────────────────────────────────
-function setPanel(id,label,svgHtml,show){
+function setPanel(id,label,svgHtml,show,withRef){
   const p=$(id);
   if(!show){p.style.display='none';return;}
   p.style.display='';
-  p.innerHTML=`<div class="panel-lbl-row"><span class="p-lbl">${label}</span></div>
+  const refTag=withRef&&_refSamples?`<span class="ref-tag">REF · ${refLabel()}</span>`:'';
+  p.innerHTML=`<div class="panel-lbl-row"><span class="p-lbl">${label}</span>${refTag}</div>
 <div class="panel-svg-wrap" data-panel="${id}"><div class="px-line"></div>${svgHtml}</div>`;
+}
+function refLabel(){
+  if(_refType==='best_lap')return 'My Best';
+  if(_refType==='theoretical')return 'Theoretical';
+  if(_refType==='last_lap')return 'Last Lap';
+  if(_refType==='cross_session')return 'Cross-session';
+  return 'Reference';
 }
 // ── Individual panel SVG builders ─────────────────────────────────────────
 function speedSVG(){
@@ -145,7 +153,7 @@ function speedSVG(){
   let[mn,mx]=autoRange([...allS,_refSamples?_refSamples:[]],'speed_mph');mn=Math.max(0,mn);
   const yr=mx-mn||1;
   let c=`${secLine(1/3,H)}${secLine(2/3,H)}${secLabel(0,'S1',H)}${secLabel(1/3,'S2',H)}${secLabel(2/3,'S3',H)}`;
-  if(_refSamples)c+=`<path d="${linePts(_refSamples,'speed_mph',H,mn,mx)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".5"/>`;
+  if(_refSamples)c+=`<path d="${linePts(_refSamples,'speed_mph',H,mn,mx)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".75"/>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.4;
@@ -170,7 +178,7 @@ function throttleSVG(){
   const y50=(H-50/100*H).toFixed(1),y70=(H-70/100*H).toFixed(1);
   let c=`${secLine(1/3,H)}${secLine(2/3,H)}
     <rect x="0" y="${y70}" width="${W}" height="${(parseFloat(y50)-parseFloat(y70)).toFixed(1)}" fill="#f59e0b1f"/>`;
-  if(_refSamples)c+=`<path d="${linePts(_refSamples,'throttle_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".5"/>`;
+  if(_refSamples)c+=`<path d="${linePts(_refSamples,'throttle_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".75"/>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.4;
@@ -182,7 +190,7 @@ function throttleSVG(){
 function brakeSVG(){
   const H=80;
   let c=`${secLine(1/3,H)}${secLine(2/3,H)}`;
-  if(_refSamples)c+=`<path d="${linePts(_refSamples,'brake_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".5"/>`;
+  if(_refSamples)c+=`<path d="${linePts(_refSamples,'brake_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".75"/>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.4;
@@ -403,8 +411,18 @@ function updateTrackDot(pos){
 }
 // ── Main render ───────────────────────────────────────────────────────────
 function renderAll(){
-  if(!_primaryLap||!_lapSamples[_primaryLap])return;
-  let deltaHtml='',showDeltaPanel=true;
+  // Empty state: no laps selected → hide everything and show a hint.
+  const empty=$('panels-empty');
+  const allPanelIds=['panel-delta','panel-speed','panel-throttle','panel-brake','panel-gear','panel-steer','panel-slip','panel-tyre'];
+  if(!_primaryLap||!_lapSamples[_primaryLap]){
+    if(empty)empty.style.display='';
+    allPanelIds.forEach(id=>{const p=$(id);if(p)p.style.display='none';});
+    const tm=$('track-map-wrap');if(tm)tm.style.display='none';
+    return;
+  }
+  if(empty)empty.style.display='none';
+  // Delta panel only renders when a reference is selected AND a non-reference lap is also selected.
+  let deltaHtml='',showDeltaPanel=false;
   if(_refSamples){
     const nonRefLaps=_selectedLaps.filter(ln=>_lapSamples[ln]&&!isRefLap(ln));
     if(nonRefLaps.length>0){
@@ -414,18 +432,13 @@ function renderAll(){
         d:buildDelta(_lapSamples[ln],_refSamples)
       }));
       deltaHtml=deltaSVG(lapDeltas);
-    }else{
-      // Reference set but only the reference lap is selected — nothing useful to show.
-      showDeltaPanel=false;
+      showDeltaPanel=true;
     }
-  }else{
-    deltaHtml=`<svg viewBox="0 0 ${W} 32" preserveAspectRatio="none" width="100%" height="32">
-      <text x="${W/2}" y="20" text-anchor="middle" fill="#282828" font-size="18" font-family="monospace">Select a reference to see delta</text></svg>`;
   }
-  setPanel('panel-delta','DELTA — CUMULATIVE TIME VS REFERENCE  (GREEN=FASTER · RED=SLOWER)',deltaHtml,showDeltaPanel);
-  setPanel('panel-speed','SPEED mph — ▽ corner minimum speed',speedSVG(),$('ch-speed').checked);
-  setPanel('panel-throttle','THROTTLE % — amber band = 50-70% dwell zone',throttleSVG(),$('ch-throttle').checked);
-  setPanel('panel-brake','BRAKE % — ● peak points',brakeSVG(),$('ch-brake').checked);
+  setPanel('panel-delta','DELTA — CUMULATIVE TIME VS REFERENCE  (GREEN=FASTER · RED=SLOWER)',deltaHtml,showDeltaPanel,true);
+  setPanel('panel-speed','SPEED mph — ▽ corner minimum speed',speedSVG(),$('ch-speed').checked,true);
+  setPanel('panel-throttle','THROTTLE % — amber band = 50-70% dwell zone',throttleSVG(),$('ch-throttle').checked,true);
+  setPanel('panel-brake','BRAKE % — ● peak points',brakeSVG(),$('ch-brake').checked,true);
   setPanel('panel-gear','GEAR',gearSVG(),$('ch-gear').checked);
   setPanel('panel-steer','STEERING',steerSVG(),$('ch-steer').checked);
   setPanel('panel-slip','SLIP RL (solid) / RR (dashed)',slipSVG(),$('ch-slip').checked);
@@ -711,24 +724,28 @@ async function fetchLap(lapN){
     _lapSamples[lapN]=Array.isArray(d)&&d.length?d:[];
   }catch(e){_lapSamples[lapN]=[];}
 }
+function setRefStatus(msg){
+  const el=$('ref-status'); if(!el)return;
+  if(msg){el.textContent=msg;el.style.display='';}
+  else{el.textContent='';el.style.display='none';}
+}
 async function fetchRef(){
-  if(!_refType||!_sess){_refSamples=null;return;}
+  if(!_refType||!_sess){_refSamples=null;setRefStatus('');return;}
   try{
     let d;
     if(_refType==='last_lap'){
-      // Most recent completed lap of the current session
       const valid=_laps.filter(l=>l.lap_number>0 && l.lap_time_s);
-      if(!valid.length){_refSamples=null;return;}
+      if(!valid.length){_refSamples=null;setRefStatus('No completed laps to reference yet.');return;}
       const lastLap=valid[valid.length-1];
       d=await fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_id)+'&lap='+lastLap.lap_number).then(r=>r.json());
     } else if(_refType==='cross_session' && _refSid && _refLapNum){
       d=await fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_refSid)+'&lap='+_refLapNum).then(r=>r.json());
     } else {
-      // best_lap, theoretical — served via track_references table
       d=await fetch('/sessions/reference-samples?track='+encodeURIComponent(_sess.track||'')+'&type='+_refType).then(r=>r.json());
     }
-    _refSamples=Array.isArray(d)&&d.length?d:null;
-  }catch(e){_refSamples=null;}
+    if(Array.isArray(d)&&d.length){_refSamples=d;setRefStatus('');}
+    else{_refSamples=null;setRefStatus('Reference unavailable for this track yet.');}
+  }catch(e){_refSamples=null;setRefStatus('Reference unavailable for this track yet.');}
 }
 
 // ── Cross-session reference picker ───────────────────────────────────────

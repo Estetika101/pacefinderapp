@@ -54,6 +54,7 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 .panel-wrap{margin-bottom:2px}
 .panel-lbl-row{display:flex;align-items:center;margin-bottom:1px;min-height:14px; font-size:1rem}
 .p-lbl{font-size:1rem;color:var(--n-500);text-transform:uppercase;letter-spacing:1.5px}
+.ref-tag{margin-left:auto;font-size:.6rem;color:#e5e7eb;letter-spacing:.12em;text-transform:uppercase;padding:1px 6px;border:1px dashed #e5e7eb;border-radius:3px;opacity:.75}
 .panel-svg-wrap{position:relative;overflow:hidden;border:1px solid var(--border-sub);border-radius:2px;background:var(--bg-raised);cursor:crosshair}
 .panel-svg-wrap.panning{cursor:grab}
 .chart-zoom-ctrl{position:absolute;top:4px;right:4px;display:flex;gap:3px;z-index:10;pointer-events:auto}
@@ -128,6 +129,7 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
         <option value="cross_session">Lap from another session…</option>
       </select>
       <div id="cs-ref-label" class="ctrl-sub" style="display:none"></div>
+      <div id="ref-status" class="ctrl-sub" style="display:none;color:var(--warn,#f59e0b)"></div>
     </div>
     <div class="ctrl-section">
       <div class="ctrl-lbl">Channels</div>
@@ -162,6 +164,7 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
         <button class="czc-btn" onclick="stepZoom(1)">+</button>
       </div>
       <div id="drag-sel"></div>
+      <div id="panels-empty" style="display:none;color:var(--n-400);font-size:.9rem;padding:60px;text-align:center">Select at least one lap to view telemetry.</div>
       <div id="panel-delta" class="panel-wrap"></div>
       <div id="panel-speed" class="panel-wrap"></div>
       <div id="panel-throttle" class="panel-wrap"></div>
