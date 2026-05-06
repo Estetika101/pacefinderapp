@@ -61,6 +61,7 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 .czc-btn:hover{border-color:var(--n-300);color:var(--text)}
 .panel-svg-wrap svg{display:block;width:100%}
 .px-line{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.16);pointer-events:none;display:none}
+.px-line.locked{background:var(--color-accent,#f59e0b);width:2px;opacity:.85;box-shadow:0 0 4px rgba(245,158,11,.4)}
 #tele-tip{position:fixed;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);font-size:var(--text-xs);padding:5px 10px;border-radius:4px;pointer-events:none;display:none;z-index:200;white-space:pre;line-height:1.7;font-family:var(--font-mono);min-width:160px}
 .track-map-wrap{margin-top:var(--sp-4);border:1px solid var(--border-sub);border-radius:2px;background:var(--bg-raised);overflow:hidden}
 .tm-lbl{font-size:.56rem;color:var(--n-500);text-transform:uppercase;letter-spacing:1.5px;padding:4px var(--sp-3)}
