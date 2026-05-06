@@ -30,7 +30,9 @@ function sparkSVG(vals){
 const _game=new URLSearchParams(location.search).get('name')||'forza_motorsport';
 
 // ── Game Overview (only when ?name= is set) ───────────────────
-let _gfType='real',_gfLast=10,_gfFormData=[];
+// Default to 'all' so the Form chart populates with whatever sessions exist
+// (time_trial, hot_lap, etc. — not just multi-driver 'real' races). See #17.
+let _gfType='all',_gfLast=10,_gfFormData=[];
 
 function gSetKV(id,val){const el=document.getElementById(id);if(!el)return;if(val==null||val==='—'){el.textContent='—';el.classList.add('dash');}else{el.textContent=val;el.classList.remove('dash');}}
 function p1(v,d=1){return v==null?null:parseFloat(v.toFixed(d));}

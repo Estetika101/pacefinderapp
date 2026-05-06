@@ -51,9 +51,9 @@ GAMES_HTML = """<!DOCTYPE html>
       <div class="form-spark" id="trend-spark"></div>
       <div class="form-filters">
         <div class="filter-group" id="type-filters">
-          <button class="ftog on" data-val="real">Real</button>
+          <button class="ftog" data-val="real">Real</button>
           <button class="ftog" data-val="ai">AI</button>
-          <button class="ftog" data-val="all">All</button>
+          <button class="ftog on" data-val="all">All</button>
         </div>
         <div class="filter-group" id="last-filters">
           <button class="ftog" data-val="5">Last 5</button>
@@ -153,9 +153,9 @@ TRACKS_HTML = """<!DOCTYPE html>
           <div class="ov-form-right">
             <div class="ov-ffilters">
               <div class="ov-fgroup" id="gf-type">
-                <button class="ftog on" data-val="real">Real</button>
+                <button class="ftog" data-val="real">Real</button>
                 <button class="ftog" data-val="ai">AI</button>
-                <button class="ftog" data-val="all">All</button>
+                <button class="ftog on" data-val="all">All</button>
               </div>
               <div class="ov-fgroup" id="gf-last">
                 <button class="ftog" data-val="5">Last 5</button>

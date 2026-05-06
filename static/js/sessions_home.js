@@ -5,7 +5,9 @@ function fmtDate(iso){if(!iso)return'—';return new Date(iso).toLocaleDateStrin
 function fmtRel(iso){if(!iso)return'';const d=new Date(iso),n=Date.now(),s=Math.floor((n-d)/1000);if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
 function p1(v,d=1){return v==null?null:parseFloat(v.toFixed(d));}
 
-let _type='real',_last=10;
+// Default to 'all' so the Form chart populates with whatever sessions exist
+// (time_trial, hot_lap, etc. — not just multi-driver 'real' races). See #17.
+let _type='all',_last=10;
 let _allTracks=[],_allRecent=[],_allFormData=[];
 
 // ── KPI cards ─────────────────────────────────────────────────
