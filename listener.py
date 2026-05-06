@@ -28,7 +28,7 @@ from net.pages.sessions import (
     SESSION_DETAIL_HTML_PRE, SESSION_DETAIL_HTML_POST,
 )
 from net.pages.telemetry import TELEMETRY_HTML
-from net.pages.debug import DEBUG_RAW_HTML
+from net.pages.debug import DEBUG_RAW_HTML, DEBUG_PERF_HTML
 from net.router import make_handler
 from net.api import (
     build_inject_packets as _build_inject_packets_core,
@@ -367,6 +367,7 @@ async def main(demo_mode: bool = False):
         "SESSION_DETAIL_HTML": SESSION_DETAIL_HTML,
         "TELEMETRY_HTML": TELEMETRY_HTML,
         "DEBUG_RAW_HTML": DEBUG_RAW_HTML,
+        "DEBUG_PERF_HTML": DEBUG_PERF_HTML,
         "get_local_ips": _get_local_ips,
         "disk_info": disk_info,
         "save_config": save_config,

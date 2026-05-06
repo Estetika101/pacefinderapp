@@ -6,6 +6,8 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
+from net.perf import _perf_ctx, _perf_ring, _perf_client_ring, _PERF_LOG_THRESHOLD_MS
+
 
 def _http_response(status: str, content_type: str, body: bytes, extra_headers: str = "") -> bytes:
     return (
@@ -38,6 +40,7 @@ def make_handler(ctx: dict):
     SESSION_DETAIL_HTML    = ctx["SESSION_DETAIL_HTML"]
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
     DEBUG_RAW_HTML         = ctx["DEBUG_RAW_HTML"]
+    DEBUG_PERF_HTML        = ctx["DEBUG_PERF_HTML"]
     last_parsed            = ctx["last_parsed"]
     get_local_ips          = ctx["get_local_ips"]
     disk_info              = ctx["disk_info"]
@@ -71,6 +74,21 @@ def make_handler(ctx: dict):
     clear_race_ended       = ctx["clear_race_ended"]
 
     async def handle_status(reader, writer):
+        # Per-request perf state — populated once we know the path.
+        _perf_token = None
+        _perf_started = time.perf_counter()
+        _perf_method = "?"
+        _perf_path = "?"
+        # Wrap writer.write so we can sum response bytes for the perf log.
+        _bytes_written = [0]
+        _orig_write = writer.write
+        def _counting_write(data):
+            try:
+                _bytes_written[0] += len(data)
+            except TypeError:
+                pass
+            return _orig_write(data)
+        writer.write = _counting_write
         try:
             # Read until the end of HTTP headers
             header_buf = b""
@@ -89,6 +107,10 @@ def make_handler(ctx: dict):
             raw_url      = parts[1] if len(parts) > 1 else "/"
             path         = raw_url.split("?")[0]
             query_string = raw_url.split("?", 1)[1] if "?" in raw_url else ""
+
+            _perf_method = method
+            _perf_path = path
+            _perf_token = _perf_ctx.set({"db_ms": 0.0})
 
             # Parse Content-Length so we read the full POST body
             content_length = 0
@@ -180,6 +202,36 @@ def make_handler(ctx: dict):
 
             elif path == "/debug/raw.json":
                 writer.write(_http_response("200 OK", "application/json", json.dumps(last_parsed).encode()))
+
+            elif path == "/debug/perf":
+                # Two flavors: HTML inspector (default) and ?json=1 raw dump.
+                if "json=1" in query_string:
+                    payload = {
+                        "server": list(_perf_ring),
+                        "client": list(_perf_client_ring),
+                    }
+                    writer.write(_http_response("200 OK", "application/json", json.dumps(payload).encode()))
+                else:
+                    writer.write(_http_response("200 OK", "text/html", DEBUG_PERF_HTML.encode()))
+
+            elif path == "/debug/perf/client" and method == "POST":
+                # Rate limit: drop entries that arrive within 200ms of the last
+                # entry from the same path. Cheap defense against polling spam.
+                try:
+                    payload = json.loads(raw_body) if raw_body else {}
+                    now = time.time()
+                    p = payload.get("path", "?")
+                    last = next((e for e in reversed(_perf_client_ring) if e.get("path") == p), None)
+                    if last is None or (now - last.get("ts", 0)) > 0.2:
+                        _perf_client_ring.append({
+                            "ts": now,
+                            "path": p,
+                            "ua": payload.get("ua", "")[:80],
+                            "marks": payload.get("marks", {}),
+                        })
+                    writer.write(_http_response("204 No Content", "text/plain", b""))
+                except Exception:
+                    writer.write(_http_response("400 Bad Request", "text/plain", b"bad json"))
 
             elif path in ("/sessions", "/sessions/"):
                 # Forza is the only active game; serve the per-game overview as the home page.
@@ -870,6 +922,41 @@ def make_handler(ctx: dict):
         except Exception:
             pass
         finally:
+            try:
+                total_ms = (time.perf_counter() - _perf_started) * 1000
+                ctx_perf = _perf_ctx.get() or {"db_ms": 0.0}
+                db_ms = ctx_perf.get("db_ms", 0.0)
+                bytes_out = _bytes_written[0]
+                # Skip noisy paths (long-lived SSE, polling instrument endpoints)
+                # to keep the log signal-rich and the ring buffer representative.
+                _perf_skip = (
+                    _perf_path.startswith("/events")
+                    or _perf_path == "/debug/perf"
+                    or _perf_path == "/debug/perf/client"
+                    or _perf_path == "/debug/raw.json"
+                )
+                if not _perf_skip:
+                    _perf_ring.append({
+                        "ts": time.time(),
+                        "method": _perf_method,
+                        "path": _perf_path,
+                        "total_ms": round(total_ms, 1),
+                        "db_ms": round(db_ms, 1),
+                        "bytes": bytes_out,
+                    })
+                    line = (f"perf method={_perf_method} path={_perf_path} "
+                            f"total_ms={total_ms:.1f} db_ms={db_ms:.1f} bytes={bytes_out}")
+                    if total_ms > _PERF_LOG_THRESHOLD_MS:
+                        log.info(line)
+                    else:
+                        log.debug(line)
+            except Exception:
+                pass
+            if _perf_token is not None:
+                try:
+                    _perf_ctx.reset(_perf_token)
+                except (LookupError, ValueError):
+                    pass
             writer.close()
 
     return handle_status
