@@ -37,6 +37,8 @@ def make_handler(ctx: dict):
     TRACK_DETAIL_HTML      = ctx["TRACK_DETAIL_HTML"]
     SESSION_DETAIL_HTML    = ctx["SESSION_DETAIL_HTML"]
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
+    DEBUG_RAW_HTML         = ctx["DEBUG_RAW_HTML"]
+    last_parsed            = ctx["last_parsed"]
     get_local_ips          = ctx["get_local_ips"]
     disk_info              = ctx["disk_info"]
     save_config            = ctx["save_config"]
@@ -172,6 +174,12 @@ def make_handler(ctx: dict):
 
             elif path == "/status":
                 writer.write(_http_response("200 OK", "application/json", json.dumps(state, indent=2).encode()))
+
+            elif path == "/debug/raw":
+                writer.write(_http_response("200 OK", "text/html", DEBUG_RAW_HTML.encode()))
+
+            elif path == "/debug/raw.json":
+                writer.write(_http_response("200 OK", "application/json", json.dumps(last_parsed).encode()))
 
             elif path in ("/sessions", "/sessions/"):
                 # Forza is the only active game; serve the per-game overview as the home page.
