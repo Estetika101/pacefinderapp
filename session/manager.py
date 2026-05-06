@@ -110,6 +110,7 @@ class Session:
         self.weather_condition: Optional[str] = None
         self.track_temp_c: Optional[float] = None
         self.air_temp_c: Optional[float] = None
+        self.tyre_compound: Optional[str] = None
 
         self.last_activity = time.time()
 
@@ -361,6 +362,7 @@ class Session:
             "track_temp_c":     self.track_temp_c,
             "air_temp_c":       self.air_temp_c,
             "closed_reason":    self.closed_reason,
+            "tyre_compound":    self.tyre_compound,
         }
 
         _db_write_session(session_data)
