@@ -2,6 +2,7 @@ import json
 import struct
 import threading
 import time
+from collections import Counter
 from datetime import datetime
 from typing import Optional
 import logging
@@ -16,6 +17,26 @@ from db.store import (
 from reference.loader import FORZA_CARS
 
 _log = logging.getLogger("pacefinder")
+
+
+def _grid_pos_from_history(positions: list) -> Optional[int]:
+    """Derive a stable starting grid position from the captured race_position
+    history.
+
+    Forza broadcasts a phantom P1 for the first ~30 packets right at the
+    lights-drop moment, before the real grid slot is finalised. Taking
+    `positions[0]` therefore lands on the phantom. Strategy: use the
+    most-frequent position in the first 60 packets (~1s at 60Hz). The
+    phantom only persists for a fraction of that window, so the real
+    grid position dominates the count.
+
+    Falls back to the only sample available when fewer than 60 packets
+    have been captured.
+    """
+    if not positions:
+        return None
+    sample = positions[:60] if len(positions) >= 60 else positions
+    return Counter(sample).most_common(1)[0][0]
 
 
 def _is_driving(parsed: dict) -> bool:
@@ -205,18 +226,16 @@ class Session:
                 _log.info(f"[{self.game}] Unmapped car_ordinal={ordinal} — displayed as 'Unknown Car'")
 
         rp = parsed.get("race_position")
-        # Only capture race_position when the race has actually started — i.e.
-        # the player has crossed the line into lap 1+. Forza broadcasts P1 as
-        # a placeholder during pre-race / formation / countdown phases, and
-        # both is_race_on=1 and current_race_time>0 are TRUE during those
-        # phases too (current_race_time ticks during countdown). The reliable
-        # signal is lap_number>=1 — that only flips once you cross the start
-        # line, at which point the position is the real grid slot.
-        ln = parsed.get("lap_number", 0) or 0
-        if rp is not None and rp > 0 and parsed.get("is_race_on") == 1 and ln >= 1:
-            # Diagnostic: log the very first captured position so we can
-            # confirm the gate caught the real grid slot (and not a phantom).
+        # Capture every race_position seen while is_race_on=1. The "real grid"
+        # heuristic now lives in _grid_pos_from_history() — see that helper —
+        # because Forza broadcasts a phantom P1 during the pre-race countdown
+        # AND uses lap_number inconsistently across session types, so neither
+        # signal alone gates this reliably.
+        if rp is not None and rp > 0 and parsed.get("is_race_on") == 1:
+            # Diagnostic: log the first captured position with full context so
+            # we can keep tuning the grid heuristic if it stays wrong.
             if not self._race_positions:
+                ln  = parsed.get("lap_number", 0) or 0
                 crt = parsed.get("current_race_time", 0) or 0
                 _log.info(
                     f"[{self.game}] First captured race_position=P{rp} "
@@ -361,8 +380,10 @@ class Session:
         if self.game in ("forza_motorsport", "forza_horizon_5") and self.session_type == "unknown":
             self.session_type = self._infer_forza_session_type()
 
-        grid_pos   = self._race_positions[0]  if self._race_positions and self.session_type == "race" else None
-        finish_pos = self._race_positions[-1] if self._race_positions and self.session_type == "race" else None
+        grid_pos   = (_grid_pos_from_history(self._race_positions)
+                      if self._race_positions and self.session_type == "race" else None)
+        finish_pos = (self._race_positions[-1]
+                      if self._race_positions and self.session_type == "race" else None)
 
         valid_laps = len([l for l in self.completed_laps if l.lap_time_s and l.lap_time_s > 0])
         self.race_type = _classify_race_type(self._race_positions, valid_laps)
@@ -516,7 +537,7 @@ def update_state(game: str, session: Session, parsed: dict):
     # dashboard doesn't show stale values from the previous race.
     if session._race_positions:
         state["race_position"] = session._race_positions[-1]
-        state["grid_pos"]      = session._race_positions[0]
+        state["grid_pos"]      = _grid_pos_from_history(session._race_positions)
     else:
         state["race_position"] = None
         state["grid_pos"]      = None
