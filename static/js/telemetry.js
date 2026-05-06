@@ -13,9 +13,13 @@ let _prevRefType='best_lap';       // restore target if cross-session picker is 
 let _xMode='distance';
 let _zoom=[0,1];
 let _maxT=1;
-let _dragging=false,_dragX0=0;
+let _dragging=false,_dragX0=0,_dragY0=0,_dragMoved=false;
 let _spaceDown=false,_panning=false,_panX0=0,_panZoom0=[0,1];
 let _tmCx=null,_tmCy=null;
+// Click-to-lock cursor on the charts/track-map. When locked, the vertical
+// line + tooltip + map dot stay at the locked x-fraction even as the mouse
+// moves away. Click again on a chart (or hit Esc) to unlock. ←/→ to nudge.
+let _cursorLocked=false,_cursorXFrac=null,_cursorTipX=null,_cursorTipY=null;
 const LAP_COLORS=['#4a9aef','#22c55e','#f59e0b','#a855f7'];
 const REF_COL='#444444';
 const W=1000;
@@ -433,6 +437,60 @@ function renderAll(){
   setupInteraction();
 }
 // ── Crosshair, tooltip, zoom ───────────────────────────────────────────────
+// Render the cursor (vertical line, tooltip, track-map dot) at a given
+// x-fraction of the zoom window. When mouseEvent is null (e.g. cursor is
+// locked), the tooltip stays at its last on-screen position.
+function paintCursor(xFrac, mouseEvent){
+  const area=$('charts-area');
+  const tip=$('tele-tip');
+  area.querySelectorAll('.px-line').forEach(l=>{
+    l.style.left=(xFrac*100)+'%';
+    l.style.display='';
+    l.classList.toggle('locked', _cursorLocked);
+  });
+  const pos=_zoom[0]+xFrac*(_zoom[1]-_zoom[0]);
+  updateTrackDot(pos);
+  const lines=[];
+  _selectedLaps.forEach((ln,ci)=>{
+    const s=_lapSamples[ln];if(!s)return;
+    const sp=(interpAt(s,pos,'speed_mph')||0).toFixed(0);
+    const th=(interpAt(s,pos,'throttle_pct')||0).toFixed(0);
+    const br=(interpAt(s,pos,'brake_pct')||0).toFixed(0);
+    const sl=(interpAt(s,pos,'slip_rl')||0).toFixed(3);
+    const g=Math.round(interpAt(s,pos,'gear'));
+    lines.push(`L${ln}  ${sp}mph  G${g}  T${th}%  B${br}%  Sl${sl}`);
+  });
+  if(_refSamples){
+    _selectedLaps.forEach(ln=>{
+      if(isRefLap(ln))return;
+      const s=_lapSamples[ln];if(!s)return;
+      const d=interpAt(s,pos,'t')-interpAt(_refSamples,pos,'t');
+      const sign=d<0?'−':'+';
+      lines.push(`Δ L${ln}: ${sign}${Math.abs(d).toFixed(3)}s`);
+    });
+    lines.push(`@${(pos*100).toFixed(1)}%`);
+  }
+  if(_cursorLocked) lines.push('🔒 locked — Esc to release');
+  tip.textContent=lines.join('\\n');
+  if(mouseEvent){
+    tip.style.left=Math.min(mouseEvent.clientX+14,window.innerWidth-180)+'px';
+    tip.style.top=Math.max(8,mouseEvent.clientY-tip.offsetHeight-8)+'px';
+    _cursorTipX=tip.style.left; _cursorTipY=tip.style.top;
+  } else if(_cursorTipX!=null){
+    tip.style.left=_cursorTipX; tip.style.top=_cursorTipY;
+  }
+  tip.style.display='block';
+}
+
+function lockCursorAt(xFrac, mouseEvent){
+  _cursorLocked=true; _cursorXFrac=xFrac;
+  paintCursor(xFrac, mouseEvent);
+}
+function unlockCursor(){
+  _cursorLocked=false; _cursorXFrac=null;
+  hideX();
+}
+
 function setupInteraction(){
   const area=$('charts-area');
   const tip=$('tele-tip');
@@ -447,37 +505,19 @@ function setupInteraction(){
       _zoom=[lo,hi];renderAll();
       return;
     }
+    // Track whether this gesture is a drag (large movement) or click — used
+    // by mouseup to decide between zoom-to-selection vs click-to-lock.
+    if(_dragging && (Math.abs(e.clientX-_dragX0Abs)>4 || Math.abs(e.clientY-_dragY0)>4)){
+      _dragMoved=true;
+    }
+    // Locked cursor — leave the line + tip at their fixed position; the mouse
+    // can roam without disturbing the comparison view.
+    if(_cursorLocked) return;
     if(!wrap){hideX();return;}
     const rect=wrap.getBoundingClientRect();
     const xFrac=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-    area.querySelectorAll('.px-line').forEach(l=>{l.style.left=(xFrac*100)+'%';l.style.display='';});
-    const pos=_zoom[0]+xFrac*(_zoom[1]-_zoom[0]);
-    updateTrackDot(pos);
-    const lines=[];
-    _selectedLaps.forEach((ln,ci)=>{
-      const s=_lapSamples[ln];if(!s)return;
-      const sp=(interpAt(s,pos,'speed_mph')||0).toFixed(0);
-      const th=(interpAt(s,pos,'throttle_pct')||0).toFixed(0);
-      const br=(interpAt(s,pos,'brake_pct')||0).toFixed(0);
-      const sl=(interpAt(s,pos,'slip_rl')||0).toFixed(3);
-      const g=Math.round(interpAt(s,pos,'gear'));
-      lines.push(`L${ln}  ${sp}mph  G${g}  T${th}%  B${br}%  Sl${sl}`);
-    });
-    if(_refSamples){
-      _selectedLaps.forEach(ln=>{
-        if(isRefLap(ln))return;
-        const s=_lapSamples[ln];if(!s)return;
-        const d=interpAt(s,pos,'t')-interpAt(_refSamples,pos,'t');
-        const sign=d<0?'−':'+';
-        lines.push(`Δ L${ln}: ${sign}${Math.abs(d).toFixed(3)}s`);
-      });
-      lines.push(`@${(pos*100).toFixed(1)}%`);
-    }
-    tip.textContent=lines.join('\\n');
-    tip.style.left=Math.min(e.clientX+14,window.innerWidth-180)+'px';
-    tip.style.top=Math.max(8,e.clientY-tip.offsetHeight-8)+'px';
-    tip.style.display='block';
-    if(_dragging){
+    paintCursor(xFrac, e);
+    if(_dragging && _dragMoved){
       const aRect=area.getBoundingClientRect();
       const x1=e.clientX-aRect.left;
       const sel=$('drag-sel');
@@ -486,7 +526,7 @@ function setupInteraction(){
       sel.style.display='block';
     }
   };
-  area.onmouseleave=e=>{if(!_panning)hideX();};
+  area.onmouseleave=e=>{if(!_panning && !_cursorLocked) hideX();};
   area.onmousedown=e=>{
     if(!e.target.closest('.panel-svg-wrap'))return;
     e.preventDefault();
@@ -495,7 +535,11 @@ function setupInteraction(){
       area.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.add('panning'));
       return;
     }
-    _dragging=true;_dragX0=e.clientX-area.getBoundingClientRect().left;
+    const aRect=area.getBoundingClientRect();
+    _dragging=true;
+    _dragX0=e.clientX-aRect.left;
+    _dragX0Abs=e.clientX; _dragY0=e.clientY;
+    _dragMoved=false;
   };
   area.onmouseup=e=>{
     if(_panning){
@@ -504,19 +548,43 @@ function setupInteraction(){
       return;
     }
     if(!_dragging)return;_dragging=false;
+    $('drag-sel').style.display='none';
+    if(!_dragMoved){
+      // Click (no meaningful drag) → toggle cursor lock at the click position.
+      const wrap=e.target.closest('.panel-svg-wrap');
+      if(wrap){
+        if(_cursorLocked){
+          unlockCursor();
+        } else {
+          const rect=wrap.getBoundingClientRect();
+          const xFrac=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+          lockCursorAt(xFrac, e);
+        }
+      }
+      return;
+    }
+    // Drag → zoom to selection (existing behaviour).
     const aRect=area.getBoundingClientRect();
     const w=aRect.width;
     const f0=Math.max(0,Math.min(1,_dragX0/w));
     const f1=Math.max(0,Math.min(1,(e.clientX-aRect.left)/w));
-    $('drag-sel').style.display='none';
     const lo=_zoom[0],hi=_zoom[1],range=hi-lo;
     const nLo=lo+Math.min(f0,f1)*range,nHi=lo+Math.max(f0,f1)*range;
     if(nHi-nLo>0.01){_zoom=[nLo,nHi];renderAll();}
   };
   document.addEventListener('keydown',e=>{
-    if(e.code==='Space'&&!e.target.matches('input,textarea,select')){
+    if(e.target.matches('input,textarea,select'))return;
+    if(e.code==='Space'){
       e.preventDefault();_spaceDown=true;
       area.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.add('panning'));
+    } else if(e.code==='Escape' && _cursorLocked){
+      unlockCursor();
+    } else if(_cursorLocked && (e.code==='ArrowLeft' || e.code==='ArrowRight')){
+      // Nudge locked cursor: ±1% of zoom window per arrow, ±10% with Shift
+      e.preventDefault();
+      const step=(e.shiftKey?0.10:0.01)*(e.code==='ArrowRight'?1:-1);
+      _cursorXFrac=Math.max(0,Math.min(1, _cursorXFrac+step));
+      paintCursor(_cursorXFrac, null);
     }
   });
   document.addEventListener('keyup',e=>{
@@ -525,9 +593,41 @@ function setupInteraction(){
       if(!_panning)area.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.remove('panning'));
     }
   });
+
+  // Click on the track map → lock cursor at the corresponding lap distance.
+  // Finds the sample whose px/py is closest to the click point and uses its
+  // xv() position. See renderTrackMap for _tmCx / _tmCy / _tmSamples.
+  const mapInner=$('track-map-inner');
+  if(mapInner){
+    mapInner.onclick=e=>{
+      if(!_tmSamples || !_tmCx || !_tmCy) return;
+      const svg=mapInner.querySelector('svg');
+      if(!svg) return;
+      const rect=svg.getBoundingClientRect();
+      // Convert click to SVG user coords (the map uses viewBox, so scale)
+      const vbW=900, vbH=260;  // matches renderTrackMap TW/TH
+      const sx=(e.clientX-rect.left)*(vbW/rect.width);
+      const sy=(e.clientY-rect.top )*(vbH/rect.height);
+      const hasPz=_tmHasPz;
+      let bestI=-1, bestD=Infinity;
+      for(let i=0;i<_tmSamples.length;i++){
+        const ss=_tmSamples[i]; if(ss.px==null) continue;
+        const z=hasPz?(ss.pz??0):(ss.py??0);
+        const dx=_tmCx(ss.px)-sx, dy=_tmCy(z)-sy;
+        const d=dx*dx+dy*dy;
+        if(d<bestD){bestD=d;bestI=i;}
+      }
+      if(bestI<0) return;
+      const ss=_tmSamples[bestI];
+      const pos=xv(ss);
+      const xFrac=(pos-_zoom[0])/(_zoom[1]-_zoom[0]);
+      if(xFrac<0||xFrac>1) return;  // outside zoom window
+      lockCursorAt(xFrac, e);
+    };
+  }
 }
 function hideX(){
-  document.querySelectorAll('.px-line').forEach(l=>l.style.display='none');
+  document.querySelectorAll('.px-line').forEach(l=>{l.style.display='none';l.classList.remove('locked');});
   $('tele-tip').style.display='none';
 }
 function resetZoom(){_zoom=[0,1];renderAll();}
