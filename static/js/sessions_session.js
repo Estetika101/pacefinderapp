@@ -106,6 +106,17 @@ function renderHeader(){
   document.getElementById('hdr-laps').textContent=_laps.length;
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   if(effType){const el=document.getElementById('hdr-type');el.textContent=TYPE_LABELS[effType]||effType;el.style.display='';}
+  // Weather + tyre compound badges (set via the edit modal)
+  const wxEl=document.getElementById('hdr-weather');
+  if(wxEl){
+    if(s.weather_condition){wxEl.textContent=s.weather_condition;wxEl.style.display='';}
+    else wxEl.style.display='none';
+  }
+  const tyEl=document.getElementById('hdr-tyre');
+  if(tyEl){
+    if(s.tyre_compound){tyEl.textContent=s.tyre_compound;tyEl.style.display='';}
+    else tyEl.style.display='none';
+  }
 }
 function renderLaps(){
   const best=_sess.best_lap_time_s;
@@ -169,7 +180,7 @@ async function runAnalysis(force){
   }
 }
 // ── Edit modal ────────────────────────────────────────────────
-let _editTrack='',_editRaceType=null;
+let _editTrack='',_editRaceType=null,_editWeather='Dry',_editTyre=null;
 async function openEdit(){
   if(!_sess)return;
   const cur=_sess.track&&_sess.track!=='unknown'?_sess.track:'';
@@ -187,14 +198,48 @@ async function openEdit(){
   document.getElementById('edit-track').value=cur;
   _editTrack=cur;
   _editRaceType=_sess.race_type||_sess.session_type||null;
-  document.querySelectorAll('#edit-ovl .etype').forEach(c=>c.classList.toggle('sel',c.dataset.val===_editRaceType));
+  // Default weather to Dry per spec; tyre has no default.
+  _editWeather=_sess.weather_condition||'Dry';
+  _editTyre=_sess.tyre_compound||null;
+  // Activate the right pill in each chip group (scoped per-row to avoid cross-row collisions).
+  document.querySelectorAll('#edit-ovl .edit-chips').forEach(g=>g.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel')));
+  document.querySelectorAll('#edit-ovl .edit-row .edit-chips .etype').forEach(c=>{
+    if(c.dataset.val===_editRaceType && c.parentElement.id!=='edit-weather-chips' && c.parentElement.id!=='edit-tyre-chips')c.classList.add('sel');
+  });
+  document.querySelectorAll('#edit-weather-chips .etype').forEach(c=>c.classList.toggle('sel',c.dataset.val===_editWeather));
+  document.querySelectorAll('#edit-tyre-chips .etype').forEach(c=>c.classList.toggle('sel',c.dataset.val===_editTyre));
+  // Read-only conditions context: show track and air temps if telemetry captured them.
+  const tt=_sess.track_temp_c, at=_sess.air_temp_c;
+  const condEl=document.getElementById('edit-conditions');
+  const condRow=document.getElementById('edit-conditions-row');
+  if(tt!=null||at!=null){
+    const parts=[];
+    if(tt!=null)parts.push(`Track: ${tt.toFixed(0)}°C`);
+    if(at!=null)parts.push(`Air: ${at.toFixed(0)}°C`);
+    condEl.textContent=parts.join(' · ');
+    condRow.style.display='';
+  }else{
+    condRow.style.display='none';
+  }
   document.getElementById('edit-ovl').classList.add('open');
 }
 function closeEdit(){document.getElementById('edit-ovl').classList.remove('open');}
 function editSelType(el){
-  document.querySelectorAll('#edit-ovl .etype').forEach(c=>c.classList.remove('sel'));
+  el.parentElement.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
   _editRaceType=el.dataset.val;
+}
+function editSelWeather(el){
+  el.parentElement.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  _editWeather=el.dataset.val;
+}
+function editSelTyre(el){
+  // Tyre is optional — clicking the active pill toggles it off.
+  if(el.classList.contains('sel')){el.classList.remove('sel');_editTyre=null;return;}
+  el.parentElement.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  _editTyre=el.dataset.val;
 }
 async function saveEdit(){
   if(!_id)return;
@@ -212,6 +257,8 @@ async function saveEdit(){
       track_name: track,
     };
   }
+  body.weather_condition=_editWeather||'';
+  body.tyre_compound=_editTyre||'';
   await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   closeEdit();
   const d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());

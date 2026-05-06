@@ -286,6 +286,8 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
   <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
   <span class="type-chip" id="hdr-type" style="display:none"></span>
+  <span class="type-chip" id="hdr-weather" style="display:none"></span>
+  <span class="type-chip" id="hdr-tyre" style="display:none"></span>
   <button class="btn-re" onclick="openEdit()" style="font-size:var(--text-xs);padding:4px 12px">Edit</button>
 </div>
 <!-- Edit modal -->
@@ -304,6 +306,29 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
         <button class="etype" data-val="hot_lap" onclick="editSelType(this)">Hot Lap</button>
         <button class="etype" data-val="time_trial" onclick="editSelType(this)">Time Trial</button>
       </div>
+    </div>
+    <div class="edit-row"><label class="edit-lbl">Weather</label>
+      <div class="edit-chips" id="edit-weather-chips">
+        <button class="etype" data-val="Dry"  onclick="editSelWeather(this)">Dry</button>
+        <button class="etype" data-val="Damp" onclick="editSelWeather(this)">Damp</button>
+        <button class="etype" data-val="Wet"  onclick="editSelWeather(this)">Wet</button>
+        <button class="etype" data-val="Snow" onclick="editSelWeather(this)">Snow</button>
+      </div>
+    </div>
+    <div class="edit-row"><label class="edit-lbl">Tyres</label>
+      <div class="edit-chips" id="edit-tyre-chips">
+        <button class="etype" data-val="Street"   onclick="editSelTyre(this)">Street</button>
+        <button class="etype" data-val="Sport"    onclick="editSelTyre(this)">Sport</button>
+        <button class="etype" data-val="Race"     onclick="editSelTyre(this)">Race</button>
+        <button class="etype" data-val="Slick"    onclick="editSelTyre(this)">Slick</button>
+        <button class="etype" data-val="Rally"    onclick="editSelTyre(this)">Rally</button>
+        <button class="etype" data-val="Off-Road" onclick="editSelTyre(this)">Off-Road</button>
+        <button class="etype" data-val="Drag"     onclick="editSelTyre(this)">Drag</button>
+      </div>
+    </div>
+    <div class="edit-row" id="edit-conditions-row" style="display:none">
+      <label class="edit-lbl">Conditions</label>
+      <span id="edit-conditions" style="font-size:.7rem;color:var(--color-text-secondary);font-variant-numeric:tabular-nums"></span>
     </div>
     <div class="edit-btns">
       <button class="edit-save" onclick="saveEdit()">Save</button>

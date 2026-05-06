@@ -574,6 +574,16 @@ def make_handler(ctx: dict):
                         if "car" in body_data:
                             session_data["car"] = body_data["car"]
 
+                        # Update weather condition (Dry / Damp / Wet / Snow)
+                        if "weather_condition" in body_data:
+                            wc = body_data["weather_condition"]
+                            session_data["weather_condition"] = wc if wc else None
+
+                        # Update tyre compound (Street / Sport / Race / Slick / Rally / Off-Road / Drag)
+                        if "tyre_compound" in body_data:
+                            tc = body_data["tyre_compound"]
+                            session_data["tyre_compound"] = tc if tc else None
+
                         # Learn a new track ordinal mapping
                         if "learned_ordinal" in body_data:
                             lo = body_data["learned_ordinal"]
@@ -609,10 +619,14 @@ def make_handler(ctx: dict):
                             db_kwargs["track"] = body_data["track"]
                         if "race_type" in body_data:
                             db_kwargs["race_type"] = body_data["race_type"]
-                        if "track" in body_data:
-                            db_kwargs["track"] = body_data["track"]
                         if "car" in body_data:
                             db_kwargs["car"] = body_data["car"]
+                        if "weather_condition" in body_data:
+                            wc = body_data["weather_condition"]
+                            db_kwargs["weather_condition"] = wc if wc else None
+                        if "tyre_compound" in body_data:
+                            tc = body_data["tyre_compound"]
+                            db_kwargs["tyre_compound"] = tc if tc else None
                         if db_kwargs:
                             db_update_session(sid, **db_kwargs)
                         if body_data.get("drop_last_lap"):
