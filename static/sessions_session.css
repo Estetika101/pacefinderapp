@@ -98,6 +98,8 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .etype{background:none;border:1px solid var(--color-border);color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--text-xs);padding:4px 10px;border-radius:var(--radius-sm);cursor:pointer;letter-spacing:.5px;transition:all .12s}
 .etype:hover{border-color:var(--color-text-dim);color:var(--color-text-secondary)}
 .etype.sel{border-color:var(--color-accent);color:var(--color-accent);background:rgba(245,158,11,.08)}
-.edit-btns{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
+.edit-btns{display:flex;gap:8px;margin-top:18px;justify-content:flex-end;align-items:center}
 .edit-save{background:var(--color-accent);color:#000;border:none;font-family:var(--font-mono);font-size:var(--text-xs);font-weight:var(--fw-bold);padding:6px 18px;border-radius:var(--radius-sm);cursor:pointer;letter-spacing:.5px}
 .edit-cancel{background:none;border:1px solid var(--color-border);color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--text-xs);padding:6px 18px;border-radius:var(--radius-sm);cursor:pointer}
+.edit-delete{background:none;border:1px solid var(--color-red,#ef4444);color:var(--color-red,#ef4444);font-family:var(--font-mono);font-size:var(--text-xs);padding:6px 18px;border-radius:var(--radius-sm);cursor:pointer;margin-right:auto}
+.edit-delete:hover{background:rgba(239,68,68,.1)}

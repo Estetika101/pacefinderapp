@@ -247,6 +247,29 @@ async function openEdit(){
   document.getElementById('edit-ovl').classList.add('open');
 }
 function closeEdit(){document.getElementById('edit-ovl').classList.remove('open');}
+async function deleteSession(){
+  if(!_id)return;
+  // Two-step confirm — single click on a destructive button feels too easy.
+  const trackHint = (_sess && _sess.track && _sess.track !== 'unknown') ? _sess.track : 'this session';
+  const ok = window.confirm(
+    'Permanently delete '+trackHint+'?\n\n'+
+    'This removes the session, its lap data, raw archive, and any AI analysis. There is no undo.'
+  );
+  if(!ok) return;
+  try{
+    const res = await fetch('/sessions/delete', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({id: _id})
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    // Redirect back to the sessions list — the current detail page no
+    // longer has anything to show.
+    location.href = '/sessions';
+  }catch(e){
+    alert('Could not delete session: '+(e && e.message || e));
+  }
+}
 function editSelType(el){
   el.parentElement.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');

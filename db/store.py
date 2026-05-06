@@ -749,6 +749,27 @@ def _db_update_session(sid: str, **kwargs):
             conn.close()
 
 
+def _db_delete_session(sid: str) -> bool:
+    """Remove a session and all its dependent rows from every table.
+
+    Used by the /sessions/delete endpoint and the bulk-cleanup script
+    (scripts/clean_test_sessions.py). Does NOT touch JSON / .bin files
+    on disk — caller is responsible for those.
+    """
+    if not sid:
+        return False
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            conn.execute("DELETE FROM lap_samples WHERE session_id=?", (sid,))
+            conn.execute("DELETE FROM laps        WHERE session_id=?", (sid,))
+            res = conn.execute("DELETE FROM sessions    WHERE session_id=?", (sid,))
+            conn.commit()
+            return res.rowcount > 0
+        finally:
+            conn.close()
+
+
 def _db_drop_last_lap(sid: str):
     """Remove the last lap row and recalculate best_lap_time_s."""
     with _db_lock:

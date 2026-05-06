@@ -338,6 +338,7 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
     <div class="edit-btns">
       <button class="edit-save" onclick="saveEdit()">Save</button>
       <button class="edit-cancel" onclick="closeEdit()">Cancel</button>
+      <button class="edit-delete" onclick="deleteSession()" title="Permanently remove this session and its data">Delete session</button>
     </div>
   </div>
 </div>
