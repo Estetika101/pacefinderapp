@@ -213,9 +213,13 @@ function renderRecent(){
     const label=(GL[s.game]||s.game||'?').toUpperCase();
     const fp=s.finish_pos,gp=s.grid_pos;
     let posHtml='';
+    // Grid → Finish (gained). Grid badge is muted; finish keeps the existing color cues.
+    if(gp!=null && gp>0){
+      posHtml+=`<span class="recent-grid">P${gp}</span><span class="recent-arrow">→</span>`;
+    }
     if(fp!=null){
       const cls=fp===1?'p1':fp<=3?'podium':'ok';
-      posHtml=`<span class="recent-pos ${cls}">P${fp}</span>`;
+      posHtml+=`<span class="recent-pos ${cls}">P${fp}</span>`;
     }
     let gainedHtml='';
     if(fp!=null&&gp!=null&&gp>0){

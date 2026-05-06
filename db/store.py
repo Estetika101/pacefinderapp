@@ -657,6 +657,14 @@ def _db_tracks_index(game: Optional[str] = None) -> list:
                 ).fetchone()
                 avg_f = finish_row[0] if finish_row else None
                 r["avg_finish"] = round(avg_f, 1) if avg_f is not None else None
+                gained_row = conn.execute(
+                    f"SELECT AVG(CAST(grid_pos AS REAL) - finish_pos) FROM sessions "
+                    f"WHERE track=? AND grid_pos IS NOT NULL AND grid_pos > 0 "
+                    f"AND finish_pos IS NOT NULL{extra_where}",
+                    extra_params_base,
+                ).fetchone()
+                avg_g = gained_row[0] if gained_row else None
+                r["avg_gained"] = round(avg_g, 1) if avg_g is not None else None
                 best_car_row = conn.execute(
                     f"SELECT car, car_class, car_pi FROM sessions WHERE track=? AND best_lap_time_s=?{extra_where} ORDER BY started_at DESC LIMIT 1",
                     [r["track"], r["best_lap_time_s"]] + (([game]) if game else []),

@@ -157,13 +157,14 @@ function _saveAccState(st){try{sessionStorage.setItem(_skey,JSON.stringify(st));
 function sessTableHtml(sessArr){
   const bests=sessArr.map(s=>s.best_lap_time_s).filter(v=>v);
   const gb=bests.length?Math.min(...bests):null;
-  return`<table><thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Pos</th><th>±</th><th>Class</th></tr></thead><tbody>`
+  return`<table><thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Grid</th><th>Finish</th><th>±</th><th>Class</th></tr></thead><tbody>`
     +sessArr.map((s,i)=>{
       const isGB=gb&&s.best_lap_time_s&&Math.abs(s.best_lap_time_s-gb)<0.001;
       const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
       const typeHtml=effType?`<span class="type-chip">${TYPE_LABELS[effType]||effType}</span>`:'';
-      const posHtml=s.finish_pos!=null?`P${s.finish_pos}`:'—';
-      return`<tr class="clickable" data-idx="${i}"><td class="date-col">${fmtDt(s.started_at)}</td><td>${typeHtml}</td><td class="${isGB?'best-time':''}">${fmtLap(s.best_lap_time_s)}</td><td>${s.lap_count||0}</td><td>${posHtml}</td><td>${gainsBadge(s.grid_pos,s.finish_pos)}</td><td>${classBadge(s.car_class)}</td></tr>`;
+      const gridHtml=s.grid_pos!=null && s.grid_pos>0 ? `P${s.grid_pos}` : '—';
+      const posHtml =s.finish_pos!=null ? `P${s.finish_pos}` : '—';
+      return`<tr class="clickable" data-idx="${i}"><td class="date-col">${fmtDt(s.started_at)}</td><td>${typeHtml}</td><td class="${isGB?'best-time':''}">${fmtLap(s.best_lap_time_s)}</td><td>${s.lap_count||0}</td><td>${gridHtml}</td><td>${posHtml}</td><td>${gainsBadge(s.grid_pos,s.finish_pos)}</td><td>${classBadge(s.car_class)}</td></tr>`;
     }).join('')
     +'</tbody></table>';
 }

@@ -106,6 +106,26 @@ function renderHeader(){
   document.getElementById('hdr-laps').textContent=_laps.length;
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   if(effType){const el=document.getElementById('hdr-type');el.textContent=TYPE_LABELS[effType]||effType;el.style.display='';}
+  // Race position: Grid / Finish / Gained header stats — shown only when present.
+  const fp=s.finish_pos, gp=s.grid_pos;
+  const gridStat=document.getElementById('hdr-grid-stat');
+  const finishStat=document.getElementById('hdr-finish-stat');
+  const gainedStat=document.getElementById('hdr-gained-stat');
+  if(gp!=null && gp>0){
+    document.getElementById('hdr-grid').textContent='P'+gp;
+    gridStat.style.display='';
+  }
+  if(fp!=null){
+    document.getElementById('hdr-finish').textContent='P'+fp;
+    finishStat.style.display='';
+  }
+  if(gp!=null && gp>0 && fp!=null){
+    const g=gp-fp;
+    const el=document.getElementById('hdr-gained');
+    el.textContent = g>0?'+'+g : g<0?String(g) : '0';
+    el.style.color = g>0?'var(--color-green)' : g<0?'var(--color-red)' : '';
+    gainedStat.style.display='';
+  }
   // Weather + tyre compound badges (set via the edit modal)
   const wxEl=document.getElementById('hdr-weather');
   if(wxEl){

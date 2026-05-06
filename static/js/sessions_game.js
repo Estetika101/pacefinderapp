@@ -126,13 +126,21 @@ function renderGameRecent(sessions){
   el.innerHTML=sessions.map(s=>{
     const fp=s.finish_pos,gp=s.grid_pos;
     let posHtml='';
-    if(fp!=null){const cls=fp===1?'p1':fp<=3?'podium':'ok';posHtml=`<span class="ov-recent-pos ${cls}">P${fp}</span>`;}
+    if(gp!=null && gp>0){posHtml+=`<span class="recent-grid">P${gp}</span><span class="recent-arrow">→</span>`;}
+    if(fp!=null){const cls=fp===1?'p1':fp<=3?'podium':'ok';posHtml+=`<span class="ov-recent-pos ${cls}">P${fp}</span>`;}
+    let gainedHtml='';
+    if(fp!=null && gp!=null && gp>0){
+      const g=gp-fp;
+      const cls=g>0?'pos':g<0?'neg':'neu';
+      gainedHtml=`<span class="recent-gained ${cls}">${g>0?'+':''}${g}</span>`;
+    }
     const href='/sessions/session?id='+encodeURIComponent(s.session_id)+'&game='+encodeURIComponent(s.game||'')+'&track='+encodeURIComponent(s.track||'');
     return`<div class="ov-recent-row" onclick="location.href='${href}'">
       <span class="ov-recent-circuit">${s.track&&s.track!=='unknown'?s.track:'Unknown Track'}</span>
       <span class="ov-recent-date">${fmtDate(s.started_at)}</span>
       <span class="ov-recent-lap">${fmtLap(s.best_lap_time_s)}</span>
       ${posHtml}
+      ${gainedHtml}
     </div>`;
   }).join('');
 }
@@ -176,7 +184,15 @@ async function init(){
     const spark=hasLap?sparkSVG(t.spark_laps||[]):'';
     const trendArrow=hasLap?(t.trend==='up'?'<span class="tl-arrow" style="color:var(--color-green)">▲</span>':t.trend==='dn'?'<span class="tl-arrow" style="color:var(--color-red)">▼</span>':'<span class="tl-arrow" style="color:var(--color-text-dim)">—</span>'):'';
     const bestLap=hasLap?fmtLap(t.best_lap_time_s):'—';
-    const avgFinish=t.avg_finish!=null?`<div class="tl-finish">P${t.avg_finish} avg finish</div>`:'';
+    let avgFinish='';
+    if(t.avg_finish!=null){
+      let gainedStr='';
+      if(t.avg_gained!=null){
+        const g=t.avg_gained, cls=g>0?'pos':g<-0?'neg':'neu';
+        gainedStr=` <span class="recent-gained ${cls}">${g>=0?'+':''}${g.toFixed(1)}</span>`;
+      }
+      avgFinish=`<div class="tl-finish">P${t.avg_finish} avg${gainedStr}</div>`;
+    }
     const href=`/sessions/track?name=${encodeURIComponent(t.track)}${_game?'&game='+encodeURIComponent(_game):''}`;
     return`<div class="tl-row${hasLap?'':' no-lap'}" onclick="location.href='${href}'">
       <div class="tl-left">
