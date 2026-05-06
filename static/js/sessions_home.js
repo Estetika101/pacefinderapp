@@ -22,6 +22,9 @@ async function loadKPIs(){
   setKV('kv-finish',af!=null?'P'+p1(af):null);
   const pg=k.avg_pos_gained;
   setKV('kv-gained',pg!=null?(pg>=0?'+':'')+p1(pg):null);
+  // Color the gained KPI by sign: green when actually gaining, red when losing.
+  const pgEl=document.getElementById('kv-gained');
+  if(pgEl){pgEl.classList.toggle('green', pg>0); pgEl.classList.toggle('red', pg<0);}
   setKV('kv-win',k.win_rate!=null?p1(k.win_rate,0)+'%':null);
   setKV('kv-podium',k.podium_rate!=null?p1(k.podium_rate,0)+'%':null);
   setKV('kv-laps',k.total_laps||'0');
