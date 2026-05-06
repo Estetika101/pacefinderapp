@@ -72,9 +72,11 @@ es.onmessage=e=>{
   if(d.session_id) state_sid = d.session_id;
   $('btn-finish').style.display = (recv||ended) ? 'inline-block' : 'none';
 
-  // Auto-open confirm modal 5s after race_ended
+  // Auto-open confirm modal shortly after race_ended. Short delay (500ms)
+  // gives the user a beat to see the dashboard transition before the modal
+  // pops; previously this was 5s which felt like a hang. See #32.
   if(ended&&!$('fo').classList.contains('open')){
-    if(!_foAutoTimer) _foAutoTimer=setTimeout(()=>{_foAutoTimer=null;openFinish();},5000);
+    if(!_foAutoTimer) _foAutoTimer=setTimeout(()=>{_foAutoTimer=null;openFinish();},500);
   } else if(!ended&&_foAutoTimer){
     clearTimeout(_foAutoTimer);_foAutoTimer=null;
   }
@@ -166,8 +168,6 @@ es.onmessage=e=>{
 };
 
 es.onerror=()=>{$('dot').className='dot';};
-
-async function resetCounters(){await fetch('/reset',{method:'POST'});}
 
 function toggleDebug(){
   _dbgOpen=!_dbgOpen;
