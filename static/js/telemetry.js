@@ -8,6 +8,8 @@ let _refSamples=null,_refMeta=null;
 let _selectedLaps=[];  // ordered, max 4
 let _primaryLap=null;
 let _refType='best_lap';
+let _refSid=null,_refLapNum=null;  // for cross_session reference picks
+let _prevRefType='best_lap';       // restore target if cross-session picker is cancelled
 let _xMode='distance';
 let _zoom=[0,1];
 let _maxT=1;
@@ -18,13 +20,22 @@ const LAP_COLORS=['#4a9aef','#22c55e','#f59e0b','#a855f7'];
 const REF_COL='#444444';
 const W=1000;
 const $=id=>document.getElementById(id);
-// True when a selected lap IS the active reference lap (so its delta is 0 by definition).
-// Only `best_lap` references map to a real lap; theoretical is a virtual composite.
+// True when a selected lap IS the active reference lap (so its delta is 0 by
+// definition). Only matters for references that map to a real lap in the
+// CURRENT session — theoretical is a virtual composite, cross_session is
+// always a different session.
 function isRefLap(lapNum){
-  if(_refType!=='best_lap')return false;
-  if(!_refMeta||!_refMeta.best_lap)return false;
-  if(_refMeta.best_lap.session_id!==_id)return false;
-  return _refMeta.best_lap.lap_number===lapNum;
+  if(_refType==='best_lap'){
+    if(!_refMeta||!_refMeta.best_lap)return false;
+    if(_refMeta.best_lap.session_id!==_id)return false;
+    return _refMeta.best_lap.lap_number===lapNum;
+  }
+  if(_refType==='last_lap'){
+    const valid=_laps.filter(l=>l.lap_number>0 && l.lap_time_s);
+    if(!valid.length)return false;
+    return valid[valid.length-1].lap_number===lapNum;
+  }
+  return false;
 }
 // ── X value of a sample (distance or time-normalised) ────────────────────
 function xv(s){return _xMode==='distance'?s.distance_norm:(s.t/_maxT);}
@@ -576,8 +587,20 @@ async function onLapToggle(lapN,checked){
   updateMaxT();renderLapList();renderAll();
 }
 async function onRefChange(){
-  _refType=$('ref-sel').value;
+  const newType=$('ref-sel').value;
+  // Special case: "Lap from another session…" opens a picker. The actual
+  // _refType isn't applied until the user picks a lap (csPickLap fires).
+  // Cancel restores the previous selection — see closeCrossSessionPicker.
+  if(newType==='cross_session'){
+    _prevRefType=_refType;
+    _refType=newType; _refSid=null; _refLapNum=null;
+    openCrossSessionPicker();
+    return;
+  }
+  _refType=newType;
   _refSamples=null;
+  _refSid=null; _refLapNum=null;
+  updateCrossSessionLabel();
   if(_refType)await fetchRef();
   renderAll();
 }
@@ -591,9 +614,97 @@ async function fetchLap(lapN){
 async function fetchRef(){
   if(!_refType||!_sess){_refSamples=null;return;}
   try{
-    const d=await fetch('/sessions/reference-samples?track='+encodeURIComponent(_sess.track||'')+'&type='+_refType).then(r=>r.json());
+    let d;
+    if(_refType==='last_lap'){
+      // Most recent completed lap of the current session
+      const valid=_laps.filter(l=>l.lap_number>0 && l.lap_time_s);
+      if(!valid.length){_refSamples=null;return;}
+      const lastLap=valid[valid.length-1];
+      d=await fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_id)+'&lap='+lastLap.lap_number).then(r=>r.json());
+    } else if(_refType==='cross_session' && _refSid && _refLapNum){
+      d=await fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_refSid)+'&lap='+_refLapNum).then(r=>r.json());
+    } else {
+      // best_lap, theoretical — served via track_references table
+      d=await fetch('/sessions/reference-samples?track='+encodeURIComponent(_sess.track||'')+'&type='+_refType).then(r=>r.json());
+    }
     _refSamples=Array.isArray(d)&&d.length?d:null;
   }catch(e){_refSamples=null;}
+}
+
+// ── Cross-session reference picker ───────────────────────────────────────
+async function openCrossSessionPicker(){
+  const ovl=$('cs-ovl'); const list=$('cs-list');
+  list.innerHTML='<div class="cs-empty">Loading sessions…</div>';
+  ovl.classList.add('open');
+  const track=_sess&&_sess.track ? _sess.track : '';
+  const game =_sess&&_sess.game  ? _sess.game  : '';
+  let sessions=[];
+  try{
+    const url='/sessions/track/data?name='+encodeURIComponent(track)+(game?'&game='+encodeURIComponent(game):'');
+    sessions=await fetch(url).then(r=>r.json());
+  }catch(e){sessions=[];}
+  // Exclude the current session — comparing against yourself defeats the purpose
+  const others=(sessions||[]).filter(s=>s.session_id!==_id);
+  if(!others.length){list.innerHTML='<div class="cs-empty">No other sessions at this track yet.</div>';return;}
+  list.innerHTML=others.map(s=>{
+    const dt=fmtDt(s.started_at);
+    const bl=s.best_lap_time_s?fmtLap(s.best_lap_time_s):'—';
+    const lc=s.lap_count||0;
+    return`<div class="cs-sess" data-sid="${s.session_id}" onclick="csToggleSession(this)">
+      <div class="cs-sess-hd"><span>${dt}</span><span>${bl} · ${lc} lap${lc===1?'':'s'}</span></div>
+      <div class="cs-sess-meta">${(s.car&&s.car!=='unknown')?s.car:''}</div>
+      <div class="cs-laps"></div>
+    </div>`;
+  }).join('');
+}
+function closeCrossSessionPicker(){
+  $('cs-ovl').classList.remove('open');
+  // If the user opened the picker but didn't pick, restore the previous ref.
+  if(_refType==='cross_session' && (!_refSid||!_refLapNum)){
+    _refType=_prevRefType;
+    $('ref-sel').value=_refType;
+    updateCrossSessionLabel();
+  }
+}
+async function csToggleSession(el){
+  const lapsEl=el.querySelector('.cs-laps');
+  if(el.classList.contains('expanded')){el.classList.remove('expanded');return;}
+  // Lazy-load laps for the clicked session
+  const sid=el.dataset.sid;
+  lapsEl.innerHTML='<div class="cs-empty" style="padding:6px">Loading laps…</div>';
+  el.classList.add('expanded');
+  try{
+    const d=await fetch('/sessions/session/data?id='+encodeURIComponent(sid)).then(r=>r.json());
+    const laps=(d.laps||[]).filter(l=>l.lap_number>0 && l.lap_time_s);
+    if(!laps.length){lapsEl.innerHTML='<div class="cs-empty" style="padding:6px">No valid laps in this session.</div>';return;}
+    lapsEl.innerHTML=laps.map(l=>{
+      const dt=d.session && d.session.started_at ? fmtDt(d.session.started_at) : '';
+      return`<div class="cs-lap" data-sid="${sid}" data-lap="${l.lap_number}" data-label="${dt} · L${l.lap_number} ${fmtLap(l.lap_time_s)}" onclick="csPickLap(this)">L${l.lap_number} — ${fmtLap(l.lap_time_s)}</div>`;
+    }).join('');
+  }catch(e){lapsEl.innerHTML='<div class="cs-empty" style="padding:6px">Error loading laps.</div>';}
+}
+async function csPickLap(el){
+  _refSid=el.dataset.sid;
+  _refLapNum=parseInt(el.dataset.lap, 10);
+  _refType='cross_session';
+  $('cs-ovl').classList.remove('open');
+  // Surface the picked lap's identity in the sidebar so the user remembers
+  // what they're comparing against.
+  const labelEl=$('cs-ref-label');
+  labelEl.textContent='ref: '+el.dataset.label;
+  labelEl.style.display='';
+  await fetchRef();
+  renderAll();
+}
+function updateCrossSessionLabel(){
+  const labelEl=$('cs-ref-label');
+  if(!labelEl)return;
+  if(_refType==='cross_session' && _refSid && _refLapNum){
+    labelEl.style.display='';
+  } else {
+    labelEl.style.display='none';
+    labelEl.textContent='';
+  }
 }
 function updateMaxT(){
   _maxT=0;
@@ -639,6 +750,12 @@ async function init(){
     _refMeta=await fetch('/sessions/references?track='+encodeURIComponent(_sess.track||'')+'&game='+encodeURIComponent(_sess.game||'')).then(r=>r.json());
     if(_refMeta.best_lap&&$('ref-sel').options[1])$('ref-sel').options[1].text='My Best — '+fmtLap(_refMeta.best_lap.lap_time_s);
     if(_refMeta.theoretical&&$('ref-sel').options[2])$('ref-sel').options[2].text='Theoretical — '+fmtLap(_refMeta.theoretical.theoretical_best_s);
+    // Last Lap option label — most recent completed lap of THIS session
+    const validLaps=_laps.filter(l=>l.lap_number>0 && l.lap_time_s);
+    if(validLaps.length && $('ref-sel').options[3]){
+      const lastLap=validLaps[validLaps.length-1];
+      $('ref-sel').options[3].text='Last Lap — L'+lastLap.lap_number+' '+fmtLap(lastLap.lap_time_s);
+    }
     // Auto-skip partial reference
     if(_refMeta.best_lap&&pThreshInit>0&&_refMeta.best_lap.lap_time_s<pThreshInit){
       $('ref-sel').value=_refMeta.theoretical?'theoretical':'';
