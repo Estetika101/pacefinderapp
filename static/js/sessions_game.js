@@ -48,6 +48,9 @@ async function loadGameOverview(){
   document.getElementById('gks-total').textContent=t?(rc+' real · '+ai+' AI'):'';
   gSetKV('gkv-finish',k.avg_finish_real!=null?'P'+p1(k.avg_finish_real):null);
   gSetKV('gkv-gained',k.avg_pos_gained!=null?(k.avg_pos_gained>=0?'+':'')+p1(k.avg_pos_gained):null);
+  // Color by sign: green = positions gained on average, red = lost.
+  const pgEl=document.getElementById('gkv-gained');
+  if(pgEl){pgEl.classList.toggle('green', k.avg_pos_gained>0); pgEl.classList.toggle('red', k.avg_pos_gained<0);}
   gSetKV('gkv-win',k.win_rate!=null?p1(k.win_rate,0)+'%':null);
   gSetKV('gkv-podium',k.podium_rate!=null?p1(k.podium_rate,0)+'%':null);
   gSetKV('gkv-best',fmtLap(k.best_lap_time_s)||'—');
