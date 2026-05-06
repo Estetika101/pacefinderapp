@@ -95,6 +95,8 @@ GAMES_HTML = """<!DOCTYPE html>
   </div>
 
 </div>
+<script src="/static/js/perf.js"></script>
+<script>Perf.autoReport('/sessions');</script>
 <script src="/static/js/sessions_home.js"></script>
 </body>
 </html>
@@ -244,6 +246,8 @@ const FORZA_TRACK_NAMES=
 """
 
 TRACK_DETAIL_HTML_POST = """;</script>
+<script src="/static/js/perf.js"></script>
+<script>Perf.autoReport('/sessions/track');</script>
 <script src="/static/js/sessions_track.js"></script>
 <div id="sp-tip"></div>
 </body>

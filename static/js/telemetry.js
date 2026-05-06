@@ -834,9 +834,11 @@ const _isEmbed=new URLSearchParams(location.search).get('embed')==='1';
 async function init(){
   if(!_id){location.href='/sessions';return;}
   if(_isEmbed){const bc=$('tele-breadcrumb');if(bc)bc.style.display='none';}
+  if(window.Perf)Perf.mark('init:start');
   let d;
   try{d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());}
   catch(e){$('tele-loading').textContent='Session not found';return;}
+  if(window.Perf)Perf.measure('fetch:session', 'init:start');
   _sess=d.session;_laps=d.laps||[];
   // Breadcrumb
   const track=(_sess.track&&_sess.track!=='unknown')?_sess.track:(_strack||'Unknown');
@@ -879,13 +881,17 @@ async function init(){
       _refType=$('ref-sel').value;
     }
   }catch(e){}
+  if(window.Perf)Perf.mark('ref:start');
   await fetchRef();
+  if(window.Perf)Perf.measure('fetch:ref', 'ref:start');
   updateMaxT();
   $('tele-loading').style.display='none';
   $('ctrl-loading').style.display='none';
   $('panels-inner').style.display='';
   $('ctrl-inner').style.display='';
   renderLapList();
+  if(window.Perf)Perf.mark('render:start');
   renderAll();
+  if(window.Perf){Perf.measure('render:initial', 'render:start');Perf.measure('init:total','init:start');}
 }
 init();

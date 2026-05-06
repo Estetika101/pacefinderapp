@@ -183,6 +183,8 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
 </div>
 </div>
 <div id="tele-tip"></div>
+<script src="/static/js/perf.js"></script>
+<script>Perf.mark('page:start');Perf.autoReport('/sessions/telemetry');</script>
 <script src="/static/js/charts.js"></script>
 <!-- Cross-session reference picker — opened from the Reference dropdown -->
 <div class="cs-ovl" id="cs-ovl">

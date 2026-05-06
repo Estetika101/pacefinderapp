@@ -7,10 +7,14 @@ from pathlib import Path
 from typing import Optional
 
 from config import MIN_VALID_LAP_S
+from net.perf import _TimedLock
 
 # ─── Module-level context (set by initialize()) ───────────────────────────────
 
-_db_lock = threading.Lock()
+# Wrapped so per-request DB time is attributed to _perf_ctx when called from
+# the HTTP router; transparent (no timing) when called from the listener.
+# See docs/specs/perf-audit-and-instrument.md.
+_db_lock = _TimedLock(threading.Lock())
 _learned_ordinals_cache: Optional[dict] = None
 _DOWNSAMPLE_TARGET = 500
 

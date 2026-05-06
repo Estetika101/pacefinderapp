@@ -220,6 +220,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 </div>
 
+<script src="/static/js/perf.js"></script>
+<script>Perf.autoReport('/');</script>
 <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
