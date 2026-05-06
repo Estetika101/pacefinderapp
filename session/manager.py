@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 import logging
 
-from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S
+from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, RACE_END_DETECTION_PACKETS
 from db.store import (
     _classify_race_type,
     _db_write_session,
@@ -113,6 +113,12 @@ class Session:
 
         self.last_activity = time.time()
 
+        # Race-end detection state (see docs/specs/race-end-detection.md)
+        self._last_is_race_on: Optional[int] = None
+        self._race_off_streak: int = 0
+        self._should_close_for_race_end: bool = False
+        self.closed_reason: Optional[str] = None
+
         raw_path = storage_path() / "raw" / f"{self.session_id}.bin"
         try:
             self.raw_file = open(raw_path, "wb")
@@ -210,6 +216,32 @@ class Session:
         parsed["_t"] = time.time() - self.current_lap.started_at
         self.current_lap.add_sample(parsed)
 
+        self._update_race_end_state(parsed.get("is_race_on"))
+
+    def _update_race_end_state(self, new_is_race_on):
+        """Detect a sustained is_race_on 1 → 0 transition that signals a real
+        race end (vs. a brief blip). See docs/specs/race-end-detection.md.
+
+        We require: (a) the previous packet had is_race_on=1, (b) the current
+        and a sustained run of subsequent packets are 0 (RACE_END_DETECTION_PACKETS),
+        and (c) at least one lap was completed in this session — so a session
+        that ends before any lap finishes still falls back to the timeout path.
+        """
+        if new_is_race_on is None:
+            return
+        if self._last_is_race_on == 1 and new_is_race_on == 0:
+            self._race_off_streak = 1
+        elif new_is_race_on == 0 and self._race_off_streak > 0:
+            self._race_off_streak += 1
+            if (self._race_off_streak >= RACE_END_DETECTION_PACKETS
+                    and self.completed_laps
+                    and not self._should_close_for_race_end):
+                self._should_close_for_race_end = True
+                self.closed_reason = "race_end"
+        elif new_is_race_on == 1:
+            self._race_off_streak = 0
+        self._last_is_race_on = new_is_race_on
+
     def _transition_lap(self, new_lap: int, lap_time_s: Optional[float] = None):
         if self.current_lap is not None:
             self.current_lap.close(lap_time_s)
@@ -247,6 +279,8 @@ class Session:
         return time.time() - self.last_activity > IDLE_TIMEOUT_S
 
     def close(self) -> dict:
+        if self.closed_reason is None:
+            self.closed_reason = "timeout"
         if self.raw_file:
             try:
                 self.raw_file.close()
@@ -326,6 +360,7 @@ class Session:
             "weather_condition": self.weather_condition,
             "track_temp_c":     self.track_temp_c,
             "air_temp_c":       self.air_temp_c,
+            "closed_reason":    self.closed_reason,
         }
 
         _db_write_session(session_data)

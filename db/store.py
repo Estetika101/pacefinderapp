@@ -125,6 +125,7 @@ def _db_init():
                 ("track_ordinal", "INTEGER"), ("car_class", "INTEGER"), ("car_pi", "INTEGER"),
                 ("weather_condition", "TEXT"), ("track_temp_c", "REAL"), ("air_temp_c", "REAL"),
                 ("car_manufacturer", "TEXT"), ("car_year", "INTEGER"),
+                ("closed_reason", "TEXT"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {defn}")
@@ -444,8 +445,8 @@ def _db_write_session(session_data: dict):
                  started_at,ended_at,packet_count,best_lap_time_s,lap_count,
                  grid_pos,finish_pos,track_ordinal,car_class,car_pi,
                  weather_condition,track_temp_c,air_temp_c,
-                 car_manufacturer,car_year)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 car_manufacturer,car_year,closed_reason)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (sid,
                   session_data.get("game"), session_data.get("track"),
                   session_data.get("car"), session_data.get("session_type"),
@@ -458,7 +459,8 @@ def _db_write_session(session_data: dict):
                   session_data.get("car_class"), session_data.get("car_pi"),
                   session_data.get("weather_condition"),
                   session_data.get("track_temp_c"), session_data.get("air_temp_c"),
-                  session_data.get("car_manufacturer"), session_data.get("car_year")))
+                  session_data.get("car_manufacturer"), session_data.get("car_year"),
+                  session_data.get("closed_reason")))
             conn.execute("DELETE FROM laps WHERE session_id=?", (sid,))
             for lap in laps:
                 conn.execute("""
