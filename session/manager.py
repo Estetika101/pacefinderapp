@@ -425,6 +425,8 @@ state = {
     "g_lon":            0,
     "drs":              False,
     "tyre_compound":    None,
+    "race_position":    None,
+    "grid_pos":         None,
     "fuel_remaining_laps": None,
     "current_lap_time": None,
     "last_lap_time_s":  None,
@@ -476,6 +478,15 @@ def update_state(game: str, session: Session, parsed: dict):
     state["g_lon"]        = round(parsed.get("g_lon", state["g_lon"]), 3)
     state["drs"]          = parsed.get("drs", state["drs"])
     state["tyre_compound"]       = parsed.get("tyre_compound", state["tyre_compound"])
+    # Race position: latest from packet history; grid is the first non-zero seen.
+    # Clear on new sessions that haven't seen a position packet yet so the live
+    # dashboard doesn't show stale values from the previous race.
+    if session._race_positions:
+        state["race_position"] = session._race_positions[-1]
+        state["grid_pos"]      = session._race_positions[0]
+    else:
+        state["race_position"] = None
+        state["grid_pos"]      = None
     state["fuel_remaining_laps"] = parsed.get("fuel_remaining_laps", state["fuel_remaining_laps"])
     state["current_lap_time"]    = parsed.get("current_lap_time", state["current_lap_time"])
     if parsed.get("last_lap_time"):

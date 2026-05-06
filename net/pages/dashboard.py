@@ -94,6 +94,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div class="t-lbl">Delta</div>
         <div class="delta-val even" id="t-delta">—</div>
       </div>
+      <div class="timing-grid" style="margin-top:10px">
+        <div>
+          <div class="t-lbl">Pos</div>
+          <div class="t-val" id="pos-cur">—</div>
+        </div>
+        <div>
+          <div class="t-lbl">Grid</div>
+          <div class="t-val" id="pos-grid">—</div>
+        </div>
+        <div>
+          <div class="t-lbl">±</div>
+          <div class="delta-val even" id="pos-delta" style="font-size:var(--text-lg)">—</div>
+        </div>
+      </div>
       <div>
         <div class="t-lbl">Tyres</div>
         <div class="tyre-inline-grid" style="margin-top:6px">
