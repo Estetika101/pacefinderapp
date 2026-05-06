@@ -1,5 +1,9 @@
 # Pacefinder
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Latest tag](https://img.shields.io/github/v/tag/Estetika101/pacefinderapp?label=version)](https://github.com/Estetika101/pacefinderapp/tags)
+
 Records UDP telemetry from Forza Motorsport. Saves every session automatically and serves a live dashboard and analysis tools to any device on your network.
 
 Start a race. It records. Stop racing. It stops.
