@@ -1,6 +1,6 @@
 # Pacefinder
 
-Records UDP telemetry from Forza Motorsport, ACC, and F1. Saves every session automatically and serves a live dashboard and analysis tools to any device on your network.
+Records UDP telemetry from Forza Motorsport. Saves every session automatically and serves a live dashboard and analysis tools to any device on your network.
 
 Start a race. It records. Stop racing. It stops.
 
@@ -28,10 +28,10 @@ Runs on any always-on machine — Mac, Windows, Linux, Raspberry Pi. Pure Python
 | Game | UDP Port |
 |------|----------|
 | Forza Motorsport | 5300 |
-| Assetto Corsa Competizione | 9996 |
-| F1 2023 / 2024 | 20777 |
 
-All three listen simultaneously. Switch games without changing anything.
+Listens for both Forza Motorsport (2023) and Forza Horizon 5 — auto-detected by packet size.
+
+> **Roadmap:** ACC and F1 support are coming soon. Parser code is in tree but not bound at startup until the Forza experience is rock-solid.
 
 ---
 
@@ -89,46 +89,26 @@ Settings → HUD and Gameplay → Data Out
 - Data Out IP Port: **5300**
 - Data Out Packet Format: **Car Dash**
 
-### ACC
-Settings → General → UDP Telemetry
-- UDP Port: **9996**
-- IP: this machine's IP
+### Forza Horizon 5
+Settings → HUD and Gameplay → Data Out
+- Data Out: **ON**
+- Data Out IP Address: this machine's IP
+- Data Out IP Port: **5300**
 
-### F1 2023 / 2024
-Settings → Telemetry Settings
-- UDP Telemetry: **On**
-- UDP Broadcast Mode: **Off**
-- UDP IP Address: this machine's IP
-- UDP Port: **20777**
-- UDP Send Rate: **60Hz**
-- UDP Format: **2023** or **2024**
+(Same port as Forza Motorsport — packet format is auto-detected.)
 
 ---
 
 ## Data Captured
 
-### All games
 - Speed, throttle %, brake %, clutch %, gear, RPM, steering
-- Rear slip ratios (RL, RR)
-- Lateral / longitudinal G-forces
-
-### Forza Motorsport (additional)
-- All 4 tyre slip ratios and angles
-- Tyre temps (FL/FR/RL/RR)
+- All 4 tyre slip ratios and angles (RL/RR especially useful for traction analysis)
+- Tyre temps (FL/FR/RL/RR), and tyre wear in Forza Horizon 5
 - Suspension travel, wheel rotation speeds
+- Lateral / longitudinal G-forces
 - Boost, fuel, best/last/current lap time
 - Car ordinal, class, performance index, drivetrain
-
-### ACC (additional)
-- Tyre pressures and brake temps (4 corners)
-- Tyre core temps (4 corners)
-- 3-axis G-forces and velocity vector
-
-### F1 2023 / 2024 (additional)
-- Track name and session type
-- Tyre compound, tyre age, fuel remaining
-- Brake temps and tyre surface/inner temps
-- Engine temp, DRS status
+- Track ordinal (Forza Horizon 5 only — auto-resolved to track name)
 
 ---
 
@@ -204,4 +184,4 @@ MIT — read it, run it, fork it.
 
 ---
 
-*Forza Motorsport is a trademark of Microsoft. Pacefinder is not affiliated with Microsoft, Codemasters, or Kunos Simulazioni.*
+*Forza Motorsport is a trademark of Microsoft. Pacefinder is not affiliated with Microsoft.*
