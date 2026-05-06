@@ -126,13 +126,21 @@ function renderGameRecent(sessions){
   el.innerHTML=sessions.map(s=>{
     const fp=s.finish_pos,gp=s.grid_pos;
     let posHtml='';
-    if(fp!=null){const cls=fp===1?'p1':fp<=3?'podium':'ok';posHtml=`<span class="ov-recent-pos ${cls}">P${fp}</span>`;}
+    if(gp!=null && gp>0){posHtml+=`<span class="recent-grid">P${gp}</span><span class="recent-arrow">→</span>`;}
+    if(fp!=null){const cls=fp===1?'p1':fp<=3?'podium':'ok';posHtml+=`<span class="ov-recent-pos ${cls}">P${fp}</span>`;}
+    let gainedHtml='';
+    if(fp!=null && gp!=null && gp>0){
+      const g=gp-fp;
+      const cls=g>0?'pos':g<0?'neg':'neu';
+      gainedHtml=`<span class="recent-gained ${cls}">${g>0?'+':''}${g}</span>`;
+    }
     const href='/sessions/session?id='+encodeURIComponent(s.session_id)+'&game='+encodeURIComponent(s.game||'')+'&track='+encodeURIComponent(s.track||'');
     return`<div class="ov-recent-row" onclick="location.href='${href}'">
       <span class="ov-recent-circuit">${s.track&&s.track!=='unknown'?s.track:'Unknown Track'}</span>
       <span class="ov-recent-date">${fmtDate(s.started_at)}</span>
       <span class="ov-recent-lap">${fmtLap(s.best_lap_time_s)}</span>
       ${posHtml}
+      ${gainedHtml}
     </div>`;
   }).join('');
 }
