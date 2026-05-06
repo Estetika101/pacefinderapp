@@ -1,0 +1,14 @@
+# Pacefinder — extended Forza car ordinal map.
+#
+# Format: ordinal,year,make,model (4 columns — same as fm8_cars.csv).
+# Loaded AFTER fm8_cars.csv (the bluemanos base list, which starts at ordinal 247);
+# entries here OVERRIDE the base on duplicate ordinals.
+#
+# Use this file for:
+#   - FM7-era and earlier carryover cars not in the FM8 base list
+#   - Newly added cars from Forza updates not yet in the base list
+#
+# Known unresolved ordinal awaiting research: 42 (appears in existing sessions
+# but predates the bluemanos FM8 list). See pacefinderapp issue #6.
+#
+ordinal,year,make,model

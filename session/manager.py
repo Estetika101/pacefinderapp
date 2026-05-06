@@ -194,7 +194,12 @@ class Session:
                 self.car_manufacturer = car_info["manufacturer"]
                 self.car_year         = car_info["year"]
             else:
-                self.car = str(ordinal)
+                # Unmapped ordinal — show "Unknown Car" in the UI rather than the raw
+                # number. The user can override via the edit modal. Log the ordinal
+                # once per session so it's easy to grep listener.log for additions
+                # to data/fm8_cars_extended.csv. See pacefinderapp issue #6.
+                self.car = "Unknown Car"
+                _log.info(f"[{self.game}] Unmapped car_ordinal={ordinal} — displayed as 'Unknown Car'")
 
         rp = parsed.get("race_position")
         if rp is not None and rp > 0:

@@ -136,7 +136,7 @@ def load_forza_reference_data() -> None:
         except Exception as exc:
             _log.warning(f"Could not parse fm8_tracks_extended.csv: {exc}")
 
-    # ── Cars CSV ─────────────────────────────────────────────────────────────
+    # ── Cars CSV — base (bluemanos format) ───────────────────────────────────
     cars_csv = data_dir / "fm8_cars.csv"
     car_count = 0
     cars: dict = {}
@@ -163,6 +163,32 @@ def load_forza_reference_data() -> None:
         except Exception as exc:
             _log.warning(f"Could not parse fm8_cars.csv: {exc}")
 
+    # ── Cars CSV — extended (curated, OVERRIDES base) ────────────────────────
+    cars_extended_csv = data_dir / "fm8_cars_extended.csv"
+    cars_extended_count = 0
+    if cars_extended_csv.exists():
+        try:
+            with cars_extended_csv.open(encoding="utf-8") as fh:
+                for row in _csv.reader(fh):
+                    if not row or row[0].startswith("#") or row[0].strip() == "ordinal":
+                        continue
+                    if len(row) < 3:
+                        continue
+                    try:
+                        ordinal = int(row[0].strip())
+                        year    = int(row[1].strip())
+                        make    = row[2].strip()
+                        model   = row[3].strip() if len(row) > 3 else ""
+                        if not make:
+                            continue
+                        full_name = f"{year} {make} {model}".strip()
+                        cars[ordinal] = {"name": full_name, "manufacturer": make, "year": year}
+                        cars_extended_count += 1
+                    except (ValueError, IndexError):
+                        continue
+        except Exception as exc:
+            _log.warning(f"Could not parse fm8_cars_extended.csv: {exc}")
+
     # ── Merge learned DB ordinals (highest priority) ──────────────────────────
     try:
         learned = _load_learned_track_ordinals()
@@ -178,7 +204,7 @@ def load_forza_reference_data() -> None:
 
     _log.info(
         f"Loaded {track_count} base + {extended_count} extended FM tracks, "
-        f"{car_count} FM cars from reference data"
+        f"{car_count} base + {cars_extended_count} extended FM cars from reference data"
     )
     _log.debug(f"FORZA_TRACKS sample: {sorted(FORZA_TRACKS.items())[:20]}")
 
