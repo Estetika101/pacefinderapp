@@ -154,7 +154,10 @@ class Session:
             if st and st != "unknown":
                 self.session_type = st
             rp = parsed.get("race_position")
-            if rp is not None and rp > 0:
+            # Only capture race_position when the race is actually live — Forza
+            # broadcasts a phantom P1 during the pre-race countdown which would
+            # otherwise be mis-cached as the grid position.
+            if rp is not None and rp > 0 and parsed.get("is_race_on") == 1:
                 self._race_positions.append(rp)
             if parsed.get("weather_condition") and self.weather_condition is None:
                 self.weather_condition = parsed["weather_condition"]
@@ -202,7 +205,10 @@ class Session:
                 _log.info(f"[{self.game}] Unmapped car_ordinal={ordinal} — displayed as 'Unknown Car'")
 
         rp = parsed.get("race_position")
-        if rp is not None and rp > 0:
+        # Only capture race_position when the race is actually live — Forza
+        # broadcasts a phantom P1 during the pre-race countdown which would
+        # otherwise be mis-cached as the grid position.
+        if rp is not None and rp > 0 and parsed.get("is_race_on") == 1:
             self._race_positions.append(rp)
 
         llt = parsed.get("last_lap_time")
