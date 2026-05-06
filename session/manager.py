@@ -237,6 +237,10 @@ class Session:
             return
         if self._last_is_race_on == 1 and new_is_race_on == 0:
             self._race_off_streak = 1
+            _log.info(
+                f"[{self.game}] is_race_on 1→0 transition (race-end candidate) — "
+                f"{len(self.completed_laps)} lap(s) completed so far"
+            )
         elif new_is_race_on == 0 and self._race_off_streak > 0:
             self._race_off_streak += 1
             if (self._race_off_streak >= RACE_END_DETECTION_PACKETS
@@ -244,6 +248,16 @@ class Session:
                     and not self._should_close_for_race_end):
                 self._should_close_for_race_end = True
                 self.closed_reason = "race_end"
+            elif (self._race_off_streak == RACE_END_DETECTION_PACKETS
+                    and not self.completed_laps):
+                # Threshold reached but the no-completed-laps guard held — log once
+                # so we know why early-close didn't fire (will fall through to the
+                # 10s timeout watchdog instead).
+                _log.info(
+                    f"[{self.game}] is_race_on=0 sustained {RACE_END_DETECTION_PACKETS} "
+                    f"packets but no lap completed — early-close skipped, "
+                    f"falling back to timeout watchdog"
+                )
         elif new_is_race_on == 1:
             self._race_off_streak = 0
         self._last_is_race_on = new_is_race_on

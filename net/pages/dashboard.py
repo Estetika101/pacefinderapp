@@ -162,7 +162,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <div class="bot">
   <div class="udp-strip" id="udp-strip"></div>
   <button class="bot-finish" id="btn-finish" onclick="openFinish()">Finish Race</button>
-  <button class="bot-btn" onclick="resetCounters()">Reset</button>
   <button class="bot-btn" id="dbg-btn" onclick="toggleDebug()">Debug</button>
 </div>
 
