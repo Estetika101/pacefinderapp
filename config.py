@@ -66,3 +66,8 @@ LOG_LEVEL         = logging.INFO
 # UDP rate, 30 packets ≈ 0.5s — fast enough to feel responsive, long enough
 # to filter brief race-state blips. See docs/specs/race-end-detection.md.
 RACE_END_DETECTION_PACKETS = 30
+
+# Floor below which a lap_time_s is treated as an out-lap or partial. Used by
+# the session-close filter and the theoretical-best calculation. 20s is shorter
+# than any real circuit lap, so anything under it is structurally suspect.
+MIN_VALID_LAP_S = 20.0
