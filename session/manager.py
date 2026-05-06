@@ -205,21 +205,22 @@ class Session:
                 _log.info(f"[{self.game}] Unmapped car_ordinal={ordinal} — displayed as 'Unknown Car'")
 
         rp = parsed.get("race_position")
-        # Only capture race_position when the race is actually live AND has
-        # been running for >=0.5s. Forza broadcasts a phantom P1 during the
-        # pre-race countdown (filtered by is_race_on=1), AND occasionally for
-        # the first few packets right after lights-out before the real grid
-        # slot is assigned (filtered by current_race_time threshold). Both
-        # gates needed to prevent the wrong number landing as grid_pos.
-        crt = parsed.get("current_race_time", 0) or 0
-        if rp is not None and rp > 0 and parsed.get("is_race_on") == 1 and crt >= 0.5:
-            # Diagnostic: log the very first race-on position captured so we
-            # can see what Forza broadcast right at race start (helps tune
-            # the threshold if grid keeps coming through wrong).
+        # Only capture race_position when the race has actually started — i.e.
+        # the player has crossed the line into lap 1+. Forza broadcasts P1 as
+        # a placeholder during pre-race / formation / countdown phases, and
+        # both is_race_on=1 and current_race_time>0 are TRUE during those
+        # phases too (current_race_time ticks during countdown). The reliable
+        # signal is lap_number>=1 — that only flips once you cross the start
+        # line, at which point the position is the real grid slot.
+        ln = parsed.get("lap_number", 0) or 0
+        if rp is not None and rp > 0 and parsed.get("is_race_on") == 1 and ln >= 1:
+            # Diagnostic: log the very first captured position so we can
+            # confirm the gate caught the real grid slot (and not a phantom).
             if not self._race_positions:
+                crt = parsed.get("current_race_time", 0) or 0
                 _log.info(
                     f"[{self.game}] First captured race_position=P{rp} "
-                    f"(current_race_time={crt:.2f}s, lap_number={parsed.get('lap_number', '?')})"
+                    f"(lap_number={ln}, current_race_time={crt:.2f}s)"
                 )
             self._race_positions.append(rp)
 
