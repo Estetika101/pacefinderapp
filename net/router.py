@@ -42,6 +42,7 @@ def make_handler(ctx: dict):
     save_config            = ctx["save_config"]
     storage_path           = ctx["storage_path"]
     effective_tracks       = ctx["effective_tracks"]
+    FM2023_TRACKS          = ctx["FM2023_TRACKS"]
     FORZA_CARS             = ctx["FORZA_CARS"]
     db_sessions_list       = ctx["db_sessions_list"]
     db_games_index         = ctx["db_games_index"]
@@ -217,6 +218,21 @@ def make_handler(ctx: dict):
                       for k, v in [pair.split("=", 1)]}
                 result = db_career_kpis(qs.get("game") or None)
                 writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
+
+            elif path == "/sessions/track-options":
+                # Merged unique track-name list for the session edit modal dropdown.
+                # Sources combined: FM2023_TRACKS hardcoded list +
+                # FORZA_TRACKS values from CSVs (incl. fm8_tracks_extended.csv) +
+                # learned_track_ordinals from prior user confirmations.
+                # See docs/specs/post-race-track-dropdown.md.
+                names = set(FM2023_TRACKS)
+                names.update(effective_tracks().values())
+                # Filter out the placeholder "unknown" entry — it's reserved for the
+                # blank state in the UI and shouldn't appear as a selectable option.
+                names.discard("unknown")
+                result = sorted(names)
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(result).encode()))
 
             elif path == "/sessions/form":
                 qs = {k: urllib.parse.unquote_plus(v)

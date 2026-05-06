@@ -368,6 +368,7 @@ async def main(demo_mode: bool = False):
         "save_config": save_config,
         "storage_path": storage_path,
         "effective_tracks": _effective_tracks,
+        "FM2023_TRACKS": FM2023_TRACKS,
         "FORZA_CARS": FORZA_CARS,
         "db_sessions_list": _db_sessions_list,
         "db_games_index": _db_games_index,
