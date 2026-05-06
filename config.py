@@ -60,3 +60,9 @@ SESSION_TIMEOUT_S = config["session_timeout_s"]
 IDLE_TIMEOUT_S    = config["idle_timeout_s"]
 STATUS_PORT       = config["status_port"]
 LOG_LEVEL         = logging.INFO
+
+# Race-end detection: number of consecutive packets with is_race_on=0 after a
+# 1→0 transition before triggering an early session close. At Forza's 60 Hz
+# UDP rate, 30 packets ≈ 0.5s — fast enough to feel responsive, long enough
+# to filter brief race-state blips. See docs/specs/race-end-detection.md.
+RACE_END_DETECTION_PACKETS = 30
