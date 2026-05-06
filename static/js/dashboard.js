@@ -226,6 +226,15 @@ function selType(el){
 async function openFinish(editSid){
   if(_foAutoTimer){clearTimeout(_foAutoTimer);_foAutoTimer=null;}
 
+  // Optimistic UX: pop the modal IMMEDIATELY with a loading state so the
+  // button feels responsive. The /finish POST blocks on synchronous DB +
+  // file writes; we used to await it before opening, which made the click
+  // feel multi-second slow. See #32.
+  $('fo-title').textContent = 'Finishing race…';
+  $('fo-sub').textContent   = 'Saving session…';
+  $('fo-stats').style.display = 'none';
+  $('fo').classList.add('open');
+
   let sid = editSid || null;
   if(!editSid){
     // Close active session
@@ -233,13 +242,17 @@ async function openFinish(editSid){
     const closed = await res.json().catch(()=>({}));
     if(closed.closed&&closed.closed.length) sid=closed.closed[0];
     if(!sid){
-      await new Promise(r=>setTimeout(r,400));
       const st = await fetch('/status').then(r=>r.json());
       sid = state_sid || st.session_id;
     }
   }
   _foSid=sid; _foRaceType=null; _foDropLast=false; _foClosed=false; _foTrackOrdinal=null;
-  if(!_foSid) return;
+  if(!_foSid){
+    // Couldn't recover a session id — back out cleanly so the user isn't
+    // stuck on a "Finishing race…" placeholder.
+    $('fo').classList.remove('open');
+    return;
+  }
 
   try {
     // Load session metadata + track list
@@ -299,9 +312,16 @@ async function openFinish(editSid){
       if(chip) selType(chip);
     }
     renderFoLaps();
-  } catch(e){ console.error(e); return; }
-
-  $('fo').classList.add('open');
+  } catch(e){
+    // Don't strand the user on a "Finishing race…" placeholder if any of the
+    // session/data fetches failed. Surface the error in the title and let
+    // them dismiss with Skip.
+    console.error(e);
+    $('fo-title').textContent = 'Could not load session';
+    $('fo-sub').textContent   = String(e && e.message || e);
+    return;
+  }
+  // Modal is already open from the optimistic step at the top of openFinish.
 }
 
 function renderFoLaps(){
