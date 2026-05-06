@@ -68,6 +68,23 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 .x-lbl-row{display:flex;justify-content:space-between;font-size:.56rem;color:var(--n-600);margin-top:3px;padding:0 1px}
 #tele-loading{color:var(--n-400);font-size:.9rem;padding:60px;text-align:center}
 .delta-neg{color:var(--accent-soft)}.delta-pos{color:var(--danger)}
+.ctrl-sub{font-size:.62rem;color:var(--n-400);margin-top:4px;padding-left:2px}
+.cs-ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:300;align-items:center;justify-content:center}
+.cs-ovl.open{display:flex}
+.cs-panel{background:var(--bg-raised);border:1px solid var(--border-sub);border-radius:6px;padding:18px 20px;min-width:360px;max-width:640px;max-height:80vh;overflow:auto}
+.cs-ttl{font-size:.85rem;color:var(--text);margin-bottom:14px;font-weight:bold}
+.cs-sess{padding:8px 10px;border:1px solid var(--border-faint);border-radius:4px;margin-bottom:6px;cursor:pointer;background:var(--bg-deep)}
+.cs-sess:hover{border-color:var(--n-400)}
+.cs-sess-hd{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text)}
+.cs-sess-meta{font-size:.6rem;color:var(--n-500);margin-top:2px}
+.cs-laps{display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-faint)}
+.cs-sess.expanded .cs-laps{display:block}
+.cs-lap{padding:4px 8px;font-size:.7rem;color:var(--n-300);cursor:pointer;border-radius:2px;font-variant-numeric:tabular-nums}
+.cs-lap:hover{background:var(--surface);color:var(--text)}
+.cs-empty{padding:18px;text-align:center;color:var(--n-500);font-size:.78rem}
+.cs-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.cs-btn{background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-family:inherit;font-size:.7rem;padding:6px 14px;border-radius:4px;cursor:pointer}
+.cs-btn:hover{border-color:var(--n-300)}
 @media(max-width:768px){.lsb-slip,.lsb-s{display:none}.lap-sum-bar{flex-wrap:nowrap}}
 </style>
 </head>
@@ -106,7 +123,10 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
         <option value="">None</option>
         <option value="best_lap" selected>My Best Lap</option>
         <option value="theoretical">Theoretical Best</option>
+        <option value="last_lap">Last Lap</option>
+        <option value="cross_session">Lap from another session…</option>
       </select>
+      <div id="cs-ref-label" class="ctrl-sub" style="display:none"></div>
     </div>
     <div class="ctrl-section">
       <div class="ctrl-lbl">Channels</div>
@@ -160,6 +180,16 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
 </div>
 <div id="tele-tip"></div>
 <script src="/static/js/charts.js"></script>
+<!-- Cross-session reference picker — opened from the Reference dropdown -->
+<div class="cs-ovl" id="cs-ovl">
+  <div class="cs-panel">
+    <div class="cs-ttl" id="cs-ttl">Pick a reference lap</div>
+    <div id="cs-list"><div class="cs-empty">Loading…</div></div>
+    <div class="cs-actions">
+      <button class="cs-btn" onclick="closeCrossSessionPicker()">Cancel</button>
+    </div>
+  </div>
+</div>
 <script src="/static/js/telemetry.js"></script>
 </body>
 </html>
