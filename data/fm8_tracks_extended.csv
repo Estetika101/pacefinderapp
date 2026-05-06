@@ -1,0 +1,23 @@
+# Pacefinder — extended Forza Motorsport track ordinal map.
+#
+# Format: ordinal,track_display_name (2 columns).
+# Loaded AFTER fm8_tracks.csv (the bluemanos base list); entries here OVERRIDE
+# the base on duplicate ordinals.
+#
+# Use this file for:
+#   - Circuit variants missing from the bluemanos list
+#   - User-discovered ordinals confirmed against actual race results
+#   - Reversed / club / mirrored layout names that the base list groups under one ordinal
+#
+# Contribute new mappings: open an issue or PR with `ordinal,name` pairs.
+#
+ordinal,track
+35,Mugello Circuit Full
+67,Maple Valley Full Circuit
+510,Yas Marina Full Circuit
+530,Circuit de Spa-Francorchamps
+540,Mount Panorama Circuit
+860,Brands Hatch Grand Prix Circuit
+990,Virginia International Raceway Full
+1630,Grand Oak Raceway National
+1643,Hakone Club Reversed

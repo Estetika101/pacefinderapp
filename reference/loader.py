@@ -74,22 +74,23 @@ FM2023_TRACKS = sorted([
 
 
 def load_forza_reference_data() -> None:
-    """Parse data/fm8_tracks.csv and data/fm8_cars.csv into FORZA_TRACKS / FORZA_CARS.
+    """Parse data/fm8_tracks*.csv and data/fm8_cars*.csv into FORZA_TRACKS / FORZA_CARS.
 
     Mutates the module-level dicts in-place so that any module holding a
     reference to them (e.g. db/store._forza_tracks) sees the updated data.
 
     Precedence (highest first):
       1. learned_track_ordinals from SQLite
-      2. fm8_tracks.csv data
-      3. _FORZA_TRACKS_FALLBACK hardcoded dict
+      2. fm8_tracks_extended.csv (curated additions, simple 2-col format)
+      3. fm8_tracks.csv (community bluemanos base, 5+ col format)
+      4. _FORZA_TRACKS_FALLBACK hardcoded dict
     """
     import csv as _csv
 
     merged: dict = dict(_FORZA_TRACKS_FALLBACK)
     data_dir = Path(__file__).parent.parent / "data"
 
-    # ── Tracks CSV ────────────────────────────────────────────────────────────
+    # ── Tracks CSV — base (bluemanos format) ─────────────────────────────────
     tracks_csv = data_dir / "fm8_tracks.csv"
     track_count = 0
     if tracks_csv.exists():
@@ -111,6 +112,29 @@ def load_forza_reference_data() -> None:
                         continue
         except Exception as exc:
             _log.warning(f"Could not parse fm8_tracks.csv: {exc}")
+
+    # ── Tracks CSV — extended (curated, 2-col format, OVERRIDES base) ────────
+    extended_csv = data_dir / "fm8_tracks_extended.csv"
+    extended_count = 0
+    if extended_csv.exists():
+        try:
+            with extended_csv.open(encoding="utf-8") as fh:
+                for row in _csv.reader(fh):
+                    if not row or row[0].startswith("#") or row[0].strip() == "ordinal":
+                        continue
+                    if len(row) < 2:
+                        continue
+                    try:
+                        ordinal = int(row[0].strip())
+                        display = row[1].strip()
+                        if not display:
+                            continue
+                        merged[ordinal] = display
+                        extended_count += 1
+                    except (ValueError, IndexError):
+                        continue
+        except Exception as exc:
+            _log.warning(f"Could not parse fm8_tracks_extended.csv: {exc}")
 
     # ── Cars CSV ─────────────────────────────────────────────────────────────
     cars_csv = data_dir / "fm8_cars.csv"
@@ -152,7 +176,10 @@ def load_forza_reference_data() -> None:
     FORZA_CARS.clear()
     FORZA_CARS.update(cars)
 
-    _log.info(f"Loaded {track_count} FM tracks, {car_count} FM cars from reference data")
+    _log.info(
+        f"Loaded {track_count} base + {extended_count} extended FM tracks, "
+        f"{car_count} FM cars from reference data"
+    )
     _log.debug(f"FORZA_TRACKS sample: {sorted(FORZA_TRACKS.items())[:20]}")
 
 
