@@ -73,11 +73,22 @@ Logs: `~/Library/Logs/pacefinder.log`
 
 ### Linux / Pi
 ```bash
-sudo cp simtelemetry.service /etc/systemd/system/
+sudo cp pacefinder.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable simtelemetry
-sudo systemctl start simtelemetry
+sudo systemctl enable pacefinder
+sudo systemctl start pacefinder
 ```
+
+> **Already installed under the old `simtelemetry` name?** Migrate with:
+> ```bash
+> sudo systemctl stop simtelemetry
+> sudo systemctl disable simtelemetry
+> sudo rm /etc/systemd/system/simtelemetry.service
+> sudo cp pacefinder.service /etc/systemd/system/
+> sudo systemctl daemon-reload
+> sudo systemctl enable pacefinder
+> sudo systemctl start pacefinder
+> ```
 
 ### Windows
 Open Task Scheduler → Create Basic Task → Trigger: At log on → Action: Start `pythonw.exe C:\path\to\listener.py`.
@@ -136,13 +147,13 @@ Default storage path is `./data/`. Change it in the setup page or edit `simtelem
 ## Running as a Background Service (Linux / Pi)
 
 ```bash
-sudo cp simtelemetry.service /etc/systemd/system/
+sudo cp pacefinder.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable simtelemetry
-sudo systemctl start simtelemetry
+sudo systemctl enable pacefinder
+sudo systemctl start pacefinder
 ```
 
-Check status: `sudo systemctl status simtelemetry`
+Check status: `sudo systemctl status pacefinder`
 
 ---
 
@@ -177,7 +188,7 @@ sudo lsof -i :5300
 
 **Service not starting:**
 ```bash
-sudo journalctl -u simtelemetry -f
+sudo journalctl -u pacefinder -f
 ```
 
 ---
