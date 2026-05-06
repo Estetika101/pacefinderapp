@@ -242,6 +242,17 @@ class Session:
                     f"(lap_number={ln}, current_race_time={crt:.2f}s)"
                 )
             self._race_positions.append(rp)
+            # Periodic sample log (every 600th capture, ≈ 10s at 60Hz). Lets
+            # us tell time-trial sessions (P1 forever) apart from real races
+            # (position varies) when diagnosing user reports. Grep
+            # listener.log for "Position sample".
+            if len(self._race_positions) % 600 == 1 and len(self._race_positions) > 1:
+                ln  = parsed.get("lap_number", 0) or 0
+                crt = parsed.get("current_race_time", 0) or 0
+                _log.info(
+                    f"[{self.game}] Position sample #{len(self._race_positions)}: "
+                    f"rp={rp} lap={ln} crt={crt:.1f}s"
+                )
 
         llt = parsed.get("last_lap_time")
         if llt and 0 < llt < 600:
