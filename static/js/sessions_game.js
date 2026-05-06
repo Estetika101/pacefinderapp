@@ -184,7 +184,15 @@ async function init(){
     const spark=hasLap?sparkSVG(t.spark_laps||[]):'';
     const trendArrow=hasLap?(t.trend==='up'?'<span class="tl-arrow" style="color:var(--color-green)">▲</span>':t.trend==='dn'?'<span class="tl-arrow" style="color:var(--color-red)">▼</span>':'<span class="tl-arrow" style="color:var(--color-text-dim)">—</span>'):'';
     const bestLap=hasLap?fmtLap(t.best_lap_time_s):'—';
-    const avgFinish=t.avg_finish!=null?`<div class="tl-finish">P${t.avg_finish} avg finish</div>`:'';
+    let avgFinish='';
+    if(t.avg_finish!=null){
+      let gainedStr='';
+      if(t.avg_gained!=null){
+        const g=t.avg_gained, cls=g>0?'pos':g<-0?'neg':'neu';
+        gainedStr=` <span class="recent-gained ${cls}">${g>=0?'+':''}${g.toFixed(1)}</span>`;
+      }
+      avgFinish=`<div class="tl-finish">P${t.avg_finish} avg${gainedStr}</div>`;
+    }
     const href=`/sessions/track?name=${encodeURIComponent(t.track)}${_game?'&game='+encodeURIComponent(_game):''}`;
     return`<div class="tl-row${hasLap?'':' no-lap'}" onclick="location.href='${href}'">
       <div class="tl-left">
