@@ -196,6 +196,9 @@ async function openEdit(){
   const dl=document.getElementById('edit-track-list');
   dl.innerHTML=tracks.map(t=>`<option value="${t.replace(/"/g,'&quot;')}"></option>`).join('');
   document.getElementById('edit-track').value=cur;
+  // Pre-fill the car free-text input. "Unknown Car" passes through unchanged
+  // so the user can keep it as-is or replace it with the real name.
+  document.getElementById('edit-car').value=(_sess.car && _sess.car!=='unknown')?_sess.car:'';
   _editTrack=cur;
   _editRaceType=_sess.race_type||_sess.session_type||null;
   // Default weather to Dry per spec; tyre has no default.
@@ -259,6 +262,9 @@ async function saveEdit(){
   }
   body.weather_condition=_editWeather||'';
   body.tyre_compound=_editTyre||'';
+  // Free-text car override (covers Unknown Car / unmapped ordinals — see #6).
+  const car=document.getElementById('edit-car').value.trim();
+  body.car=car;  // empty string clears the override; "Unknown Car" passes through
   await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   closeEdit();
   const d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());

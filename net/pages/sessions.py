@@ -297,6 +297,8 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
     <div class="edit-row"><label class="edit-lbl">Track</label>
       <input class="edit-sel" id="edit-track" list="edit-track-list" placeholder="Search or type track name" autocomplete="off">
       <datalist id="edit-track-list"></datalist></div>
+    <div class="edit-row"><label class="edit-lbl">Car</label>
+      <input class="edit-sel" id="edit-car" placeholder="e.g. 2018 Honda Civic Type R" autocomplete="off"></div>
     <div class="edit-row"><label class="edit-lbl">Type</label>
       <div class="edit-chips">
         <button class="etype" data-val="practice" onclick="editSelType(this)">Practice</button>
