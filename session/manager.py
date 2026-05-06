@@ -232,8 +232,13 @@ class Session:
         # AND uses lap_number inconsistently across session types, so neither
         # signal alone gates this reliably.
         if rp is not None and rp > 0 and parsed.get("is_race_on") == 1:
-            # Diagnostic: log the first captured position with full context so
-            # we can keep tuning the grid heuristic if it stays wrong.
+            # Diagnostic: log every CHANGE in race_position (not every packet —
+            # would be too noisy at 60Hz, but every per-packet sample misses
+            # short sessions). If Forza broadcasts varying positions during
+            # a race, every transition shows up. If positions stay flat at
+            # P1 the whole race, only the first-capture line appears.
+            # Grep listener.log for "Position changed" or "First captured".
+            prev = self._race_positions[-1] if self._race_positions else None
             if not self._race_positions:
                 ln  = parsed.get("lap_number", 0) or 0
                 crt = parsed.get("current_race_time", 0) or 0
@@ -241,18 +246,14 @@ class Session:
                     f"[{self.game}] First captured race_position=P{rp} "
                     f"(lap_number={ln}, current_race_time={crt:.2f}s)"
                 )
-            self._race_positions.append(rp)
-            # Periodic sample log (every 600th capture, ≈ 10s at 60Hz). Lets
-            # us tell time-trial sessions (P1 forever) apart from real races
-            # (position varies) when diagnosing user reports. Grep
-            # listener.log for "Position sample".
-            if len(self._race_positions) % 600 == 1 and len(self._race_positions) > 1:
+            elif prev is not None and rp != prev:
                 ln  = parsed.get("lap_number", 0) or 0
                 crt = parsed.get("current_race_time", 0) or 0
                 _log.info(
-                    f"[{self.game}] Position sample #{len(self._race_positions)}: "
-                    f"rp={rp} lap={ln} crt={crt:.1f}s"
+                    f"[{self.game}] Position changed P{prev}→P{rp} "
+                    f"(lap_number={ln}, current_race_time={crt:.2f}s, samples={len(self._race_positions)+1})"
                 )
+            self._race_positions.append(rp)
 
         llt = parsed.get("last_lap_time")
         if llt and 0 < llt < 600:
