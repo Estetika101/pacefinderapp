@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 import logging
 
-from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, RACE_END_DETECTION_PACKETS
+from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, RACE_END_DETECTION_PACKETS, MIN_VALID_LAP_S
 from db.store import (
     _classify_race_type,
     _db_write_session,
@@ -397,10 +397,8 @@ class Session:
         # Drop incomplete laps before computing best / best_lap-derived stats.
         # An OUT LAP (lap_number=0) is the partial run from pit-exit to the
         # start/finish line — its time is not a representative lap pace.
-        # MIN_VALID_LAP_S filters anything obviously partial that slipped
-        # through with a non-zero lap_number (e.g. a session ended seconds
-        # after a transition). 20s is shorter than any real circuit lap.
-        MIN_VALID_LAP_S = 20.0
+        # MIN_VALID_LAP_S (config.py) filters anything obviously partial that
+        # slipped through with a non-zero lap_number.
         completed_before = len(self.completed_laps)
         self.completed_laps = [
             lap for lap in self.completed_laps

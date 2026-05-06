@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from config import MIN_VALID_LAP_S
+
 # ─── Module-level context (set by initialize()) ───────────────────────────────
 
 _db_lock = threading.Lock()
@@ -1007,16 +1009,32 @@ def _backfill_lap_samples():
 # ─── Sector Utilities ─────────────────────────────────────────────────────────
 
 def _sector_time_from_samples(samples: list, lo: float, hi: float) -> Optional[float]:
-    """Time spent between two distance_norm boundaries, read from sample 't' field."""
+    """
+    Time spent between two distance_norm boundaries.
+
+    Linearly interpolates t between the two samples that bracket each boundary
+    so sector-time precision isn't bound by sample spacing (~5–6 m of jitter at
+    racing speed with 10 Hz samples).
+    """
     if not samples:
         return None
 
-    def t_at(target: float) -> float:
+    def t_at(target: float) -> Optional[float]:
+        # Bracket the target with the first sample whose distance_norm >= target.
+        for i in range(1, len(samples)):
+            a = samples[i - 1].get("distance_norm", 0.0)
+            b = samples[i].get("distance_norm", 0.0)
+            if a <= target <= b and b > a:
+                f = (target - a) / (b - a)
+                return samples[i - 1]["t"] + f * (samples[i]["t"] - samples[i - 1]["t"])
+        # Fallback: nearest sample (covers degenerate / non-monotonic cases).
         closest = min(samples, key=lambda s: abs(s.get("distance_norm", 0.0) - target))
         return closest["t"]
 
     t_lo = samples[0]["t"] if lo <= 0.0 else t_at(lo)
     t_hi = samples[-1]["t"] if hi >= 1.0 else t_at(hi)
+    if t_lo is None or t_hi is None:
+        return None
     delta = t_hi - t_lo
     return round(delta, 3) if delta > 0 else None
 
@@ -1084,14 +1102,17 @@ def update_track_references(track: str, game: str):
     with _db_lock:
         conn = _db_connect()
         try:
+            # Filter out-laps and obviously partial laps (lap_time_s < MIN_VALID_LAP_S)
+            # so a 5s out-lap "S1" can't poison the theoretical-best calc.
             rows = conn.execute(
                 """SELECT l.session_id, l.lap_number, l.lap_time_s, s.started_at
                    FROM laps l
                    JOIN sessions s ON l.session_id = s.session_id
                    WHERE s.track=? AND s.game=?
-                     AND l.lap_time_s IS NOT NULL AND l.lap_time_s > 0
+                     AND l.lap_number > 0
+                     AND l.lap_time_s IS NOT NULL AND l.lap_time_s >= ?
                    ORDER BY l.lap_time_s ASC""",
-                (track, game),
+                (track, game, MIN_VALID_LAP_S),
             ).fetchall()
         finally:
             conn.close()
