@@ -170,12 +170,21 @@ async function runAnalysis(force){
 }
 // ── Edit modal ────────────────────────────────────────────────
 let _editTrack='',_editRaceType=null;
-function openEdit(){
+async function openEdit(){
   if(!_sess)return;
   const cur=_sess.track&&_sess.track!=='unknown'?_sess.track:'';
-  const allTracks=TRACK_NAMES.includes(cur)||!cur?TRACK_NAMES:[...TRACK_NAMES,cur].sort();
-  const sel=document.getElementById('edit-track');
-  sel.innerHTML='<option value="">— Unknown —</option>'+allTracks.map(t=>`<option value="${t}"${t===cur?' selected':''}>${t}</option>`).join('');
+  // Fetch the merged track list at open time so newly-learned ordinals
+  // (and any extended-CSV reload) are reflected without a page refresh.
+  // Falls back to the page-embedded TRACK_NAMES if the endpoint fails.
+  let tracks;
+  try{
+    tracks=await fetch('/sessions/track-options').then(r=>r.json());
+    if(!Array.isArray(tracks)||!tracks.length)tracks=TRACK_NAMES;
+  }catch(e){tracks=TRACK_NAMES;}
+  if(cur && !tracks.includes(cur))tracks=[...tracks,cur].sort();
+  const dl=document.getElementById('edit-track-list');
+  dl.innerHTML=tracks.map(t=>`<option value="${t.replace(/"/g,'&quot;')}"></option>`).join('');
+  document.getElementById('edit-track').value=cur;
   _editTrack=cur;
   _editRaceType=_sess.race_type||_sess.session_type||null;
   document.querySelectorAll('#edit-ovl .etype').forEach(c=>c.classList.toggle('sel',c.dataset.val===_editRaceType));
@@ -190,9 +199,19 @@ function editSelType(el){
 async function saveEdit(){
   if(!_id)return;
   const body={id:_id};
-  const track=document.getElementById('edit-track').value;
+  const track=document.getElementById('edit-track').value.trim();
   if(track)body.track=track;
   if(_editRaceType)body.race_type=_editRaceType;
+  // If the user picked a track AND the session has a detected ordinal,
+  // remember the ordinal→name mapping so future sessions auto-resolve it.
+  // The /sessions/update endpoint upserts into learned_track_ordinals.
+  if(track && _sess.track_ordinal && track !== _sess.track){
+    body.learned_ordinal={
+      ordinal: _sess.track_ordinal,
+      game: _sess.game||'forza_motorsport',
+      track_name: track,
+    };
+  }
   await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   closeEdit();
   const d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());

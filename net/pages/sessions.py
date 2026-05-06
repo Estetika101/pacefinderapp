@@ -293,7 +293,8 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   <div class="edit-panel">
     <div class="edit-ttl">Edit Session</div>
     <div class="edit-row"><label class="edit-lbl">Track</label>
-      <select class="edit-sel" id="edit-track"></select></div>
+      <input class="edit-sel" id="edit-track" list="edit-track-list" placeholder="Search or type track name" autocomplete="off">
+      <datalist id="edit-track-list"></datalist></div>
     <div class="edit-row"><label class="edit-lbl">Type</label>
       <div class="edit-chips">
         <button class="etype" data-val="practice" onclick="editSelType(this)">Practice</button>
