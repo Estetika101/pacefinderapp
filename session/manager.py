@@ -205,10 +205,22 @@ class Session:
                 _log.info(f"[{self.game}] Unmapped car_ordinal={ordinal} — displayed as 'Unknown Car'")
 
         rp = parsed.get("race_position")
-        # Only capture race_position when the race is actually live — Forza
-        # broadcasts a phantom P1 during the pre-race countdown which would
-        # otherwise be mis-cached as the grid position.
-        if rp is not None and rp > 0 and parsed.get("is_race_on") == 1:
+        # Only capture race_position when the race is actually live AND has
+        # been running for >=0.5s. Forza broadcasts a phantom P1 during the
+        # pre-race countdown (filtered by is_race_on=1), AND occasionally for
+        # the first few packets right after lights-out before the real grid
+        # slot is assigned (filtered by current_race_time threshold). Both
+        # gates needed to prevent the wrong number landing as grid_pos.
+        crt = parsed.get("current_race_time", 0) or 0
+        if rp is not None and rp > 0 and parsed.get("is_race_on") == 1 and crt >= 0.5:
+            # Diagnostic: log the very first race-on position captured so we
+            # can see what Forza broadcast right at race start (helps tune
+            # the threshold if grid keeps coming through wrong).
+            if not self._race_positions:
+                _log.info(
+                    f"[{self.game}] First captured race_position=P{rp} "
+                    f"(current_race_time={crt:.2f}s, lap_number={parsed.get('lap_number', '?')})"
+                )
             self._race_positions.append(rp)
 
         llt = parsed.get("last_lap_time")

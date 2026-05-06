@@ -75,8 +75,12 @@ es.onmessage=e=>{
   // Auto-open confirm modal shortly after race_ended. Short delay (500ms)
   // gives the user a beat to see the dashboard transition before the modal
   // pops; previously this was 5s which felt like a hang. See #32.
-  if(ended&&!$('fo').classList.contains('open')){
-    if(!_foAutoTimer) _foAutoTimer=setTimeout(()=>{_foAutoTimer=null;openFinish();},500);
+  // _foShown guard prevents re-popping after the user closes the modal —
+  // state.status='race_ended' lingers for 30s so without the guard every
+  // dashboard tick would re-fire openFinish.
+  if(!ended) _foShown=false;  // reset for the next race_ended phase
+  if(ended && !$('fo').classList.contains('open') && !_foShown){
+    if(!_foAutoTimer) _foAutoTimer=setTimeout(()=>{_foAutoTimer=null;_foShown=true;openFinish();},500);
   } else if(!ended&&_foAutoTimer){
     clearTimeout(_foAutoTimer);_foAutoTimer=null;
   }
@@ -216,6 +220,11 @@ function clearDebug(){_dbgLines.length=0;$('dbg-log').innerHTML='';}
 // ── Finish Race overlay ───────────────────────────────────────────────────────
 let _foSid=null, _foRaceType=null, _foDropLast=false, _foLaps=[], _foClosed=false;
 let _foTrackOrdinal=null, _foAutoTimer=null;
+// True after the modal has been auto-opened (or manually opened) for the
+// current race_ended phase. Resets when status leaves race_ended (on next
+// race or after the 30s _clear_race_ended timeout). Prevents the modal from
+// re-popping every dashboard tick after the user has saved or skipped.
+let _foShown=false;
 
 function selType(el){
   document.querySelectorAll('#fo .type-chip').forEach(c=>c.classList.remove('sel'));
@@ -225,6 +234,10 @@ function selType(el){
 
 async function openFinish(editSid){
   if(_foAutoTimer){clearTimeout(_foAutoTimer);_foAutoTimer=null;}
+  // Mark that the modal was shown for this race_ended phase so the
+  // dashboard tick handler doesn't auto-open it again after the user
+  // closes it. See _foShown comment at top of the file.
+  _foShown=true;
 
   // Optimistic UX: pop the modal IMMEDIATELY with a loading state so the
   // button feels responsive. The /finish POST blocks on synchronous DB +
