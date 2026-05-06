@@ -394,6 +394,29 @@ class Session:
                 )
             self.completed_laps.append(self.current_lap)
 
+        # Drop incomplete laps before computing best / best_lap-derived stats.
+        # An OUT LAP (lap_number=0) is the partial run from pit-exit to the
+        # start/finish line — its time is not a representative lap pace.
+        # MIN_VALID_LAP_S filters anything obviously partial that slipped
+        # through with a non-zero lap_number (e.g. a session ended seconds
+        # after a transition). 20s is shorter than any real circuit lap.
+        MIN_VALID_LAP_S = 20.0
+        completed_before = len(self.completed_laps)
+        self.completed_laps = [
+            lap for lap in self.completed_laps
+            if lap.lap_number > 0
+            and lap.lap_time_s is not None
+            and lap.lap_time_s >= MIN_VALID_LAP_S
+        ]
+        dropped = completed_before - len(self.completed_laps)
+        if dropped:
+            _log.info(f"[{self.game}] Dropped {dropped} incomplete lap(s) (out-laps or <20s)")
+
+        # Recompute best_lap_time_s from the filtered list — without this,
+        # an out-lap's 13s could persist as the session's "best".
+        valid_times = [lap.lap_time_s for lap in self.completed_laps if lap.lap_time_s and lap.lap_time_s > 0]
+        self.best_lap_time_s = min(valid_times) if valid_times else None
+
         laps_summary = [
             {
                 "lap_number":    lap.lap_number,
