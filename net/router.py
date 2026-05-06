@@ -61,6 +61,7 @@ def make_handler(ctx: dict):
     db_save_ai_analysis    = ctx["db_save_ai_analysis"]
     db_update_session      = ctx["db_update_session"]
     db_drop_last_lap       = ctx["db_drop_last_lap"]
+    db_delete_session      = ctx["db_delete_session"]
     db_write_learned_ordinal = ctx["db_write_learned_ordinal"]
     db_get_lap_samples     = ctx["db_get_lap_samples"]
     build_inject_packets   = ctx["build_inject_packets"]
@@ -634,6 +635,39 @@ def make_handler(ctx: dict):
 
                         writer.write(_http_response("200 OK", "application/json",
                                                     json.dumps({"ok": True, "session": session_data}).encode()))
+
+            elif path == "/sessions/delete" and method == "POST":
+                # Permanently remove a session from DB tables AND backing
+                # files on disk. Used by the Edit modal's Delete button and
+                # by the bulk-cleanup script. No undo — caller is expected
+                # to confirm before posting.
+                try:
+                    body_data = json.loads(raw_body)
+                except (json.JSONDecodeError, ValueError) as exc:
+                    writer.write(_http_response("400 Bad Request", "application/json",
+                                                json.dumps({"error": str(exc)}).encode()))
+                else:
+                    sid = body_data.get("id", "")
+                    if not sid:
+                        writer.write(_http_response("400 Bad Request", "application/json",
+                                                    b'{"error":"id required"}'))
+                    else:
+                        deleted = db_delete_session(sid)
+                        sessions_dir = storage_path() / "sessions"
+                        raw_dir      = storage_path() / "raw"
+                        for f in [
+                            sessions_dir / f"{sid}.json",
+                            sessions_dir / f"{sid}_laps.json",
+                            sessions_dir / f"{sid}_analysis.json",
+                            raw_dir      / f"{sid}.bin",
+                        ]:
+                            if f.exists():
+                                try:
+                                    f.unlink()
+                                except OSError as exc:
+                                    log.warning(f"Could not remove {f}: {exc}")
+                        writer.write(_http_response("200 OK", "application/json",
+                                                    json.dumps({"ok": True, "deleted": deleted}).encode()))
 
             elif path == "/analyze":
                 qs = {k: urllib.parse.unquote_plus(v)
