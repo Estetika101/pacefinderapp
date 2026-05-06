@@ -141,6 +141,14 @@ class Session:
         self._should_close_for_race_end: bool = False
         self.closed_reason: Optional[str] = None
 
+        # Race-start detection: Forza ticks current_race_time during the
+        # pre-race countdown, then RESETS it to ~0 the moment the race
+        # actually begins. Real grid_pos is the race_position captured at
+        # that reset moment — using that when available, falling back to
+        # the mode-of-history helper otherwise.
+        self._last_crt: Optional[float] = None
+        self._grid_pos_at_start: Optional[int] = None
+
         raw_path = storage_path() / "raw" / f"{self.session_id}.bin"
         try:
             self.raw_file = open(raw_path, "wb")
@@ -231,24 +239,31 @@ class Session:
         # because Forza broadcasts a phantom P1 during the pre-race countdown
         # AND uses lap_number inconsistently across session types, so neither
         # signal alone gates this reliably.
+        # Race-start detection: current_race_time RESETS to ~0 the moment
+        # the race actually begins (after the countdown). The race_position
+        # at that reset packet is the real grid slot — Forza broadcasts a
+        # phantom P1 throughout the entire countdown that we want to skip.
+        crt = parsed.get("current_race_time", 0) or 0
+        if (self._last_crt is not None and self._last_crt > 1.0 and crt < 0.5
+                and self._grid_pos_at_start is None):
+            if rp is not None and rp > 0:
+                self._grid_pos_at_start = rp
+                _log.info(
+                    f"[{self.game}] Race start detected — current_race_time "
+                    f"reset {self._last_crt:.1f}s→{crt:.2f}s, grid=P{rp}"
+                )
+        self._last_crt = crt
+
         if rp is not None and rp > 0 and parsed.get("is_race_on") == 1:
-            # Diagnostic: log every CHANGE in race_position (not every packet —
-            # would be too noisy at 60Hz, but every per-packet sample misses
-            # short sessions). If Forza broadcasts varying positions during
-            # a race, every transition shows up. If positions stay flat at
-            # P1 the whole race, only the first-capture line appears.
-            # Grep listener.log for "Position changed" or "First captured".
             prev = self._race_positions[-1] if self._race_positions else None
             if not self._race_positions:
-                ln  = parsed.get("lap_number", 0) or 0
-                crt = parsed.get("current_race_time", 0) or 0
+                ln = parsed.get("lap_number", 0) or 0
                 _log.info(
                     f"[{self.game}] First captured race_position=P{rp} "
                     f"(lap_number={ln}, current_race_time={crt:.2f}s)"
                 )
             elif prev is not None and rp != prev:
-                ln  = parsed.get("lap_number", 0) or 0
-                crt = parsed.get("current_race_time", 0) or 0
+                ln = parsed.get("lap_number", 0) or 0
                 _log.info(
                     f"[{self.game}] Position changed P{prev}→P{rp} "
                     f"(lap_number={ln}, current_race_time={crt:.2f}s, samples={len(self._race_positions)+1})"
@@ -392,8 +407,12 @@ class Session:
         if self.game in ("forza_motorsport", "forza_horizon_5") and self.session_type == "unknown":
             self.session_type = self._infer_forza_session_type()
 
-        grid_pos   = (_grid_pos_from_history(self._race_positions)
-                      if self._race_positions and self.session_type == "race" else None)
+        # Grid prefers the position captured at the current_race_time reset
+        # (real race start). Falls back to the mode-of-history heuristic when
+        # no reset was detected (Forza didn't show a clear race-start signal).
+        grid_pos = (self._grid_pos_at_start if self._grid_pos_at_start is not None
+                    else _grid_pos_from_history(self._race_positions)) \
+                   if self._race_positions and self.session_type == "race" else None
         finish_pos = (self._race_positions[-1]
                       if self._race_positions and self.session_type == "race" else None)
 
@@ -549,7 +568,12 @@ def update_state(game: str, session: Session, parsed: dict):
     # dashboard doesn't show stale values from the previous race.
     if session._race_positions:
         state["race_position"] = session._race_positions[-1]
-        state["grid_pos"]      = _grid_pos_from_history(session._race_positions)
+        # Prefer the grid captured at the race-start moment (current_race_time
+        # reset). Fall back to the mode-of-history heuristic when Forza didn't
+        # produce a clear race-start signal.
+        state["grid_pos"] = (session._grid_pos_at_start
+                             if session._grid_pos_at_start is not None
+                             else _grid_pos_from_history(session._race_positions))
     else:
         state["race_position"] = None
         state["grid_pos"]      = None
