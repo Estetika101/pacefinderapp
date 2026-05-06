@@ -134,6 +134,19 @@ es.onmessage=e=>{
     dEl.textContent='—'; dEl.className='delta-val even';
   }
 
+  // race position (current, grid, ± gained vs grid)
+  const rp=d.race_position, gp=d.grid_pos;
+  $('pos-cur').textContent  = rp ? 'P'+rp : '—';
+  $('pos-grid').textContent = gp ? 'P'+gp : '—';
+  const pdEl=$('pos-delta');
+  if(rp && gp){
+    const gained=gp-rp;  // positive = gained positions vs grid
+    pdEl.textContent = gained>0 ? '+'+gained : gained<0 ? String(gained) : '0';
+    pdEl.className='delta-val '+(gained>0?'ahead':gained<0?'behind':'even');
+  } else {
+    pdEl.textContent='—'; pdEl.className='delta-val even';
+  }
+
   // tyres
   ['fl','fr','rl','rr'].forEach(c=>{
     const el=$('ty-'+c);
