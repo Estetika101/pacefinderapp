@@ -266,21 +266,25 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   <span id="bc-sess">Session</span>
 </div>
 <div class="sess-hdr">
-  <div>
-    <div class="sess-title" id="hdr-track">Loading&hellip;</div>
-    <div class="sess-sub" id="hdr-sub"></div>
+  <div class="sess-hdr-top">
+    <div class="sess-hdr-title">
+      <div class="sess-title" id="hdr-track">Loading&hellip;</div>
+      <div class="sess-sub" id="hdr-sub"></div>
+    </div>
+    <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
+    <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
+    <div class="hdr-stat" id="hdr-grid-stat" style="display:none"><div class="v" id="hdr-grid">&mdash;</div><div class="l">Grid</div></div>
+    <div class="hdr-stat" id="hdr-finish-stat" style="display:none"><div class="v" id="hdr-finish">&mdash;</div><div class="l">Finish</div></div>
+    <div class="hdr-stat" id="hdr-gained-stat" style="display:none"><div class="v" id="hdr-gained">&mdash;</div><div class="l">Gained</div></div>
   </div>
-  <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
-  <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
-  <div class="hdr-stat" id="hdr-grid-stat" style="display:none"><div class="v" id="hdr-grid">&mdash;</div><div class="l">Grid</div></div>
-  <div class="hdr-stat" id="hdr-finish-stat" style="display:none"><div class="v" id="hdr-finish">&mdash;</div><div class="l">Finish</div></div>
-  <div class="hdr-stat" id="hdr-gained-stat" style="display:none"><div class="v" id="hdr-gained">&mdash;</div><div class="l">Gained</div></div>
-  <span class="type-chip" id="hdr-car" style="display:none" title=""></span>
-  <span class="type-chip" id="hdr-type" style="display:none"></span>
-  <span class="type-chip" id="hdr-weather" style="display:none"></span>
-  <span class="type-chip" id="hdr-tyre" style="display:none"></span>
-  <button class="btn-re" onclick="openEdit()" style="font-size:var(--text-xs);padding:4px 12px"
-          title="Edit session metadata — track, car, race type, weather, tyres, nickname">Edit</button>
+  <div class="sess-hdr-pills">
+    <span class="type-chip" id="hdr-car" style="display:none" title=""></span>
+    <span class="type-chip" id="hdr-type" style="display:none"></span>
+    <span class="type-chip" id="hdr-weather" style="display:none"></span>
+    <span class="type-chip" id="hdr-tyre" style="display:none"></span>
+    <button class="btn-re" onclick="openEdit()" style="font-size:var(--text-xs);padding:4px 12px;margin-left:auto"
+            title="Edit session metadata — track, car, race type, weather, tyres, nickname">Edit race</button>
+  </div>
 </div>
 <!-- Edit modal -->
 <div class="edit-ovl" id="edit-ovl">
@@ -313,14 +317,14 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
       </div>
     </div>
     <div class="edit-row"><label class="edit-lbl">Tyres</label>
+      <!-- Forza Motorsport compounds. FH5 uses different categories
+           (Street/Sport/Race/Slick/Rally/Off-Road/Drag) — to be split per
+           game once FH5 support comes back online (see issue #84). -->
       <div class="edit-chips" id="edit-tyre-chips">
-        <button class="etype" data-val="Street"   onclick="editSelTyre(this)">Street</button>
-        <button class="etype" data-val="Sport"    onclick="editSelTyre(this)">Sport</button>
-        <button class="etype" data-val="Race"     onclick="editSelTyre(this)">Race</button>
-        <button class="etype" data-val="Slick"    onclick="editSelTyre(this)">Slick</button>
-        <button class="etype" data-val="Rally"    onclick="editSelTyre(this)">Rally</button>
-        <button class="etype" data-val="Off-Road" onclick="editSelTyre(this)">Off-Road</button>
-        <button class="etype" data-val="Drag"     onclick="editSelTyre(this)">Drag</button>
+        <button class="etype" data-val="Soft"    onclick="editSelTyre(this)">Soft</button>
+        <button class="etype" data-val="Medium"  onclick="editSelTyre(this)">Medium</button>
+        <button class="etype" data-val="Hard"    onclick="editSelTyre(this)">Hard</button>
+        <button class="etype" data-val="Wet"     onclick="editSelTyre(this)">Wet</button>
       </div>
     </div>
     <div class="edit-row" id="edit-conditions-row" style="display:none">
