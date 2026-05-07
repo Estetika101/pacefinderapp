@@ -30,9 +30,10 @@ function sparkSVG(vals){
 const _game=new URLSearchParams(location.search).get('name')||'forza_motorsport';
 
 // ── Game Overview (only when ?name= is set) ───────────────────
-// Default to 'all' so the Form chart populates with whatever sessions exist
-// (time_trial, hot_lap, etc. — not just multi-driver 'real' races). See #17.
-let _gfType='all',_gfLast=10,_gfFormData=[];
+// _gfType is fixed to 'all' since the Real/AI filter was removed (Bundle 4).
+// _gfLast defaults to 5 — user prefers a tight window for "current form".
+const _gfType='all';
+let _gfLast=5,_gfFormData=[];
 
 function gSetKV(id,val){const el=document.getElementById(id);if(!el)return;if(val==null||val==='—'){el.textContent='—';el.classList.add('dash');}else{el.textContent=val;el.classList.remove('dash');}}
 function p1(v,d=1){return v==null?null:parseFloat(v.toFixed(d));}
@@ -67,33 +68,6 @@ async function loadGameOverview(){
 async function loadGameForm(){
   try{_gfFormData=await fetch('/sessions/form?type='+_gfType+'&last=50&game='+encodeURIComponent(_game)).then(r=>r.json());}catch(e){_gfFormData=[];}
   renderGameForm();
-  renderGameTrend();
-}
-
-function renderGameTrend(){
-  const data=_gfFormData;
-  const el=document.getElementById('gtd-spark');
-  const dir=document.getElementById('gtd-dir');
-  const withPos=data.filter(s=>s.finish_pos!=null);
-  if(withPos.length<2){el.innerHTML='<span style="font-size:var(--text-xs);color:var(--color-text-muted)">Not enough race data</span>';dir.textContent='';dir.className='ov-trend-dir fl';return;}
-  const pcts=withPos.map(s=>posToPercentile(s.finish_pos));
-  const w=400,h=40,pad=3;
-  const mn=Math.min(...pcts),mx=Math.max(...pcts),span=Math.max(mx-mn,15);
-  const lo=Math.max(0,mn-span*0.1),hi=Math.min(100,mx+span*0.1),rng=hi-lo;
-  const xs=pcts.map((_,i)=>pad+(w-pad*2)*i/Math.max(pcts.length-1,1));
-  const ys=pcts.map(v=>h-pad-(h-pad*2)*(v-lo)/rng);
-  const pts=xs.map((x,i)=>x.toFixed(1)+','+ys[i].toFixed(1)).join(' ');
-  const half=Math.floor(pcts.length/2);
-  const diff=(pcts.slice(half).reduce((a,b)=>a+b,0)/((pcts.length-half)||1))-(pcts.slice(0,half).reduce((a,b)=>a+b,0)/(half||1));
-  const col=diff>4?'#4ade80':diff<-4?'#f87171':'#888';
-  const lx=xs[xs.length-1],ly=ys[ys.length-1];
-  el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%">
-    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
-    <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3" fill="${col}" opacity=".9"/>
-  </svg>`;
-  if(diff>4){dir.textContent='▲ Improving';dir.className='ov-trend-dir up';}
-  else if(diff<-4){dir.textContent='▼ Declining';dir.className='ov-trend-dir dn';}
-  else{dir.textContent='— Steady';dir.className='ov-trend-dir fl';}
 }
 
 function renderGameForm(){
@@ -105,8 +79,19 @@ function renderGameForm(){
     const pct=posToPercentile(s.finish_pos);
     const h=pct!=null?Math.round(pct+20):0;
     const col=pct!=null?`hsl(${h},70%,38%)`:'#1a1a1a';
-    const ht=pct!=null?(pct+'% · P'+s.finish_pos+' · '+(s.track||'?')):'(no pos) · '+(s.track||'?');
-    return`<div class="bar" style="height:${pct!=null?pct:20}%;background:${col}"><div class="bar-tip">${ht}</div></div>`;
+    // Hover card mirrors a Recent Sessions row — track, date, finish vs grid,
+    // delta. Per Bundle 4 of the UX review.
+    const date=fmtDate(s.started_at);
+    const fp=s.finish_pos, gp=s.grid_pos;
+    const posLine=fp!=null?(gp!=null&&gp>0?`P${gp} → P${fp}`:`P${fp}`):'(no pos)';
+    let gainedLine='';
+    if(fp!=null && gp!=null && gp>0){
+      const g=gp-fp;
+      const cls=g>0?'pos':g<0?'neg':'neu';
+      gainedLine=`<span class="bar-tip-gained ${cls}">${g>0?'+':''}${g}</span>`;
+    }
+    const tipHtml=`<div class="bar-tip-track">${esc(s.track||'?')}</div><div class="bar-tip-meta">${date}</div><div class="bar-tip-pos">${posLine} ${gainedLine}</div>`;
+    return`<div class="bar" style="height:${pct!=null?pct:20}%;background:${col}"><div class="bar-tip">${tipHtml}</div></div>`;
   }).join('');
   // meta
   const withPos=sliced.filter(s=>s.finish_pos!=null);
@@ -126,33 +111,33 @@ function renderGameForm(){
 function renderGameRecent(sessions){
   const el=document.getElementById('gf-recent');
   if(!sessions.length){el.innerHTML='<div style="color:var(--color-text-muted);font-size:var(--text-xs);padding:10px 0">No sessions yet</div>';return;}
-  el.innerHTML=sessions.map(s=>{
+  // Horizontal cards per Bundle 4 of the UX review. Each card is
+  // self-contained (no horizontal alignment with neighbors needed) so the
+  // user can scan them at a glance.
+  el.innerHTML=`<div class="ov-recent-cards">${sessions.map(s=>{
     const fp=s.finish_pos,gp=s.grid_pos;
-    let posHtml='';
-    if(gp!=null && gp>0){posHtml+=`<span class="recent-grid">P${gp}</span><span class="recent-arrow">→</span>`;}
-    if(fp!=null){const cls=fp===1?'p1':fp<=3?'podium':'ok';posHtml+=`<span class="ov-recent-pos ${cls}">P${fp}</span>`;}
+    const posCls=fp==null?'':(fp===1?'p1':fp<=3?'podium':'ok');
+    const posHtml=fp!=null?`<span class="ov-recent-pos ${posCls}">P${fp}</span>`:'<span class="ov-recent-pos none">—</span>';
     let gainedHtml='';
     if(fp!=null && gp!=null && gp>0){
       const g=gp-fp;
       const cls=g>0?'pos':g<0?'neg':'neu';
-      gainedHtml=`<span class="recent-gained ${cls}">${g>0?'+':''}${g}</span>`;
+      gainedHtml=`<div class="rc-gained ${cls}">${g>0?'+':''}${g} pos</div>`;
     }
+    const gridHtml=(gp!=null&&gp>0)?`<span class="rc-grid">from P${gp}</span>`:'';
+    const lap=s.best_lap_time_s?fmtLap(s.best_lap_time_s):'—';
     const href='/sessions/session?id='+encodeURIComponent(s.session_id)+'&game='+encodeURIComponent(s.game||'')+'&track='+encodeURIComponent(s.track||'');
-    return`<div class="ov-recent-row" onclick="location.href='${href}'">
-      <span class="ov-recent-circuit">${s.track&&s.track!=='unknown'?s.track:'Unknown Track'}</span>
-      <span class="ov-recent-date">${fmtDate(s.started_at)}</span>
-      <span class="ov-recent-lap">${fmtLap(s.best_lap_time_s)}</span>
-      ${posHtml}
+    return`<div class="rc" onclick="location.href='${href}'">
+      <div class="rc-date">${fmtDate(s.started_at)}</div>
+      <div class="rc-track">${s.track&&s.track!=='unknown'?esc(s.track):'Unknown Track'}</div>
+      <div class="rc-pos-row">${posHtml}${gridHtml}</div>
       ${gainedHtml}
+      <div class="rc-lap">${lap}</div>
     </div>`;
-  }).join('');
+  }).join('')}</div>`;
 }
 
-document.getElementById('gf-type').addEventListener('click',e=>{
-  const b=e.target.closest('.ftog');if(!b)return;
-  document.querySelectorAll('#gf-type .ftog').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');_gfType=b.dataset.val;loadGameForm();
-});
+// AI/Real type filter removed in Bundle 4 — Form chart always shows all races.
 document.getElementById('gf-last').addEventListener('click',e=>{
   const b=e.target.closest('.ftog');if(!b)return;
   document.querySelectorAll('#gf-last .ftog').forEach(x=>x.classList.remove('on'));
