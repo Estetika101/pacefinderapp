@@ -197,6 +197,12 @@ sudo journalctl -u pacefinder -f
 
 MIT — read it, run it, fork it.
 
+## Acknowledgements
+
+The bundled Forza car ordinal database (`data/fm8_cars.csv`) is sourced from
+[bluemanos/forza-motorsport-car-track-ordinal](https://github.com/bluemanos/forza-motorsport-car-track-ordinal).
+See [`NOTICE.md`](NOTICE.md) for the full attribution list.
+
 ---
 
 *Forza Motorsport is a trademark of Microsoft. Pacefinder is not affiliated with Microsoft.*
