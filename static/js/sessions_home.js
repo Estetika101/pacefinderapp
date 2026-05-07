@@ -185,7 +185,10 @@ function renderGames(games){
     const empty=!g.session_count;
     const last=fmtDate(g.last_played);
     const spark=sparkSVG(g.spark||[]);
-    return`<div class="gc${empty?' empty':''}" onclick="${empty?'':'location.href=\\'/sessions/game?name=\\'+encodeURIComponent(\\''+g.game+'\\')'}">
+    // Build the onclick separately to avoid escaping hell in the inline
+    // attribute. data-game is read by the click handler at the bottom.
+    const cls='gc'+(empty?' empty':'');
+    return`<div class="${cls}" data-game="${g.game}">
       <div class="gc-name">${label}</div>
       <div class="gc-desc">${desc}</div>
       <div class="gc-stats">
@@ -197,6 +200,12 @@ function renderGames(games){
       <div class="gc-last">${last?('Last: '+last+(g.last_played_track?' &bull; '+g.last_played_track:'')):'No sessions yet'}</div>
     </div>`;
   }).join('');
+  // Delegated click — non-empty cards navigate to that game's overview.
+  grid.querySelectorAll('.gc:not(.empty)').forEach(el=>{
+    el.addEventListener('click',()=>{
+      location.href='/sessions/game?name='+encodeURIComponent(el.dataset.game);
+    });
+  });
 }
 
 // ── Recent feed ───────────────────────────────────────────────
