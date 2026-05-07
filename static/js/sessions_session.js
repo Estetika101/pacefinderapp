@@ -69,15 +69,18 @@ function renderLeftRail(){
   // THIS SESSION block
   // Only render the THIS SESSION pill when we have a real car name —
   // otherwise it reads as noise ("Unknown Car / PI 900 / real").
-  // Use the resolved name when known; fall back to "Unknown Car (#ord)"
-  // so the rail at least identifies an unmapped car. Only hide the pill
-  // when we have neither a name nor an ordinal.
-  let carName=null;
+  // Render priority: user nickname > resolved name > "Unknown Car (#ord)".
+  // When a nickname is set AND we have a resolved name, show the resolved
+  // name as a small subtitle so the user can still identify the actual car.
+  let resolvedName=null;
   if(s.car&&s.car!=='unknown'&&!/^Unknown Car/i.test(s.car)){
-    carName=s.car;
+    resolvedName=s.car;
   }else if(s.car_ordinal!=null){
-    carName=`Unknown Car (#${s.car_ordinal})`;
+    resolvedName=`Unknown Car (#${s.car_ordinal})`;
   }
+  const nick=s.car_nickname||null;
+  const carName=nick||resolvedName;
+  const subtitle=(nick&&resolvedName&&nick!==resolvedName)?resolvedName:null;
   const cls=s.car_class!=null?CLASS_NAMES[s.car_class]:null;
   const pi=s.car_pi;
   const dt=s.drivetrain_type!=null?DRIVETRAIN_LABELS[s.drivetrain_type]:null;
@@ -88,7 +91,7 @@ function renderLeftRail(){
   const badgesEl=document.getElementById('lr-badges');
   if(carName){
     thisBlock.style.display='';
-    carEl.textContent=carName;
+    carEl.innerHTML=carName + (subtitle?`<div style="font-size:.65rem;color:var(--color-text-muted);font-weight:normal;margin-top:2px">${subtitle}</div>`:'');
     let badges='';
     if(cls)badges+=`<span class="cc cc-${cls}">${cls}</span>`;
     if(pi)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">PI ${pi}</span>`;
@@ -236,6 +239,17 @@ async function openEdit(){
   // Pre-fill the car free-text input. "Unknown Car" passes through unchanged
   // so the user can keep it as-is or replace it with the real name.
   document.getElementById('edit-car').value=(_sess.car && _sess.car!=='unknown')?_sess.car:'';
+  // Nickname row: only meaningful when we have a car_ordinal — otherwise
+  // there's nothing to key the nickname to.
+  const nickRow=document.getElementById('edit-nickname-row');
+  const nickInput=document.getElementById('edit-nickname');
+  if(_sess.car_ordinal!=null){
+    nickRow.style.display='';
+    nickInput.value=_sess.car_nickname||'';
+  }else{
+    nickRow.style.display='none';
+    nickInput.value='';
+  }
   _editTrack=cur;
   _editRaceType=_sess.race_type||_sess.session_type||null;
   // Default weather to Dry per spec; tyre has no default.
@@ -326,6 +340,15 @@ async function saveEdit(){
   const car=document.getElementById('edit-car').value.trim();
   body.car=car;  // empty string clears the override; "Unknown Car" passes through
   await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  // Nickname is keyed to car_ordinal, not the session — separate POST.
+  // Empty string deletes the nickname (matches server-side semantics).
+  if(_sess.car_ordinal!=null){
+    const nick=document.getElementById('edit-nickname').value.trim();
+    if(nick !== (_sess.car_nickname||'')){
+      await fetch('/cars/nickname',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ordinal:_sess.car_ordinal, nickname:nick})});
+    }
+  }
   closeEdit();
   const d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());
   if(d.session){_sess=d.session;_laps=d.laps||[];renderHeader();}
