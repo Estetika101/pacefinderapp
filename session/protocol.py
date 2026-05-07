@@ -23,6 +23,17 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
 
         parsed = self.parser(data)
         if not parsed:
+            # Discriminate between a real format failure (wrong size or unparseable
+            # bytes) and an intentional skip (parser returns None when is_race_on=0,
+            # i.e. the user is in a menu / pause / replay). Same-sized Forza packets
+            # are valid — we just don't have a race to record into. Silence those
+            # to keep the log focused on real problems.
+            forza_known_size = (
+                self.game == "forza_motorsport"
+                and len(data) in (FM_PACKET_SIZE, FM_PACKET_SIZE_FH)
+            )
+            if forza_known_size:
+                return
             count = state["udp_rejected"].get(self.game, 0) + 1
             state["udp_rejected"][self.game] = count
             state["last_rejected_size"][self.game] = len(data)
