@@ -1,3 +1,4 @@
+import gzip
 import json
 import math as _math
 import sqlite3
@@ -990,6 +991,37 @@ def normalize_lap_samples(samples: list) -> tuple:
     return norm_samples, dist_m_out
 
 
+# ─── gzip wrappers for samples blobs ──────────────────────────────────────────
+# Per docs/specs/storage-compression-and-field-expansion.md.
+#
+# The lap_samples and track_references columns are declared TEXT (legacy) but
+# SQLite stores BLOBs in TEXT columns just fine when given bytes. We sniff the
+# first byte on read: 0x1f = gzip magic, otherwise treat as legacy uncompressed
+# JSON text. New writes are always gzipped. No schema migration needed.
+_GZIP_MAGIC = b"\x1f\x8b"
+
+
+def _encode_samples(payload: list) -> bytes:
+    """JSON → gzip bytes. Use compresslevel=6 (default) — good ratio, fast."""
+    return gzip.compress(json.dumps(payload).encode("utf-8"))
+
+
+def _decode_samples(raw) -> list:
+    """Decode whatever's in the row: gzip bytes (new) or JSON text (legacy)."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        # Legacy uncompressed JSON text — pre-compression rows.
+        return json.loads(raw)
+    if isinstance(raw, (bytes, bytearray, memoryview)):
+        b = bytes(raw)
+        if b.startswith(_GZIP_MAGIC):
+            return json.loads(gzip.decompress(b).decode("utf-8"))
+        # Bytes-but-not-gzip = legacy text stored as bytes (sqlite can do that)
+        return json.loads(b.decode("utf-8"))
+    raise TypeError(f"unexpected samples_json type: {type(raw).__name__}")
+
+
 def _db_save_lap_samples(session_id: str, lap_number: int,
                           samples: list, dist_m: list):
     with _db_lock:
@@ -1000,7 +1032,7 @@ def _db_save_lap_samples(session_id: str, lap_number: int,
                    (session_id, lap_number, samples_json, distance_m_json, created_at)
                    VALUES (?,?,?,?,?)""",
                 (session_id, lap_number,
-                 json.dumps(samples), json.dumps(dist_m),
+                 _encode_samples(samples), _encode_samples(dist_m),
                  datetime.now().isoformat())
             )
             conn.commit()
@@ -1019,8 +1051,8 @@ def _db_get_lap_samples(session_id: str, lap_number: int) -> Optional[dict]:
             ).fetchone()
             if row:
                 return {
-                    "samples": json.loads(row["samples_json"]),
-                    "distance_m": json.loads(row["distance_m_json"]),
+                    "samples": _decode_samples(row["samples_json"]),
+                    "distance_m": _decode_samples(row["distance_m_json"]),
                 }
             return None
         finally:
@@ -1248,7 +1280,7 @@ def update_track_references(track: str, game: str):
                        VALUES (?,?,?,?,?,?)""",
                     (track, "best_lap",
                      best_row["session_id"], best_row["lap_number"],
-                     json.dumps(best_data["samples"]),
+                     _encode_samples(best_data["samples"]),
                      datetime.now().isoformat()),
                 )
                 conn.commit()
@@ -1300,7 +1332,7 @@ def update_track_references(track: str, game: str):
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (track, "theoretical",
                  None, None,
-                 json.dumps(stitched),
+                 _encode_samples(stitched),
                  s1_t, best_meta[0]["session_id"], best_meta[0]["lap"],
                  s2_t, best_meta[1]["session_id"], best_meta[1]["lap"],
                  s3_t, best_meta[2]["session_id"], best_meta[2]["lap"],
