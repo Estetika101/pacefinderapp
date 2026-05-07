@@ -289,44 +289,38 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
       <input class="edit-sel" id="edit-track" placeholder="Search or type track name"></div>
     <div class="edit-row"><label class="edit-lbl">Car</label>
       <input class="edit-sel" id="edit-car" placeholder="e.g. 2018 Honda Civic Type R" autocomplete="off"></div>
-    <!-- Type / Weather / Tyres on a single horizontal row to compact the modal. -->
-    <div class="edit-row edit-row-multi">
-      <div class="edit-col">
-        <label class="edit-lbl">Type</label>
-        <div class="edit-chips">
-          <button class="etype" data-val="practice" onclick="editSelType(this)">Practice</button>
-          <button class="etype" data-val="qualifying" onclick="editSelType(this)">Qualifying</button>
-          <button class="etype" data-val="race" onclick="editSelType(this)">Race</button>
-          <button class="etype" data-val="race_ai" onclick="editSelType(this)">AI Race</button>
-          <button class="etype" data-val="hot_lap" onclick="editSelType(this)">Hot Lap</button>
-          <button class="etype" data-val="time_trial" onclick="editSelType(this)">Time Trial</button>
-        </div>
-      </div>
-      <div class="edit-col">
-        <label class="edit-lbl">Weather</label>
-        <div class="edit-chips" id="edit-weather-chips">
-          <button class="etype" data-val="Dry"  onclick="editSelWeather(this)">Dry</button>
-          <button class="etype" data-val="Damp" onclick="editSelWeather(this)">Damp</button>
-          <button class="etype" data-val="Wet"  onclick="editSelWeather(this)">Wet</button>
-          <button class="etype" data-val="Snow" onclick="editSelWeather(this)">Snow</button>
-        </div>
-      </div>
-      <div class="edit-col">
-        <label class="edit-lbl">Tyres</label>
-        <div class="edit-chips" id="edit-tyre-chips">
-          <button class="etype" data-val="Street"   onclick="editSelTyre(this)">Street</button>
-          <button class="etype" data-val="Sport"    onclick="editSelTyre(this)">Sport</button>
-          <button class="etype" data-val="Race"     onclick="editSelTyre(this)">Race</button>
-          <button class="etype" data-val="Slick"    onclick="editSelTyre(this)">Slick</button>
-          <button class="etype" data-val="Rally"    onclick="editSelTyre(this)">Rally</button>
-          <button class="etype" data-val="Off-Road" onclick="editSelTyre(this)">Off-Road</button>
-          <button class="etype" data-val="Drag"     onclick="editSelTyre(this)">Drag</button>
-        </div>
-      </div>
-    </div>
     <div class="edit-row" id="edit-nickname-row" style="display:none">
       <label class="edit-lbl">Nickname <span style="font-weight:normal;text-transform:none;color:var(--color-text-muted)">(applies to every session in this car)</span></label>
       <input class="edit-sel" id="edit-nickname" placeholder="e.g. Lady Bug, Dreamliner" autocomplete="off" maxlength="40">
+    </div>
+    <div class="edit-row"><label class="edit-lbl">Type</label>
+      <div class="edit-chips">
+        <button class="etype" data-val="practice" onclick="editSelType(this)">Practice</button>
+        <button class="etype" data-val="qualifying" onclick="editSelType(this)">Qualifying</button>
+        <button class="etype" data-val="race" onclick="editSelType(this)">Race</button>
+        <button class="etype" data-val="race_ai" onclick="editSelType(this)">AI Race</button>
+        <button class="etype" data-val="hot_lap" onclick="editSelType(this)">Hot Lap</button>
+        <button class="etype" data-val="time_trial" onclick="editSelType(this)">Time Trial</button>
+      </div>
+    </div>
+    <div class="edit-row"><label class="edit-lbl">Weather</label>
+      <div class="edit-chips" id="edit-weather-chips">
+        <button class="etype" data-val="Dry"  onclick="editSelWeather(this)">Dry</button>
+        <button class="etype" data-val="Damp" onclick="editSelWeather(this)">Damp</button>
+        <button class="etype" data-val="Wet"  onclick="editSelWeather(this)">Wet</button>
+        <button class="etype" data-val="Snow" onclick="editSelWeather(this)">Snow</button>
+      </div>
+    </div>
+    <div class="edit-row"><label class="edit-lbl">Tyres</label>
+      <div class="edit-chips" id="edit-tyre-chips">
+        <button class="etype" data-val="Street"   onclick="editSelTyre(this)">Street</button>
+        <button class="etype" data-val="Sport"    onclick="editSelTyre(this)">Sport</button>
+        <button class="etype" data-val="Race"     onclick="editSelTyre(this)">Race</button>
+        <button class="etype" data-val="Slick"    onclick="editSelTyre(this)">Slick</button>
+        <button class="etype" data-val="Rally"    onclick="editSelTyre(this)">Rally</button>
+        <button class="etype" data-val="Off-Road" onclick="editSelTyre(this)">Off-Road</button>
+        <button class="etype" data-val="Drag"     onclick="editSelTyre(this)">Drag</button>
+      </div>
     </div>
     <div class="edit-row" id="edit-conditions-row" style="display:none">
       <label class="edit-lbl">Conditions</label>
