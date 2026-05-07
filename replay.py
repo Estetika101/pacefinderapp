@@ -8,6 +8,7 @@ The script auto-detects the game from the first packet size when --game is omitt
 With --csv it writes a CSV of all samples to stdout.
 With --summary it prints per-lap stats.
 """
+from __future__ import annotations
 
 import argparse
 import csv
