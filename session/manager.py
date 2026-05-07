@@ -344,23 +344,28 @@ class Session:
 
     def _transition_lap(self, new_lap: int, lap_time_s: Optional[float] = None):
         if self.current_lap is not None:
+            # Log what Forza gave us BEFORE close() applies its wall-clock
+            # fallback, so when laps go missing later we can see whether the
+            # cause was a bogus last_lap_time, a None, or a sub-MIN_VALID
+            # value from Forza itself.
+            samples_n = len(self.current_lap.samples)
+            wall_dur = time.time() - self.current_lap.started_at
             self.current_lap.close(lap_time_s)
             if lap_time_s:
                 if self.best_lap_time_s is None or lap_time_s < self.best_lap_time_s:
                     self.best_lap_time_s = lap_time_s
                 # Live-delta reference: rebuild only when an in-session lap
-                # beats our prior in-session best. Skip out-laps and partials.
-                if (lap_time_s >= MIN_VALID_LAP_S and self.current_lap.lap_number > 0
+                # beats our prior in-session best. Skip partials (no
+                # lap_number guard — Forza uses lap_number=0 for race lap 1).
+                if (lap_time_s >= MIN_VALID_LAP_S
                         and (self._delta_ref_time_s is None or lap_time_s < self._delta_ref_time_s)):
                     self._rebuild_delta_reference(self.current_lap, lap_time_s)
-            self.completed_laps.append(self.current_lap)
             _log.info(
-                f"[{self.game}] Lap {self.current_lap.lap_number} complete | "
-                f"time={lap_time_s:.3f}s | samples={len(self.current_lap.samples)}"
-                if lap_time_s else
-                f"[{self.game}] Lap {self.current_lap.lap_number} complete | "
-                f"samples={len(self.current_lap.samples)}"
+                f"[{self.game}] Lap transition L{self.current_lap.lap_number}->L{new_lap} | "
+                f"raw last_lap_time={lap_time_s} | stored lap_time_s={self.current_lap.lap_time_s} | "
+                f"wall_clock={wall_dur:.2f}s | samples={samples_n}"
             )
+            self.completed_laps.append(self.current_lap)
         self.current_lap_num = new_lap
         self.current_lap = LapRecord(new_lap)
 
@@ -439,20 +444,29 @@ class Session:
             self.completed_laps.append(self.current_lap)
 
         # Drop incomplete laps before computing best / best_lap-derived stats.
-        # An OUT LAP (lap_number=0) is the partial run from pit-exit to the
-        # start/finish line — its time is not a representative lap pace.
-        # MIN_VALID_LAP_S (config.py) filters anything obviously partial that
-        # slipped through with a non-zero lap_number.
+        # MIN_VALID_LAP_S (config.py) filters anything obviously partial.
+        # NOTE: Forza Motorsport uses lap_number=0 for the FIRST race lap
+        # (not for an out-lap), so we deliberately do NOT filter on
+        # lap_number > 0 here — that bug used to drop the entire first lap
+        # of every Forza race. ACC's pit-exit out-lap is not relevant since
+        # ACC support is parked (see docs/specs/park-acc-f1.md). If/when ACC
+        # comes back, gate the lap_number > 0 check on game == "acc".
         completed_before = len(self.completed_laps)
-        self.completed_laps = [
-            lap for lap in self.completed_laps
-            if lap.lap_number > 0
-            and lap.lap_time_s is not None
-            and lap.lap_time_s >= MIN_VALID_LAP_S
-        ]
-        dropped = completed_before - len(self.completed_laps)
-        if dropped:
-            _log.info(f"[{self.game}] Dropped {dropped} incomplete lap(s) (out-laps or <20s)")
+        kept: list = []
+        dropped_detail: list = []
+        for lap in self.completed_laps:
+            if lap.lap_time_s is not None and lap.lap_time_s >= MIN_VALID_LAP_S:
+                kept.append(lap)
+            else:
+                dropped_detail.append(
+                    f"L{lap.lap_number}={lap.lap_time_s if lap.lap_time_s is not None else 'None'}"
+                )
+        self.completed_laps = kept
+        if dropped_detail:
+            _log.info(
+                f"[{self.game}] Dropped {len(dropped_detail)} incomplete lap(s) "
+                f"(<{MIN_VALID_LAP_S}s): {', '.join(dropped_detail)}"
+            )
 
         # Recompute best_lap_time_s from the filtered list — without this,
         # an out-lap's 13s could persist as the session's "best".
