@@ -25,7 +25,7 @@ from net.pages.admin import ADMIN_HTML
 from net.pages.sessions import (
     GAMES_HTML, TRACKS_HTML,
     TRACK_DETAIL_HTML_PRE, TRACK_DETAIL_HTML_POST,
-    SESSION_DETAIL_HTML_PRE, SESSION_DETAIL_HTML_POST,
+    SESSION_DETAIL_HTML_PRE, SESSION_DETAIL_HTML_MID, SESSION_DETAIL_HTML_POST,
 )
 from net.pages.telemetry import TELEMETRY_HTML
 from net.pages.debug import DEBUG_RAW_HTML, DEBUG_PERF_HTML
@@ -294,7 +294,17 @@ _PAGE_STYLE = '<link rel="stylesheet" href="/static/tokens.css"><link rel="style
 TRACK_DETAIL_HTML = TRACK_DETAIL_HTML_PRE + json.dumps(FM2023_TRACKS, ensure_ascii=False) + TRACK_DETAIL_HTML_POST
 
 
-SESSION_DETAIL_HTML = SESSION_DETAIL_HTML_PRE + json.dumps(FM2023_TRACKS, ensure_ascii=False) + SESSION_DETAIL_HTML_POST
+# CAR_CATALOG is the FORZA_CARS dict reduced to a sorted list of display
+# strings ("2018 Honda Civic Type R") for the autocomplete picker on the
+# session-edit modal. Sorted alphabetically so the dropdown reads naturally.
+_CAR_CATALOG = sorted({c["name"] for c in FORZA_CARS.values() if c.get("name")})
+SESSION_DETAIL_HTML = (
+    SESSION_DETAIL_HTML_PRE
+    + json.dumps(FM2023_TRACKS, ensure_ascii=False)
+    + SESSION_DETAIL_HTML_MID
+    + json.dumps(_CAR_CATALOG, ensure_ascii=False)
+    + SESSION_DETAIL_HTML_POST
+)
 
 
 # ─── AI Analysis ──────────────────────────────────────────────────────────────

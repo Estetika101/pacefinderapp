@@ -388,6 +388,11 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
 const TRACK_NAMES=
 """
 
+# CAR_CATALOG is spliced between the two halves below — see listener.py.
+SESSION_DETAIL_HTML_MID = """;
+const CAR_CATALOG=
+"""
+
 SESSION_DETAIL_HTML_POST = """;</script>
 <script src="/static/js/widgets/autocomplete.js"></script>
 <script src="/static/js/sessions_session.js"></script>
