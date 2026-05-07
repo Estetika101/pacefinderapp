@@ -50,18 +50,13 @@ GAMES_HTML = """<!DOCTYPE html>
     <div class="form-right">
       <div class="form-spark" id="trend-spark"></div>
       <div class="form-filters">
-        <div class="filter-group" id="type-filters">
-          <button class="ftog" data-val="real">Real</button>
-          <button class="ftog" data-val="ai">AI</button>
-          <button class="ftog on" data-val="all">All</button>
-        </div>
         <div class="filter-group" id="last-filters">
           <button class="ftog" data-val="5">Last 5</button>
           <button class="ftog on" data-val="10">Last 10</button>
           <button class="ftog" data-val="20">Last 20</button>
         </div>
       </div>
-      <div class="form-chart" id="form-chart"><div class="form-empty">No race data<small>Finish position data needed — check session race_type classification.</small></div></div>
+      <div class="form-chart" id="form-chart"><div class="form-empty">No race data<small>Finish a race to populate this chart.</small></div></div>
     </div>
   </div>
 
@@ -129,11 +124,10 @@ TRACKS_HTML = """<!DOCTYPE html>
         <!-- KPI cards -->
         <div class="kpi-row">
           <div class="kpi"><div class="kpi-label">Total Sessions</div><div class="kpi-val muted" id="gkv-total">—</div><div class="kpi-sub" id="gks-total">&nbsp;</div></div>
-          <div class="kpi"><div class="kpi-label">Avg Finish</div><div class="kpi-val blue" id="gkv-finish">—</div><div class="kpi-sub">Race lobbies</div></div>
+          <div class="kpi"><div class="kpi-label">Avg Finish</div><div class="kpi-val blue" id="gkv-finish">—</div><div class="kpi-sub">&nbsp;</div></div>
           <div class="kpi"><div class="kpi-label">Avg Pos Gained</div><div class="kpi-val" id="gkv-gained">—</div><div class="kpi-sub">From grid</div></div>
-          <div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-val amber" id="gkv-win">—</div><div class="kpi-sub">Real lobbies</div></div>
-          <div class="kpi"><div class="kpi-label">Podium Rate</div><div class="kpi-val green" id="gkv-podium">—</div><div class="kpi-sub">Real lobbies</div></div>
-          <div class="kpi"><div class="kpi-label">Best Lap</div><div class="kpi-val amber" id="gkv-best">—</div><div class="kpi-sub" id="gks-best">&nbsp;</div></div>
+          <div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-val amber" id="gkv-win">—</div><div class="kpi-sub">&nbsp;</div></div>
+          <div class="kpi"><div class="kpi-label">Podium Rate</div><div class="kpi-val green" id="gkv-podium">—</div><div class="kpi-sub">&nbsp;</div></div>
           <div class="kpi"><div class="kpi-label">Total Laps</div><div class="kpi-val muted" id="gkv-laps">—</div><div class="kpi-sub" id="gks-circuits">&nbsp;</div></div>
         </div>
         <!-- Performance Trend -->

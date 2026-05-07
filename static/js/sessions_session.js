@@ -65,16 +65,18 @@ function renderLeftRail(){
     return`<a class="lr-pill${active?' active':''}" href="${href}">${t.track==='unknown'?'Unknown':t.track}</a>`;
   }).join('');
   // THIS SESSION block
-  const carName=s.car&&s.car!=='unknown'?s.car:null;
+  // Only render the THIS SESSION pill when we have a real car name —
+  // otherwise it reads as noise ("Unknown Car / PI 900 / real").
+  const carName=s.car&&s.car!=='unknown'&&!/^Unknown Car/i.test(s.car)?s.car:null;
   const cls=s.car_class!=null?CLASS_NAMES[s.car_class]:null;
   const pi=s.car_pi;
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   const thisBlock=document.getElementById('lr-this');
   const carEl=document.getElementById('lr-car');
   const badgesEl=document.getElementById('lr-badges');
-  if(carName||cls||pi||effType){
+  if(carName){
     thisBlock.style.display='';
-    carEl.textContent=carName||'Unknown Car';
+    carEl.textContent=carName;
     let badges='';
     if(cls)badges+=`<span class="cc cc-${cls}">${cls}</span>`;
     if(pi)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">PI ${pi}</span>`;

@@ -143,12 +143,12 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
         <label class="ch-tog"><input type="checkbox" id="ch-tyre" onchange="renderAll()"> Tyres</label>
       </div>
     </div>
-    <div class="ctrl-section">
-      <div class="ctrl-lbl">X Axis</div>
-      <div class="xmode-btns">
-        <button class="xmode-btn active" id="xm-dist" onclick="setXMode('distance')">Distance</button>
-        <button class="xmode-btn" id="xm-time" onclick="setXMode('time')">Time</button>
-      </div>
+    <!-- X-axis toggle hidden until Time mode has a clear use case;
+         distance is the default per-distance industry standard.
+         Buttons kept off-page so setXMode() callers don't NPE. -->
+    <div class="xmode-btns" style="display:none">
+      <button class="xmode-btn active" id="xm-dist">Distance</button>
+      <button class="xmode-btn" id="xm-time">Time</button>
     </div>
   </div>
 </div>
