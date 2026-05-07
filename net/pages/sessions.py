@@ -130,15 +130,8 @@ TRACKS_HTML = """<!DOCTYPE html>
           <div class="kpi"><div class="kpi-label">Podium Rate</div><div class="kpi-val green" id="gkv-podium">—</div><div class="kpi-sub">&nbsp;</div></div>
           <div class="kpi"><div class="kpi-label">Total Laps</div><div class="kpi-val muted" id="gkv-laps">—</div><div class="kpi-sub" id="gks-circuits">&nbsp;</div></div>
         </div>
-        <!-- Performance Trend -->
-        <div class="ov-trend">
-          <div class="ov-trend-meta">
-            <div class="ov-trend-lbl">Performance Trend</div>
-            <div class="ov-trend-dir fl" id="gtd-dir">—</div>
-          </div>
-          <div class="ov-trend-spark" id="gtd-spark"></div>
-        </div>
-        <!-- Current Form -->
+        <!-- Current Form (with sparkline; Performance Trend was a duplicate
+             of this and got merged in Bundle 4 of the user UX review). -->
         <div class="ov-form">
           <div class="ov-form-left">
             <div class="ov-form-lbl">Current Form</div>
@@ -148,14 +141,9 @@ TRACKS_HTML = """<!DOCTYPE html>
           </div>
           <div class="ov-form-right">
             <div class="ov-ffilters">
-              <div class="ov-fgroup" id="gf-type">
-                <button class="ftog" data-val="real">Real</button>
-                <button class="ftog" data-val="ai">AI</button>
-                <button class="ftog on" data-val="all">All</button>
-              </div>
               <div class="ov-fgroup" id="gf-last">
-                <button class="ftog" data-val="5">Last 5</button>
-                <button class="ftog on" data-val="10">Last 10</button>
+                <button class="ftog on" data-val="5">Last 5</button>
+                <button class="ftog" data-val="10">Last 10</button>
                 <button class="ftog" data-val="20">Last 20</button>
               </div>
             </div>
