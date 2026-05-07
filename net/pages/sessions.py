@@ -245,6 +245,7 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/sessions_session.css">
+<link rel="stylesheet" href="/static/widgets/autocomplete.css">
 </head>
 <body>
 <div class="tb">
@@ -284,8 +285,7 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   <div class="edit-panel">
     <div class="edit-ttl">Edit Session</div>
     <div class="edit-row"><label class="edit-lbl">Track</label>
-      <input class="edit-sel" id="edit-track" list="edit-track-list" placeholder="Search or type track name" autocomplete="off">
-      <datalist id="edit-track-list"></datalist></div>
+      <input class="edit-sel" id="edit-track" placeholder="Search or type track name"></div>
     <div class="edit-row"><label class="edit-lbl">Car</label>
       <input class="edit-sel" id="edit-car" placeholder="e.g. 2018 Honda Civic Type R" autocomplete="off"></div>
     <div class="edit-row" id="edit-nickname-row" style="display:none">
@@ -389,6 +389,7 @@ const TRACK_NAMES=
 """
 
 SESSION_DETAIL_HTML_POST = """;</script>
+<script src="/static/js/widgets/autocomplete.js"></script>
 <script src="/static/js/sessions_session.js"></script>
 </body>
 </html>

@@ -221,6 +221,7 @@ async function runAnalysis(force){
 }
 // ── Edit modal ────────────────────────────────────────────────
 let _editTrack='',_editRaceType=null,_editWeather='Dry',_editTyre=null;
+let _trackAc=null;  // Autocomplete widget instance for the track field; reused across opens.
 async function openEdit(){
   if(!_sess)return;
   const cur=_sess.track&&_sess.track!=='unknown'?_sess.track:'';
@@ -233,9 +234,19 @@ async function openEdit(){
     if(!Array.isArray(tracks)||!tracks.length)tracks=TRACK_NAMES;
   }catch(e){tracks=TRACK_NAMES;}
   if(cur && !tracks.includes(cur))tracks=[...tracks,cur].sort();
-  const dl=document.getElementById('edit-track-list');
-  dl.innerHTML=tracks.map(t=>`<option value="${t.replace(/"/g,'&quot;')}"></option>`).join('');
-  document.getElementById('edit-track').value=cur;
+  // Autocomplete widget (replaces the old <datalist>). Attached once and
+  // reused; setOptions on subsequent opens so newly-learned tracks show up.
+  const trackInput=document.getElementById('edit-track');
+  if(!_trackAc){
+    _trackAc=Autocomplete.attach(trackInput,{
+      options:tracks,
+      allowFreeText:true,
+      initialValue:cur,
+    });
+  }else{
+    _trackAc.setOptions(tracks);
+    trackInput.value=cur;
+  }
   // Pre-fill the car free-text input. "Unknown Car" passes through unchanged
   // so the user can keep it as-is or replace it with the real name.
   document.getElementById('edit-car').value=(_sess.car && _sess.car!=='unknown')?_sess.car:'';
