@@ -127,14 +127,15 @@ es.onmessage=e=>{
   $('t-last').textContent=fmt(d.last_lap_time_s);
   $('t-lap').textContent=d.lap!=null?'L'+d.lap:'—';
 
-  // delta to best
+  // Live in-race delta vs this session's best lap (computed server-side per
+  // packet from the best-lap distance→time timeline). Null on lap 1 (no
+  // reference yet) and outside the lap bounds.
   const dEl=$('t-delta');
-  if(d.current_lap_time!=null&&d.best_lap_time_s!=null){
-    const delta=d.current_lap_time-d.best_lap_time_s;
+  const delta=d.delta_to_best_s;
+  if(delta!=null){
     const sign=delta<0?'':'+';
-    dEl.textContent=sign+delta.toFixed(3)+'s';
+    dEl.textContent=sign+delta.toFixed(2)+'s';
     dEl.className='delta-val '+(delta<-0.01?'ahead':delta>0.01?'behind':'even');
-    // flash delta when significantly behind pace
     if(recv&&delta>1.5) flash('t-delta');
   } else {
     dEl.textContent='—'; dEl.className='delta-val even';
