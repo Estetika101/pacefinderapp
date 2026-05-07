@@ -184,16 +184,35 @@ function renderHeader(){
     el.style.color = g>0?'var(--color-green)' : g<0?'var(--color-red)' : '';
     gainedStat.style.display='';
   }
-  // Weather + tyre compound badges (set via the edit modal)
+  // Weather + tyre compound chips (set via the edit modal). Always render
+  // them — when the user hasn't set them yet, show a dim placeholder
+  // ("Tyres?" / "Weather?") so the slot is discoverable instead of hidden.
+  // Click the placeholder to open the edit modal and set it.
   const wxEl=document.getElementById('hdr-weather');
   if(wxEl){
-    if(s.weather_condition){wxEl.textContent=s.weather_condition;wxEl.style.display='';}
-    else wxEl.style.display='none';
+    if(s.weather_condition){
+      wxEl.textContent=s.weather_condition;
+      wxEl.className='type-chip';
+      wxEl.onclick=null;
+    }else{
+      wxEl.textContent='Weather?';
+      wxEl.className='type-chip placeholder';
+      wxEl.onclick=openEdit;
+    }
+    wxEl.style.display='';
   }
   const tyEl=document.getElementById('hdr-tyre');
   if(tyEl){
-    if(s.tyre_compound){tyEl.textContent=s.tyre_compound;tyEl.style.display='';}
-    else tyEl.style.display='none';
+    if(s.tyre_compound){
+      tyEl.textContent=s.tyre_compound;
+      tyEl.className='type-chip';
+      tyEl.onclick=null;
+    }else{
+      tyEl.textContent='Tyres?';
+      tyEl.className='type-chip placeholder';
+      tyEl.onclick=openEdit;
+    }
+    tyEl.style.display='';
   }
 }
 function renderLaps(){
