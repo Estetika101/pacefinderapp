@@ -1,7 +1,9 @@
 # Install instructions audit + fix
 
 ## Purpose
-Install copy across the in-app `/setup` page, the README, and the marketing site has drifted out of sync as the project evolved. A first-time Mac user just hit a hard 404 by following the suggested install command, and the Linux/Pi block on `/setup` still references the pre-rename `simtelemetry` systemd unit. Audit every install/setup surface, fix the broken bits, and align all three places to the same source of truth.
+Install copy in the in-app `/setup` page and the README has drifted as the project evolved. A first-time Mac user hit a hard 404 by following the suggested install command, and the Linux/Pi block on `/setup` still references the pre-rename `simtelemetry` systemd unit. Audit every install/setup surface in this repo, fix the broken bits, and align with the README.
+
+> **Marketing site sync** (the `pacefinder.app#install` block) is tracked separately in the marketing repo — see the repo-split rule in [docs/specs/README.md](README.md). This spec covers the app-side surfaces only.
 
 ## Behavior
 
@@ -34,22 +36,20 @@ Install copy across the in-app `/setup` page, the README, and the marketing site
 - [ ] `/setup` storage-path placeholder text matches the README's stated default
 - [ ] README `Quick Start` commands match `/setup` Quick Start (same clone URL, same script names)
 - [ ] README `Auto-start` commands match `/setup` (same migration footnote, same status/logs commands)
-- [ ] Marketing site `pacefinder.app#install` block matches both — same commands, same paths, same systemd unit name
 - [ ] README `Game Setup` section's port (5300) and packet format (Car Dash) match the in-app `/setup` instructions
 - [ ] No remaining references to "simtelemetry" anywhere in user-facing copy except in the migration footnote
 
 ### Source-of-truth choice
-The README is the canonical source today and is the most up-to-date. Mirror it into `/setup` and the marketing site rather than the other way around. Going forward, when install steps change, update the README first, then sync to the other two surfaces in the same PR.
+The README is the canonical source today and is the most up-to-date. Mirror it into `/setup`. Going forward, when install steps change, update the README first, then sync `/setup` in the same PR. The marketing site is a separate-repo concern.
 
 ### Acceptance
 - Following the `/setup` Mac block on a clean Mac produces a working installation
 - Following the `/setup` Linux block on a clean Pi produces a working `pacefinder.service`
 - `grep -ri "simtelemetry" net/pages/setup.py` returns only the storage-path placeholder + the config-file name (both legitimate — those names didn't get renamed)
-- All three surfaces (README, `/setup`, marketing site) prescribe the same commands
+- The two app-side surfaces (README, `/setup`) prescribe the same commands
 
 ## Scope
 - Edit `net/pages/setup.py` to fix the Mac 404 and the Linux unit-name drift
-- Edit the marketing site (`pacefinder` repo) to match
 - Confirm README accuracy after edits
 - No code-behavior changes; pure copy
 
@@ -60,8 +60,7 @@ The README is the canonical source today and is the most up-to-date. Mirror it i
 - Renaming the storage-path default `/mnt/usb/simtelemetry` (same — would break)
 
 ## Cross-repo work
-- `pacefinderapp`: setup page edits + README accuracy check
-- `pacefinder` (marketing): install block sync
+- `pacefinderapp` only — marketing-site sync is a separate concern handled in the marketing repo
 
 ## Open questions
 - For the Mac install instruction, should we suggest `bash install-mac.sh` after `git clone`, or `./install-mac.sh` (with `chmod +x` already done in-repo)? Recommend `bash install-mac.sh` — matches the README, doesn't depend on file mode.
