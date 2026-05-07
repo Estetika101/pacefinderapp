@@ -137,6 +137,23 @@ function renderHeader(){
   document.getElementById('hdr-sub').textContent=(s.game||'').replace(/_/g,' ')+' · '+fmtDt(s.started_at);
   document.getElementById('hdr-best').textContent=fmtLap(s.best_lap_time_s);
   document.getElementById('hdr-laps').textContent=_laps.length;
+  // Car chip — nickname takes priority, fall back to resolved name, then to
+  // the raw ordinal so unmapped cars are still identifiable. Mirrors the
+  // priority logic used by the THIS SESSION pill in the left rail.
+  const carEl=document.getElementById('hdr-car');
+  if(carEl){
+    let txt=null,sub=null;
+    if(s.car_nickname){txt=s.car_nickname;sub=s.car&&!/^Unknown Car/i.test(s.car)?s.car:null;}
+    else if(s.car && s.car!=='unknown' && !/^Unknown Car/i.test(s.car)){txt=s.car;}
+    else if(s.car_ordinal!=null){txt=`Car #${s.car_ordinal}`;}
+    if(txt){
+      carEl.textContent=txt;
+      carEl.title=sub||'';  // hover reveals the resolved name when nickname shown
+      carEl.style.display='';
+    }else{
+      carEl.style.display='none';
+    }
+  }
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   if(effType){
     const el=document.getElementById('hdr-type');

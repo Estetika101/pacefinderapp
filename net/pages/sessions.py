@@ -275,6 +275,7 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   <div class="hdr-stat" id="hdr-grid-stat" style="display:none"><div class="v" id="hdr-grid">&mdash;</div><div class="l">Grid</div></div>
   <div class="hdr-stat" id="hdr-finish-stat" style="display:none"><div class="v" id="hdr-finish">&mdash;</div><div class="l">Finish</div></div>
   <div class="hdr-stat" id="hdr-gained-stat" style="display:none"><div class="v" id="hdr-gained">&mdash;</div><div class="l">Gained</div></div>
+  <span class="type-chip" id="hdr-car" style="display:none" title=""></span>
   <span class="type-chip" id="hdr-type" style="display:none"></span>
   <span class="type-chip" id="hdr-weather" style="display:none"></span>
   <span class="type-chip" id="hdr-tyre" style="display:none"></span>
