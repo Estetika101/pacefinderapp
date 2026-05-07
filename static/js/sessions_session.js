@@ -140,18 +140,19 @@ function renderHeader(){
 }
 function renderLaps(){
   const best=_sess.best_lap_time_s;
-  const validTimes=_laps.filter(l=>l.lap_number>0&&l.lap_time_s).map(l=>l.lap_time_s);
+  // Forza UDP lap_number is 0-indexed; lap 0 IS race lap 1, not an out-lap.
+  // Drop the lap_number > 0 / OUT LAP carve-outs (those were ACC-style and
+  // ACC support is parked).
+  const validTimes=_laps.filter(l=>l.lap_time_s).map(l=>l.lap_time_s);
   validTimes.sort((a,b)=>a-b);
   const median=validTimes.length?validTimes[Math.floor(validTimes.length/2)]:null;
   document.getElementById('lap-tbody').innerHTML=_laps.map(l=>{
-    const isOut=l.lap_number===0;
-    const isSlow=!isOut&&median&&l.lap_time_s&&l.lap_time_s>median*1.4;
-    const isB=!isOut&&best&&l.lap_time_s&&Math.abs(l.lap_time_s-best)<0.001;
+    const isSlow=median&&l.lap_time_s&&l.lap_time_s>median*1.4;
+    const isB=best&&l.lap_time_s&&Math.abs(l.lap_time_s-best)<0.001;
     const rowCls=[isB?'best-row':'',isSlow?'outlier-row':''].filter(Boolean).join(' ');
-    const lapNumHtml=isOut?`<span class="out-lap-lbl">OUT LAP</span>`:l.lap_number;
-    const timeHtml=isOut?`<span class="out-lap-time">${fmtLap(l.lap_time_s)}</span>`:(isSlow?`<span class="outlier-time">${fmtLap(l.lap_time_s)}</span>`:fmtLap(l.lap_time_s));
+    const timeHtml=isSlow?`<span class="outlier-time">${fmtLap(l.lap_time_s)}</span>`:fmtLap(l.lap_time_s);
     return `<tr class="${rowCls}">
-      <td>${lapNumHtml}</td>
+      <td>${l.lap_number != null ? l.lap_number + 1 : '—'}</td>
       <td>${timeHtml}</td>
       <td>${l.max_speed_mph!=null?l.max_speed_mph.toFixed(1)+' mph':'—'}</td>
       <td>${l.avg_throttle!=null?l.avg_throttle.toFixed(1)+'%':'—'}</td>

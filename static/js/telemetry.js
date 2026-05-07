@@ -1,4 +1,7 @@
 // ── State ──────────────────────────────────────────────────────────────────
+// Forza UDP lap_number is 0-indexed (race lap 1 = lap_number 0). Match
+// Forza's on-screen 1-indexed display when rendering. ACC is parked.
+const lapLabel = n => 'L' + (Number(n) + 1);
 const _id=new URLSearchParams(location.search).get('id')||'';
 const _sgame=new URLSearchParams(location.search).get('game')||'';
 const _strack=new URLSearchParams(location.search).get('track')||'';
@@ -35,7 +38,7 @@ function isRefLap(lapNum){
     return _refMeta.best_lap.lap_number===lapNum;
   }
   if(_refType==='last_lap'){
-    const valid=_laps.filter(l=>l.lap_number>0 && l.lap_time_s);
+    const valid=_laps.filter(l=>l.lap_time_s);
     if(!valid.length)return false;
     return valid[valid.length-1].lap_number===lapNum;
   }
@@ -291,7 +294,7 @@ function secTime(samples,lo,hi){
 }
 // ── Sector header ─────────────────────────────────────────────────────────
 function renderSectorHdr(){
-  const lapEntries=_selectedLaps.map(ln=>({ln,s:_lapSamples[ln],col:LAP_COLORS[_selectedLaps.indexOf(ln)],lbl:'L'+ln,isRef:isRefLap(ln)}));
+  const lapEntries=_selectedLaps.map(ln=>({ln,s:_lapSamples[ln],col:LAP_COLORS[_selectedLaps.indexOf(ln)],lbl:lapLabel(ln),isRef:isRefLap(ln)}));
   const nonRefCount=lapEntries.filter(l=>!l.isRef).length;
   const showDelta=!!_refSamples&&nonRefCount>0;
   const secs=[[0,1/3,'S1'],[1/3,2/3,'S2'],[2/3,1,'S3']];
@@ -658,7 +661,7 @@ function setXMode(m){
 }
 // ── Lap selector ──────────────────────────────────────────────────────────
 function _partialThresh(){
-  const validTimes=_laps.filter(l=>l.lap_number>0&&l.lap_time_s).map(l=>l.lap_time_s);
+  const validTimes=_laps.filter(l=>l.lap_time_s).map(l=>l.lap_time_s);
   if(validTimes.length<2)return 0;
   const sorted=[...validTimes].sort((a,b)=>a-b);
   const median=sorted[Math.floor(sorted.length/2)];
@@ -667,7 +670,8 @@ function _partialThresh(){
 function renderLapList(){
   const best=_sess.best_lap_time_s;
   const pThresh=_partialThresh();
-  $('lap-list').innerHTML=_laps.filter(l=>l.lap_time_s&&l.lap_number>0).map(l=>{
+  // Forza lap_number=0 IS race lap 1 — drop the lap_number > 0 carve-out.
+  $('lap-list').innerHTML=_laps.filter(l=>l.lap_time_s).map(l=>{
     const ci=_selectedLaps.indexOf(l.lap_number);
     const checked=ci>=0;
     const col=checked?LAP_COLORS[ci]:'#444';
@@ -678,7 +682,7 @@ function renderLapList(){
     return`<label class="lap-item">
       <input type="checkbox" ${checked?'checked':''} onchange="onLapToggle(${l.lap_number},this.checked)">
       <span class="lap-swatch" style="background:${col}"></span>
-      Lap ${l.lap_number}${bestMark}${partialMark}
+      Lap ${l.lap_number + 1}${bestMark}${partialMark}
       <span class="lap-time-s">${fmtLap(l.lap_time_s)}</span>
     </label>`;
   }).join('');
@@ -734,7 +738,7 @@ async function fetchRef(){
   try{
     let d;
     if(_refType==='last_lap'){
-      const valid=_laps.filter(l=>l.lap_number>0 && l.lap_time_s);
+      const valid=_laps.filter(l=>l.lap_time_s);
       if(!valid.length){_refSamples=null;setRefStatus('No completed laps to reference yet.');return;}
       const lastLap=valid[valid.length-1];
       d=await fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_id)+'&lap='+lastLap.lap_number).then(r=>r.json());
@@ -792,11 +796,12 @@ async function csToggleSession(el){
   el.classList.add('expanded');
   try{
     const d=await fetch('/sessions/session/data?id='+encodeURIComponent(sid)).then(r=>r.json());
-    const laps=(d.laps||[]).filter(l=>l.lap_number>0 && l.lap_time_s);
+    const laps=(d.laps||[]).filter(l=>l.lap_time_s);
     if(!laps.length){lapsEl.innerHTML='<div class="cs-empty" style="padding:6px">No valid laps in this session.</div>';return;}
     lapsEl.innerHTML=laps.map(l=>{
       const dt=d.session && d.session.started_at ? fmtDt(d.session.started_at) : '';
-      return`<div class="cs-lap" data-sid="${sid}" data-lap="${l.lap_number}" data-label="${dt} · L${l.lap_number} ${fmtLap(l.lap_time_s)}" onclick="csPickLap(this)">L${l.lap_number} — ${fmtLap(l.lap_time_s)}</div>`;
+      const lbl=lapLabel(l.lap_number);
+      return`<div class="cs-lap" data-sid="${sid}" data-lap="${l.lap_number}" data-label="${dt} · ${lbl} ${fmtLap(l.lap_time_s)}" onclick="csPickLap(this)">${lbl} — ${fmtLap(l.lap_time_s)}</div>`;
     }).join('');
   }catch(e){lapsEl.innerHTML='<div class="cs-empty" style="padding:6px">Error loading laps.</div>';}
 }
@@ -855,7 +860,7 @@ async function init(){
   $('bc-sess').href=sessHref;
   // Best lap default — skip partial laps
   const best=_sess.best_lap_time_s;
-  const validLaps=_laps.filter(l=>l.lap_number>0&&l.lap_time_s);
+  const validLaps=_laps.filter(l=>l.lap_time_s);
   const pThreshInit=_partialThresh();
   const nonPartialLaps=pThreshInit>0?validLaps.filter(l=>l.lap_time_s>=pThreshInit):validLaps;
   const bestLap=nonPartialLaps.find(l=>best&&Math.abs(l.lap_time_s-best)<0.001)||nonPartialLaps[0]||validLaps[0];
@@ -870,10 +875,10 @@ async function init(){
     if(_refMeta.best_lap&&$('ref-sel').options[1])$('ref-sel').options[1].text='My Best — '+fmtLap(_refMeta.best_lap.lap_time_s);
     if(_refMeta.theoretical&&$('ref-sel').options[2])$('ref-sel').options[2].text='Theoretical — '+fmtLap(_refMeta.theoretical.theoretical_best_s);
     // Last Lap option label — most recent completed lap of THIS session
-    const validLaps=_laps.filter(l=>l.lap_number>0 && l.lap_time_s);
+    const validLaps=_laps.filter(l=>l.lap_time_s);
     if(validLaps.length && $('ref-sel').options[3]){
       const lastLap=validLaps[validLaps.length-1];
-      $('ref-sel').options[3].text='Last Lap — L'+lastLap.lap_number+' '+fmtLap(lastLap.lap_time_s);
+      $('ref-sel').options[3].text='Last Lap — '+lapLabel(lastLap.lap_number)+' '+fmtLap(lastLap.lap_time_s);
     }
     // Auto-skip partial reference
     if(_refMeta.best_lap&&pThreshInit>0&&_refMeta.best_lap.lap_time_s<pThreshInit){
