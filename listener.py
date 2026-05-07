@@ -334,6 +334,19 @@ async def main(demo_mode: bool = False):
     _db_initialize(_DEMO_DB_PATH_REF, storage_path, FORZA_TRACKS, FORZA_CARS, log)
     _db_init()
     load_forza_reference_data()
+    # FORZA_CARS is populated by load_forza_reference_data(); SESSION_DETAIL_HTML
+    # was computed at module-import time when the dict was still empty. Rebuild
+    # it now so CAR_CATALOG (and TRACK_NAMES) reflect the loaded data.
+    global SESSION_DETAIL_HTML, TRACK_DETAIL_HTML
+    _car_catalog = sorted({c["name"] for c in FORZA_CARS.values() if c.get("name")})
+    SESSION_DETAIL_HTML = (
+        SESSION_DETAIL_HTML_PRE
+        + json.dumps(FM2023_TRACKS, ensure_ascii=False)
+        + SESSION_DETAIL_HTML_MID
+        + json.dumps(_car_catalog, ensure_ascii=False)
+        + SESSION_DETAIL_HTML_POST
+    )
+    TRACK_DETAIL_HTML = TRACK_DETAIL_HTML_PRE + json.dumps(FM2023_TRACKS, ensure_ascii=False) + TRACK_DETAIL_HTML_POST
     _db_cull_ghost_sessions()
     _db_backfill_track_names()
     threading.Thread(target=_backfill_lap_samples, daemon=True).start()
