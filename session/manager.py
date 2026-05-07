@@ -58,11 +58,17 @@ class LapRecord:
         self.samples      = []
         self.max_speed    = 0.0
         self.sector_times = []
+        # First packet's distance_traveled (cumulative-since-race-start). Used
+        # as the lap-start zero so the live delta can compute "meters into the
+        # current lap" each packet without recomputing from positions.
+        self.start_distance_m: Optional[float] = None
 
     def add_sample(self, parsed: dict):
         speed = parsed.get("speed_mph", 0)
         if speed > self.max_speed:
             self.max_speed = speed
+        if self.start_distance_m is None and parsed.get("distance_traveled") is not None:
+            self.start_distance_m = parsed["distance_traveled"]
         sample = {
             "t":            round(parsed.get("current_lap_time", parsed.get("_t", 0)), 3),
             "speed_mph":    round(parsed.get("speed_mph", 0), 1),
@@ -77,6 +83,8 @@ class LapRecord:
             "g_lat":        round(parsed.get("g_lat", 0), 3),
             "g_lon":        round(parsed.get("g_lon", 0), 3),
         }
+        if parsed.get("distance_traveled") is not None:
+            sample["distance_traveled_m"] = round(parsed["distance_traveled"], 2)
         if parsed.get("position_x") is not None:
             sample["px"] = round(parsed["position_x"], 2)
             sample["py"] = round(parsed["position_y"], 2)
@@ -148,6 +156,13 @@ class Session:
         # the mode-of-history helper otherwise.
         self._last_crt: Optional[float] = None
         self._grid_pos_at_start: Optional[int] = None
+
+        # Live in-race delta vs THIS session's best lap — see
+        # update_state(). Snapshotted from the session-best lap whenever a
+        # new best is set in _transition_lap. None on lap 1 (no reference).
+        self._delta_ref_time_s: Optional[float] = None
+        self._delta_ref_timeline: list = []   # list[(dist_m_in_lap, t_s)]
+        self._delta_ref_total_m: float = 0.0
 
         raw_path = storage_path() / "raw" / f"{self.session_id}.bin"
         try:
@@ -333,6 +348,11 @@ class Session:
             if lap_time_s:
                 if self.best_lap_time_s is None or lap_time_s < self.best_lap_time_s:
                     self.best_lap_time_s = lap_time_s
+                # Live-delta reference: rebuild only when an in-session lap
+                # beats our prior in-session best. Skip out-laps and partials.
+                if (lap_time_s >= MIN_VALID_LAP_S and self.current_lap.lap_number > 0
+                        and (self._delta_ref_time_s is None or lap_time_s < self._delta_ref_time_s)):
+                    self._rebuild_delta_reference(self.current_lap, lap_time_s)
             self.completed_laps.append(self.current_lap)
             _log.info(
                 f"[{self.game}] Lap {self.current_lap.lap_number} complete | "
@@ -343,6 +363,30 @@ class Session:
             )
         self.current_lap_num = new_lap
         self.current_lap = LapRecord(new_lap)
+
+    def _rebuild_delta_reference(self, lap: LapRecord, lap_time_s: float):
+        """Snapshot a (dist_in_lap, t) timeline from the new session-best lap
+        so update_state() can compute live delta on subsequent packets."""
+        samples = lap.samples
+        start_d = lap.start_distance_m
+        if not samples or start_d is None:
+            return
+        timeline: list = []
+        for s in samples:
+            d = s.get("distance_traveled_m")
+            if d is None:
+                continue
+            timeline.append((d - start_d, s["t"]))
+        if len(timeline) < 2:
+            return
+        self._delta_ref_time_s = lap_time_s
+        self._delta_ref_timeline = timeline
+        self._delta_ref_total_m = timeline[-1][0]
+        _log.info(
+            f"[{self.game}] live-delta reference rebuilt from lap "
+            f"{lap.lap_number} ({lap_time_s:.3f}s, {len(timeline)} pts, "
+            f"{self._delta_ref_total_m:.0f}m)"
+        )
 
     def _infer_forza_session_type(self) -> str:
         positions = self._race_positions
@@ -537,6 +581,9 @@ state = {
     "fuel_remaining_laps": None,
     "current_lap_time": None,
     "last_lap_time_s":  None,
+    # Live delta vs THIS session's best lap (negative = ahead, positive = behind).
+    # Populated when a session-best is set and we're past lap 1; null otherwise.
+    "delta_to_best_s":  None,
     "tyre_fl":          None,
     "tyre_fr":          None,
     "tyre_rl":          None,
@@ -554,6 +601,30 @@ active_sessions: dict = {}
 # Latest fully-parsed packet, exposed via /debug/raw for live field inspection.
 # Mutable dict so the router can read it without an import cycle.
 last_parsed: dict = {}
+
+
+def _interp_dist_to_t(timeline: list, target_d: float) -> Optional[float]:
+    """Binary-search a sorted (dist_m, t_s) timeline for the bracket
+    containing target_d, then linear-interp t between the two samples."""
+    if not timeline:
+        return None
+    if target_d <= timeline[0][0]:
+        return timeline[0][1]
+    if target_d >= timeline[-1][0]:
+        return timeline[-1][1]
+    lo, hi = 0, len(timeline) - 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if timeline[mid][0] < target_d:
+            lo = mid + 1
+        else:
+            hi = mid
+    d1, t1 = timeline[lo]
+    d0, t0 = timeline[lo - 1]
+    if d1 == d0:
+        return t1
+    f = (target_d - d0) / (d1 - d0)
+    return t0 + f * (t1 - t0)
 
 
 def update_state(game: str, session: Session, parsed: dict):
@@ -610,6 +681,27 @@ def update_state(game: str, session: Session, parsed: dict):
     state["current_lap_time"]    = parsed.get("current_lap_time", state["current_lap_time"])
     if parsed.get("last_lap_time"):
         state["last_lap_time_s"] = parsed["last_lap_time"]
+
+    # Live in-race delta vs THIS session's best lap.
+    # Reference is rebuilt in _transition_lap whenever a new in-session best
+    # is set. We need: a reference timeline, the current lap's start distance,
+    # and the current packet's distance_traveled + current_lap_time.
+    delta_val = None
+    if (_driving
+            and session._delta_ref_timeline
+            and session.current_lap is not None
+            and session.current_lap.start_distance_m is not None):
+        cur_d = parsed.get("distance_traveled")
+        cur_t = parsed.get("current_lap_time")
+        if cur_d is not None and cur_t is not None and cur_t > 0:
+            d_in_lap = cur_d - session.current_lap.start_distance_m
+            # Allow a small overshoot past lap end (5%) so the delta is visible
+            # right at the finish line rather than blanking on the last sample.
+            if 0 <= d_in_lap <= session._delta_ref_total_m * 1.05:
+                ref_t = _interp_dist_to_t(session._delta_ref_timeline, d_in_lap)
+                if ref_t is not None:
+                    delta_val = round(cur_t - ref_t, 2)
+    state["delta_to_best_s"] = delta_val
     for corner in ("fl", "fr", "rl", "rr"):
         v = parsed.get(f"tire_temp_{corner}")
         if v is None:
