@@ -586,7 +586,12 @@ def make_handler(ctx: dict):
                         writer.write(_http_response("200 OK", "application/json",
                                                     json.dumps(decoded).encode()))
                     else:
-                        writer.write(_http_response("404 Not Found", "application/json", b"[]"))
+                        # No row yet for this track is normal (first session at
+                        # a track, or before track_references is computed) —
+                        # not a real "not found." Return an empty array as 200
+                        # so it doesn't show up as a red 404 in dev tools. The
+                        # client treats [] and 404+[] identically anyway.
+                        writer.write(_http_response("200 OK", "application/json", b"[]"))
 
             elif path == "/sessions/lap-samples":
                 qs = {k: urllib.parse.unquote_plus(v)
@@ -606,7 +611,11 @@ def make_handler(ctx: dict):
                         writer.write(_http_response("200 OK", "application/json",
                                                     json.dumps(data["samples"]).encode()))
                     else:
-                        writer.write(_http_response("404 Not Found", "application/json", b"[]"))
+                        # Lap with no stored samples is normal for older sessions
+                        # that pre-date the lap_samples migration — return an
+                        # empty array as 200 so it doesn't read as a real error
+                        # in dev tools. Client treats [] and 404+[] identically.
+                        writer.write(_http_response("200 OK", "application/json", b"[]"))
 
             elif path == "/sessions/update" and method == "POST":
                 try:
