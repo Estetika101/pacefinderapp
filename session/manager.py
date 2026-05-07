@@ -135,6 +135,12 @@ class Session:
         self.track_ordinal: Optional[int] = None
         self.car_class: Optional[int] = None
         self.car_pi: Optional[int] = None
+        # Raw UDP fields kept verbatim — surface ordinal even when name
+        # lookup fails ("Unknown Car (#641)") and let the UI render
+        # drivetrain (FWD/RWD/AWD) + cylinders.
+        self.car_ordinal: Optional[int] = None
+        self.drivetrain_type: Optional[int] = None
+        self.num_cylinders: Optional[int] = None
         self.car_manufacturer: Optional[str] = None
         self.car_year: Optional[int] = None
         self.weather_condition: Optional[str] = None
@@ -226,6 +232,12 @@ class Session:
                 self.car_class = int(parsed["car_class"])
         if parsed.get("car_performance_index") is not None and self.car_pi is None:
             self.car_pi = int(parsed["car_performance_index"])
+        if parsed.get("car_ordinal") is not None and self.car_ordinal is None:
+            self.car_ordinal = int(parsed["car_ordinal"])
+        if parsed.get("drivetrain_type") is not None and self.drivetrain_type is None:
+            self.drivetrain_type = int(parsed["drivetrain_type"])
+        if parsed.get("num_cylinders") is not None and self.num_cylinders is None:
+            self.num_cylinders = int(parsed["num_cylinders"])
         if parsed.get("weather_condition") and self.weather_condition is None:
             self.weather_condition = parsed["weather_condition"]
         if parsed.get("track_temp_c") is not None and self.track_temp_c is None:
@@ -530,6 +542,9 @@ class Session:
             "track_ordinal":    self.track_ordinal,
             "car_class":        self.car_class,
             "car_pi":           self.car_pi,
+            "car_ordinal":      self.car_ordinal,
+            "drivetrain_type":  self.drivetrain_type,
+            "num_cylinders":    self.num_cylinders,
             "car_manufacturer": self.car_manufacturer,
             "car_year":         self.car_year,
             "weather_condition": self.weather_condition,

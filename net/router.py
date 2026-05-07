@@ -405,7 +405,8 @@ def make_handler(ctx: dict):
                         sess_row = conn.execute(
                             "SELECT session_id,game,track,car,session_type,race_type,started_at,ended_at,"
                             "best_lap_time_s,lap_count,ai_analysis,ai_analyzed_at,ai_model,"
-                            "car_class,car_pi,finish_pos,grid_pos,weather_condition,track_temp_c,air_temp_c "
+                            "car_class,car_pi,car_ordinal,drivetrain_type,num_cylinders,"
+                            "finish_pos,grid_pos,weather_condition,track_temp_c,air_temp_c "
                             "FROM sessions WHERE session_id=?", (sid,)
                         ).fetchone()
                         lap_rows = conn.execute(
@@ -421,15 +422,23 @@ def make_handler(ctx: dict):
                                                 json.dumps({"error": "Session not found"}).encode()))
                 else:
                     sess_dict = dict(sess_row)
-                    # Resolve car ordinal stored as numeric string to full name
+                    # Resolve the car name. Two legacy cases + the new
+                    # car_ordinal column from Bundle 2:
+                    #   1) `car` stored as a numeric string → look up
+                    #   2) `car` is "Unknown Car" (or "unknown") AND we now
+                    #      have car_ordinal → re-attempt lookup; if still
+                    #      unmapped, surface the raw ordinal so the user can
+                    #      identify it (see issue #6 / cars bundle)
                     car_val = sess_dict.get("car", "")
+                    car_ord = sess_dict.get("car_ordinal")
                     if car_val and isinstance(car_val, str) and car_val.isdigit():
-                        ordinal = int(car_val)
-                        car_info = FORZA_CARS.get(ordinal)
+                        car_ord = int(car_val)
+                    if car_ord is not None:
+                        car_info = FORZA_CARS.get(int(car_ord))
                         if car_info:
                             sess_dict["car"] = f"{car_info.get('year','')} {car_info['name']}".strip()
-                        else:
-                            sess_dict["car"] = f"Unknown car ({car_val})"
+                        elif not car_val or car_val.lower().startswith("unknown") or (isinstance(car_val, str) and car_val.isdigit()):
+                            sess_dict["car"] = f"Unknown Car (#{car_ord})"
                     laps = [dict(r) for r in lap_rows]
                     writer.write(_http_response("200 OK", "application/json",
                                                 json.dumps({"session": sess_dict, "laps": laps}).encode()))

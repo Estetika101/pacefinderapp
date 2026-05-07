@@ -1,4 +1,6 @@
 const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap'};
+// Forza drivetrain_type spec: 0=FWD, 1=RWD, 2=AWD.
+const DRIVETRAIN_LABELS={0:'FWD',1:'RWD',2:'AWD'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function scls(v){return v>0.25?'crit':v>0.12?'warn':'';}
@@ -67,9 +69,19 @@ function renderLeftRail(){
   // THIS SESSION block
   // Only render the THIS SESSION pill when we have a real car name —
   // otherwise it reads as noise ("Unknown Car / PI 900 / real").
-  const carName=s.car&&s.car!=='unknown'&&!/^Unknown Car/i.test(s.car)?s.car:null;
+  // Use the resolved name when known; fall back to "Unknown Car (#ord)"
+  // so the rail at least identifies an unmapped car. Only hide the pill
+  // when we have neither a name nor an ordinal.
+  let carName=null;
+  if(s.car&&s.car!=='unknown'&&!/^Unknown Car/i.test(s.car)){
+    carName=s.car;
+  }else if(s.car_ordinal!=null){
+    carName=`Unknown Car (#${s.car_ordinal})`;
+  }
   const cls=s.car_class!=null?CLASS_NAMES[s.car_class]:null;
   const pi=s.car_pi;
+  const dt=s.drivetrain_type!=null?DRIVETRAIN_LABELS[s.drivetrain_type]:null;
+  const cyl=s.num_cylinders;
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   const thisBlock=document.getElementById('lr-this');
   const carEl=document.getElementById('lr-car');
@@ -80,6 +92,8 @@ function renderLeftRail(){
     let badges='';
     if(cls)badges+=`<span class="cc cc-${cls}">${cls}</span>`;
     if(pi)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">PI ${pi}</span>`;
+    if(dt)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">${dt}</span>`;
+    if(cyl)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">${cyl}cyl</span>`;
     if(effType)badges+=`<span class="type-chip" style="font-size:.55rem">${TYPE_LABELS[effType]||effType}</span>`;
     badgesEl.innerHTML=badges;
   }
