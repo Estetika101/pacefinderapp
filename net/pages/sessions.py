@@ -300,6 +300,10 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
       <datalist id="edit-track-list"></datalist></div>
     <div class="edit-row"><label class="edit-lbl">Car</label>
       <input class="edit-sel" id="edit-car" placeholder="e.g. 2018 Honda Civic Type R" autocomplete="off"></div>
+    <div class="edit-row" id="edit-nickname-row" style="display:none">
+      <label class="edit-lbl">Nickname <span style="font-weight:normal;text-transform:none;color:var(--color-text-muted)">(applies to every session in this car)</span></label>
+      <input class="edit-sel" id="edit-nickname" placeholder="e.g. Lady Bug, Dreamliner" autocomplete="off" maxlength="40">
+    </div>
     <div class="edit-row"><label class="edit-lbl">Type</label>
       <div class="edit-chips">
         <button class="etype" data-val="practice" onclick="editSelType(this)">Practice</button>

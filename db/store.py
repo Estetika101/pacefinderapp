@@ -119,6 +119,11 @@ def _db_init():
                     created_at  TEXT,
                     PRIMARY KEY (ordinal, game)
                 );
+                CREATE TABLE IF NOT EXISTS car_nicknames (
+                    ordinal    INTEGER PRIMARY KEY,
+                    nickname   TEXT NOT NULL,
+                    updated_at TEXT
+                );
                 CREATE INDEX IF NOT EXISTS idx_laps_session  ON laps(session_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_track ON sessions(track);
                 CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(started_at);
@@ -264,6 +269,50 @@ def _effective_tracks() -> dict:
     result = dict(_forza_tracks)
     result.update(_learned_ordinals_cache)
     return result
+
+
+# ─── Car nicknames (per ordinal) ─────────────────────────────────────────────
+
+
+def _db_get_car_nickname(ordinal: int) -> Optional[str]:
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            row = conn.execute(
+                "SELECT nickname FROM car_nicknames WHERE ordinal=?", (ordinal,)
+            ).fetchone()
+            return row["nickname"] if row else None
+        finally:
+            conn.close()
+
+
+def _db_get_car_nicknames() -> dict:
+    """Return {ordinal: nickname} for every car the user has named."""
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            rows = conn.execute("SELECT ordinal, nickname FROM car_nicknames").fetchall()
+            return {r["ordinal"]: r["nickname"] for r in rows}
+        finally:
+            conn.close()
+
+
+def _db_set_car_nickname(ordinal: int, nickname: Optional[str]):
+    """Insert/replace a nickname; pass nickname=None or '' to delete."""
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            if nickname:
+                conn.execute(
+                    "INSERT OR REPLACE INTO car_nicknames (ordinal, nickname, updated_at) "
+                    "VALUES (?,?,?)",
+                    (int(ordinal), nickname.strip(), datetime.now().isoformat()),
+                )
+            else:
+                conn.execute("DELETE FROM car_nicknames WHERE ordinal=?", (int(ordinal),))
+            conn.commit()
+        finally:
+            conn.close()
 
 
 # ─── Race Type Classification ─────────────────────────────────────────────────

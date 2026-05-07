@@ -68,6 +68,9 @@ def make_handler(ctx: dict):
     db_drop_last_lap       = ctx["db_drop_last_lap"]
     db_delete_session      = ctx["db_delete_session"]
     db_write_learned_ordinal = ctx["db_write_learned_ordinal"]
+    db_get_car_nickname = ctx["db_get_car_nickname"]
+    db_get_car_nicknames = ctx["db_get_car_nicknames"]
+    db_set_car_nickname = ctx["db_set_car_nickname"]
     db_get_lap_samples     = ctx["db_get_lap_samples"]
     build_inject_packets   = ctx["build_inject_packets"]
     build_analysis_prompt  = ctx["build_analysis_prompt"]
@@ -295,6 +298,26 @@ def make_handler(ctx: dict):
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps(result).encode()))
 
+            elif path == "/cars/nicknames" and method == "GET":
+                # Full {ordinal: nickname} map. Cheap lookup; no pagination.
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(db_get_car_nicknames()).encode()))
+
+            elif path == "/cars/nickname" and method == "POST":
+                # Body: {"ordinal": int, "nickname": "..."}; nickname=""/null deletes.
+                try:
+                    body = json.loads(raw_body) if raw_body else {}
+                    ordinal = int(body.get("ordinal"))
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    writer.write(_http_response("400 Bad Request", "application/json",
+                                                json.dumps({"error": "ordinal required"}).encode()))
+                else:
+                    nick = body.get("nickname")
+                    db_set_car_nickname(ordinal, nick if nick else None)
+                    writer.write(_http_response("200 OK", "application/json",
+                                                json.dumps({"ok": True, "ordinal": ordinal,
+                                                            "nickname": nick or None}).encode()))
+
             elif path == "/sessions/form":
                 qs = {k: urllib.parse.unquote_plus(v)
                       for pair in query_string.split("&") if "=" in pair
@@ -439,6 +462,10 @@ def make_handler(ctx: dict):
                             sess_dict["car"] = f"{car_info.get('year','')} {car_info['name']}".strip()
                         elif not car_val or car_val.lower().startswith("unknown") or (isinstance(car_val, str) and car_val.isdigit()):
                             sess_dict["car"] = f"Unknown Car (#{car_ord})"
+                        # Bundle 3: surface user-set nickname for this ordinal
+                        # so the UI can display it in priority over the
+                        # resolved/fallback name (see Bundle 3 PR).
+                        sess_dict["car_nickname"] = db_get_car_nickname(int(car_ord))
                     laps = [dict(r) for r in lap_rows]
                     writer.write(_http_response("200 OK", "application/json",
                                                 json.dumps({"session": sess_dict, "laps": laps}).encode()))
