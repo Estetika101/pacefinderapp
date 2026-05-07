@@ -138,6 +138,22 @@ def _db_init():
                     conn.commit()
                 except Exception:
                     pass
+            # Per-lap precomputed aggregates so /sessions/session/data can be
+            # served by a single SQL query instead of re-reading <sid>_laps.json
+            # from disk and iterating every sample on each request.
+            # See docs/specs/perf-session-data-precompute.md.
+            for col, defn in [
+                ("avg_throttle",   "REAL"),
+                ("avg_brake",      "REAL"),
+                ("avg_slip",       "REAL"),
+                ("peak_slip",      "REAL"),
+                ("slip_above_pct", "REAL"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE laps ADD COLUMN {col} {defn}")
+                    conn.commit()
+                except Exception:
+                    pass
         finally:
             conn.close()
     _db_migrate()
@@ -470,13 +486,49 @@ def _db_write_session(session_data: dict):
             conn.execute("DELETE FROM laps WHERE session_id=?", (sid,))
             for lap in laps:
                 conn.execute("""
-                    INSERT INTO laps (session_id,lap_number,lap_time_s,max_speed_mph,sample_count)
-                    VALUES (?,?,?,?,?)
+                    INSERT INTO laps (session_id,lap_number,lap_time_s,max_speed_mph,sample_count,
+                                      avg_throttle,avg_brake,avg_slip,peak_slip,slip_above_pct)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)
                 """, (sid, lap.get("lap_number"), lap.get("lap_time_s"),
-                      lap.get("max_speed_mph"), lap.get("sample_count", 0)))
+                      lap.get("max_speed_mph"), lap.get("sample_count", 0),
+                      lap.get("avg_throttle"), lap.get("avg_brake"),
+                      lap.get("avg_slip"), lap.get("peak_slip"),
+                      lap.get("slip_above_pct")))
             conn.commit()
         finally:
             conn.close()
+
+
+# ─── Per-lap aggregates (precomputed at session close) ───────────────────────
+
+
+def compute_lap_aggregates(samples: list) -> dict:
+    """Compute the per-lap aggregates served by /sessions/session/data.
+
+    Same numbers the old in-handler iteration produced — just hoisted out
+    so they can be precomputed at session close (and during backfill) and
+    served by a pure SQL query instead of recomputing on every request.
+    See docs/specs/perf-session-data-precompute.md.
+    """
+    n = len(samples)
+    if not n:
+        return {
+            "avg_throttle": None, "avg_brake": None,
+            "avg_slip": None, "peak_slip": None, "slip_above_pct": None,
+        }
+    throttle  = [s.get("throttle_pct", 0) for s in samples]
+    brake     = [s.get("brake_pct", 0)    for s in samples]
+    slip_vals = [(abs(s.get("slip_rl", 0)) + abs(s.get("slip_rr", 0))) / 2
+                 for s in samples]
+    sv_sorted = sorted(slip_vals)
+    p99_idx   = max(0, int(n * 0.99) - 1)
+    return {
+        "avg_throttle":   round(sum(throttle)  / n, 1),
+        "avg_brake":      round(sum(brake)     / n, 1),
+        "avg_slip":       round(sum(slip_vals) / n, 4),
+        "peak_slip":      round(sv_sorted[p99_idx], 4),
+        "slip_above_pct": round(sum(1 for v in slip_vals if v > 0.1) / n * 100, 1),
+    }
 
 
 # ─── Session Queries ──────────────────────────────────────────────────────────

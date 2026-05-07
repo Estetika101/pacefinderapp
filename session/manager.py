@@ -13,6 +13,7 @@ from db.store import (
     _db_write_session,
     _store_session_lap_samples,
     _update_track_references_bg,
+    compute_lap_aggregates,
 )
 from reference.loader import FORZA_CARS
 
@@ -479,6 +480,9 @@ class Session:
                 "lap_time_s":    lap.lap_time_s,
                 "max_speed_mph": lap.max_speed,
                 "sample_count":  len(lap.samples),
+                # Per-lap aggregates precomputed once at close so
+                # /sessions/session/data is a pure SQL query.
+                **compute_lap_aggregates(lap.samples),
             }
             for lap in self.completed_laps
         ]

@@ -390,6 +390,11 @@ def make_handler(ctx: dict):
                     }).encode()))
 
             elif path == "/sessions/session/data":
+                # Pure-SQL handler — per-lap aggregates are precomputed at session
+                # close (see compute_lap_aggregates in db/store.py). Was reading
+                # <sid>_laps.json from disk and iterating every sample on each
+                # request, which made p95 500–1450 ms. See PR #63 / spec
+                # docs/specs/perf-session-data-precompute.md.
                 qs = {k: urllib.parse.unquote_plus(v)
                       for pair in query_string.split("&") if "=" in pair
                       for k, v in [pair.split("=", 1)]}
@@ -403,6 +408,12 @@ def make_handler(ctx: dict):
                             "car_class,car_pi,finish_pos,grid_pos,weather_condition,track_temp_c,air_temp_c "
                             "FROM sessions WHERE session_id=?", (sid,)
                         ).fetchone()
+                        lap_rows = conn.execute(
+                            "SELECT lap_number,lap_time_s,max_speed_mph,"
+                            "avg_throttle,avg_brake,avg_slip,peak_slip,slip_above_pct "
+                            "FROM laps WHERE session_id=? ORDER BY lap_number",
+                            (sid,)
+                        ).fetchall() if sess_row else []
                     finally:
                         conn.close()
                 if not sess_row:
@@ -419,60 +430,9 @@ def make_handler(ctx: dict):
                             sess_dict["car"] = f"{car_info.get('year','')} {car_info['name']}".strip()
                         else:
                             sess_dict["car"] = f"Unknown car ({car_val})"
-                    laps_file = storage_path() / "sessions" / f"{sid}_laps.json"
-                    _debug = {
-                        "sid": sid,
-                        "laps_file": str(laps_file),
-                        "file_exists": laps_file.exists(),
-                    }
-                    try:
-                        raw_laps = json.loads(laps_file.read_text())
-                        _debug["raw_lap_count"] = len(raw_laps)
-                        _debug["first_lap_keys"] = list(raw_laps[0].keys()) if raw_laps else []
-                        log.info(f"[session/data] {sid}: {laps_file} exists={_debug['file_exists']}, "
-                                 f"{len(raw_laps)} raw laps, "
-                                 f"finish_pos={sess_dict.get('finish_pos')} race_type={sess_dict.get('race_type')} "
-                                 f"session_type={sess_dict.get('session_type')}")
-                    except OSError:
-                        raw_laps = []
-                        _debug["error"] = "OSError — file not found or unreadable"
-                        log.warning(f"[session/data] {sid}: _laps.json NOT FOUND at {laps_file}")
-                    except Exception as exc:
-                        raw_laps = []
-                        _debug["error"] = str(exc)
-                        log.error(f"[session/data] {sid}: error reading _laps.json: {exc}")
-                    computed_laps = []
-                    for lap in raw_laps:
-                        samples  = lap.get("samples", [])
-                        n        = len(samples)
-                        lap_time = lap.get("lap_time_s")
-                        row = {
-                            "lap_number":    lap.get("lap_number"),
-                            "lap_time_s":    lap_time,
-                            "max_speed_mph": lap.get("max_speed_mph"),
-                        }
-                        if n:
-                            throttle   = [s.get("throttle_pct", 0) for s in samples]
-                            brake      = [s.get("brake_pct", 0)    for s in samples]
-                            slip_vals  = [(abs(s.get("slip_rl", 0)) + abs(s.get("slip_rr", 0))) / 2
-                                          for s in samples]
-                            row["avg_throttle"]   = round(sum(throttle) / n, 1)
-                            row["avg_brake"]      = round(sum(brake)    / n, 1)
-                            row["avg_slip"]       = round(sum(slip_vals) / n, 4)
-                            _sv_sorted = sorted(slip_vals)
-                            _p99_idx = max(0, int(len(_sv_sorted) * 0.99) - 1)
-                            row["peak_slip"]      = round(_sv_sorted[_p99_idx], 4)
-                            row["slip_above_pct"] = round(
-                                sum(1 for v in slip_vals if v > 0.1) / n * 100, 1)
-                        else:
-                            row["avg_throttle"] = row["avg_brake"] = None
-                            row["avg_slip"] = row["peak_slip"] = row["slip_above_pct"] = None
-                        computed_laps.append(row)
-                    _debug["computed_lap_count"] = len(computed_laps)
-                    log.info(f"[session/data] {sid}: returning {len(computed_laps)} computed laps")
+                    laps = [dict(r) for r in lap_rows]
                     writer.write(_http_response("200 OK", "application/json",
-                                                json.dumps({"session": sess_dict, "laps": computed_laps,
-                                                            "_debug": _debug}).encode()))
+                                                json.dumps({"session": sess_dict, "laps": laps}).encode()))
 
             elif path == "/sessions/laps":
                 qs = {k: urllib.parse.unquote_plus(v)
