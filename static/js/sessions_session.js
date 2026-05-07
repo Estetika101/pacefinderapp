@@ -1,4 +1,18 @@
-const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap'};
+// race_type values land here from db.store._classify_race_type — primarily
+// `real` (humans present), `ai` (AI grid), `time_trial` (no position changes,
+// <=3 laps). Older code also wrote `race`, `race_ai`, etc. — keep those for
+// backward compat with sessions classified before the rename.
+const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Race',ai:'AI Race'};
+// Maps race_type to a color-modifier class on .type-chip. Folds older synonyms
+// (race_ai → t-ai, race_online → t-race, etc.) onto the canonical buckets.
+function typeChipClass(t){
+  if(t==='real'||t==='race'||t==='race_online')return 't-race';
+  if(t==='ai'||t==='race_ai')return 't-ai';
+  if(t==='time_trial')return 't-time_trial';
+  if(t==='practice')return 't-practice';
+  if(t==='hot_lap')return 't-hot_lap';
+  return '';
+}
 // Forza drivetrain_type spec: 0=FWD, 1=RWD, 2=AWD.
 const DRIVETRAIN_LABELS={0:'FWD',1:'RWD',2:'AWD'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
@@ -97,7 +111,7 @@ function renderLeftRail(){
     if(pi)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">PI ${pi}</span>`;
     if(dt)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">${dt}</span>`;
     if(cyl)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">${cyl}cyl</span>`;
-    if(effType)badges+=`<span class="type-chip" style="font-size:.55rem">${TYPE_LABELS[effType]||effType}</span>`;
+    if(effType)badges+=`<span class="type-chip ${typeChipClass(effType)}" style="font-size:.55rem">${TYPE_LABELS[effType]||effType}</span>`;
     badgesEl.innerHTML=badges;
   }
 }
@@ -124,7 +138,15 @@ function renderHeader(){
   document.getElementById('hdr-best').textContent=fmtLap(s.best_lap_time_s);
   document.getElementById('hdr-laps').textContent=_laps.length;
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
-  if(effType){const el=document.getElementById('hdr-type');el.textContent=TYPE_LABELS[effType]||effType;el.style.display='';}
+  if(effType){
+    const el=document.getElementById('hdr-type');
+    el.textContent=TYPE_LABELS[effType]||effType;
+    // Reset prior color class then apply current — keeps the chip from
+    // accumulating modifiers across navigations (defensive, not strictly
+    // necessary on a hard reload).
+    el.className='type-chip '+typeChipClass(effType);
+    el.style.display='';
+  }
   // Race position: Grid / Finish / Gained header stats — shown only when present.
   const fp=s.finish_pos, gp=s.grid_pos;
   const gridStat=document.getElementById('hdr-grid-stat');

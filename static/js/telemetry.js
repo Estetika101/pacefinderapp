@@ -134,13 +134,17 @@ function localMaxes(samples,field,thresh){
   return out.filter((m,i)=>i===0||(xv(sl[m.i])-xv(sl[out[i-1].i]))>0.04);
 }
 // ── Panel builder ─────────────────────────────────────────────────────────
+// Per-chart mini-axis row — repeats 0/25/50/75/100% under every chart so
+// users don't have to mentally project the shared bottom axis up to each
+// chart. Issue #12 polish bundle.
+const _PX_AXIS = `<div class="px-axis"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>`;
 function setPanel(id,label,svgHtml,show,withRef){
   const p=$(id);
   if(!show){p.style.display='none';return;}
   p.style.display='';
   const refTag=withRef&&_refSamples?`<span class="ref-tag">REF · ${refLabel()}</span>`:'';
   p.innerHTML=`<div class="panel-lbl-row"><span class="p-lbl">${label}</span>${refTag}</div>
-<div class="panel-svg-wrap" data-panel="${id}"><div class="px-line"></div>${svgHtml}</div>`;
+<div class="panel-svg-wrap" data-panel="${id}"><div class="px-line"></div>${svgHtml}</div>${_PX_AXIS}`;
 }
 function refLabel(){
   if(_refType==='best_lap')return 'My Best';
@@ -249,9 +253,9 @@ function slipSVG(){
     <line x1="0" y1="${y10}" x2="${W}" y2="${y10}" stroke="#22c55e1a" stroke-width="1"/>
     <line x1="0" y1="${y30}" x2="${W}" y2="${y30}" stroke="#f59e0b1a" stroke-width="1"/>
     ${secLine(1/3,H)}${secLine(2/3,H)}
-    <text x="${W-4}" y="${H-4}" fill="#22c55e" font-size="10" text-anchor="end" font-family="monospace">Optimal</text>
-    <text x="${W-4}" y="${((parseFloat(y30)+parseFloat(y10))/2+5).toFixed(1)}" fill="#f59e0b" font-size="10" text-anchor="end" font-family="monospace">Managed</text>
-    <text x="${W-4}" y="${(parseFloat(y30)/2+5).toFixed(1)}" fill="#ef4444" font-size="10" text-anchor="end" font-family="monospace">Excess</text>`;
+    <text x="4" y="${H-4}" fill="#22c55e" font-size="10" text-anchor="start" font-family="monospace">Optimal</text>
+    <text x="4" y="${((parseFloat(y30)+parseFloat(y10))/2+5).toFixed(1)}" fill="#f59e0b" font-size="10" text-anchor="start" font-family="monospace">Managed</text>
+    <text x="4" y="${(parseFloat(y30)/2+5).toFixed(1)}" fill="#ef4444" font-size="10" text-anchor="start" font-family="monospace">Excess</text>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.35;
@@ -363,7 +367,7 @@ function renderLapSummaries(){
       <span class="lsb-l" style="color:${col}">LAP ${ln + 1}</span>
       <span class="lsb-t" style="color:${col}">${fmtLap(lap.lap_time_s)}</span>
       <span class="lsb-s">S1 ${s1!=null?fmtLap(s1):'—'} &nbsp;S2 ${s2!=null?fmtLap(s2):'—'} &nbsp;S3 ${s3!=null?fmtLap(s3):'—'}</span>
-      ${dHtml}<span class="lsb-slip">${slipHtml}</span>
+      ${dHtml}<span class="lsb-slip" title="Tyre slip: max(rear-left, rear-right) per packet&#10;avg = mean across the lap&#10;pk = peak (max) value&#10;&gt;0.1 = % of lap above the 0.1 slip threshold (loose grip)">${slipHtml}</span>
     </div>`;
   });
   $('lap-summaries').innerHTML=html;

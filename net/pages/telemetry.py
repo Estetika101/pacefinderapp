@@ -68,6 +68,9 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 .tm-lbl{font-size:.56rem;color:var(--n-500);text-transform:uppercase;letter-spacing:1.5px;padding:4px var(--sp-3)}
 #drag-sel{position:absolute;background:rgba(74,154,239,.1);border:1px solid rgba(74,154,239,.35);pointer-events:none;display:none;top:0;bottom:0}
 .x-lbl-row{display:flex;justify-content:space-between;font-size:.56rem;color:var(--n-600);margin-top:3px;padding:0 1px}
+/* Per-chart mini-axis (issue #12 polish bundle). Same percentages as
+   .x-lbl-row but rendered under every chart for at-a-glance scanning. */
+.px-axis{display:flex;justify-content:space-between;font-size:.55rem;color:var(--n-700,#4a4a4a);padding:1px 1px 4px;line-height:1}
 #tele-loading{color:var(--n-400);font-size:.9rem;padding:60px;text-align:center}
 .delta-neg{color:var(--accent-soft)}.delta-pos{color:var(--danger)}
 .ctrl-sub{font-size:.62rem;color:var(--n-400);margin-top:4px;padding-left:2px}
@@ -116,7 +119,7 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
   <div id="ctrl-loading" style="color:var(--n-400);font-size:.78rem;padding:8px 0">Loading&hellip;</div>
   <div id="ctrl-inner" style="display:none">
     <div class="ctrl-section">
-      <div class="ctrl-lbl">Laps (up to 4)</div>
+      <div class="ctrl-lbl" title="Up to 4 laps can be selected for overlay comparison. Capped at 4 so the chart and track-map colors stay legible — picking a 5th drops the oldest selection.">Laps (up to 4)</div>
       <div id="lap-list"></div>
     </div>
     <div class="ctrl-section">
