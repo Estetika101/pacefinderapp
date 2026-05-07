@@ -118,11 +118,8 @@ function updateFormMeta(data){
 }
 
 // ── Filter toggles ────────────────────────────────────────────
-document.getElementById('type-filters').addEventListener('click',e=>{
-  const b=e.target.closest('.ftog');if(!b)return;
-  document.querySelectorAll('#type-filters .ftog').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');_type=b.dataset.val;loadFormData();
-});
+// Race-type filter (Real/AI/All) was removed per user feedback —
+// keep race_type data + display it as a per-row pill, no top-of-page filter.
 document.getElementById('last-filters').addEventListener('click',e=>{
   const b=e.target.closest('.ftog');if(!b)return;
   document.querySelectorAll('#last-filters .ftog').forEach(x=>x.classList.remove('on'));

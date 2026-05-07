@@ -156,11 +156,11 @@ function speedSVG(){
   let[mn,mx]=autoRange([...allS,_refSamples?_refSamples:[]],'speed_mph');mn=Math.max(0,mn);
   const yr=mx-mn||1;
   let c=`${secLine(1/3,H)}${secLine(2/3,H)}${secLabel(0,'S1',H)}${secLabel(1/3,'S2',H)}${secLabel(2/3,'S3',H)}`;
-  if(_refSamples)c+=`<path d="${linePts(_refSamples,'speed_mph',H,mn,mx)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".75"/>`;
+  if(_refSamples)c+=`<path d="${linePts(_refSamples,'speed_mph',H,mn,mx)}" fill="none" stroke="${REF_COL}" stroke-width="1" stroke-dasharray="7,4" opacity=".75"/>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.4;
-    c+=`<path d="${linePts(s,'speed_mph',H,mn,mx)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?2:1.5}" opacity="${op}"/>`;
+    c+=`<path d="${linePts(s,'speed_mph',H,mn,mx)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?1.5:1}" opacity="${op}"/>`;
     if(ln===_primaryLap){
       const mins=localMins(s,'speed_mph');
       const sl=zs(s);
@@ -181,24 +181,24 @@ function throttleSVG(){
   const y50=(H-50/100*H).toFixed(1),y70=(H-70/100*H).toFixed(1);
   let c=`${secLine(1/3,H)}${secLine(2/3,H)}
     <rect x="0" y="${y70}" width="${W}" height="${(parseFloat(y50)-parseFloat(y70)).toFixed(1)}" fill="#f59e0b1f"/>`;
-  if(_refSamples)c+=`<path d="${linePts(_refSamples,'throttle_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".75"/>`;
+  if(_refSamples)c+=`<path d="${linePts(_refSamples,'throttle_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1" stroke-dasharray="7,4" opacity=".75"/>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.4;
     if(ln===_primaryLap)c+=`<path d="${fillPts(s,'throttle_pct',H,0,100)}" fill="${col}1a" stroke="none"/>`;
-    c+=`<path d="${linePts(s,'throttle_pct',H,0,100)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?2:1.5}" opacity="${op}"/>`;
+    c+=`<path d="${linePts(s,'throttle_pct',H,0,100)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?1.5:1}" opacity="${op}"/>`;
   });
   return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">${c}</svg>`;
 }
 function brakeSVG(){
   const H=80;
   let c=`${secLine(1/3,H)}${secLine(2/3,H)}`;
-  if(_refSamples)c+=`<path d="${linePts(_refSamples,'brake_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1.5" stroke-dasharray="7,4" opacity=".75"/>`;
+  if(_refSamples)c+=`<path d="${linePts(_refSamples,'brake_pct',H,0,100)}" fill="none" stroke="${REF_COL}" stroke-width="1" stroke-dasharray="7,4" opacity=".75"/>`;
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.4;
     if(ln===_primaryLap)c+=`<path d="${fillPts(s,'brake_pct',H,0,100)}" fill="#ef44441a" stroke="none"/>`;
-    c+=`<path d="${linePts(s,'brake_pct',H,0,100)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?2:1.5}" opacity="${op}"/>`;
+    c+=`<path d="${linePts(s,'brake_pct',H,0,100)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?1.5:1}" opacity="${op}"/>`;
     if(ln===_primaryLap){
       const peaks=localMaxes(s,'brake_pct',75);
       const sl=zs(s);
@@ -221,7 +221,7 @@ function gearSVG(){
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?.9:.3;
-    c+=`<path d="${stepPts(s,'gear',H,0,gM)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?2:1.5}" opacity="${op}" stroke-linejoin="miter"/>`;
+    c+=`<path d="${stepPts(s,'gear',H,0,gM)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?1.5:1}" opacity="${op}" stroke-linejoin="miter"/>`;
   });
   for(let g=1;g<=gM;g++)c+=`<text x="5" y="${(H-((g-.5)/gM)*H+5).toFixed(1)}" fill="#2a2a2a" font-size="17" font-family="monospace">${g}</text>`;
   return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">${c}</svg>`;
@@ -255,7 +255,7 @@ function slipSVG(){
   _selectedLaps.forEach((ln,ci)=>{
     const s=_lapSamples[ln];if(!s)return;
     const col=LAP_COLORS[ci],op=ln===_primaryLap?1:.35;
-    c+=`<path d="${linePts(s,'slip_rl',H,0,mx)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?2:1.5}" opacity="${op}"/>`;
+    c+=`<path d="${linePts(s,'slip_rl',H,0,mx)}" fill="none" stroke="${col}" stroke-width="${ln===_primaryLap?1.5:1}" opacity="${op}"/>`;
     c+=`<path d="${linePts(s,'slip_rr',H,0,mx)}" fill="none" stroke="#93c5fd" stroke-width="${ln===_primaryLap?1.5:1}" stroke-dasharray="5,3" opacity="${op*.7}"/>`;
   });
   return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">${c}</svg>`;
@@ -360,7 +360,7 @@ function renderLapSummaries(){
       }
     }
     html+=`<div class="lap-sum-bar" style="border-color:${col}">
-      <span class="lsb-l" style="color:${col}">LAP ${ln}</span>
+      <span class="lsb-l" style="color:${col}">LAP ${ln + 1}</span>
       <span class="lsb-t" style="color:${col}">${fmtLap(lap.lap_time_s)}</span>
       <span class="lsb-s">S1 ${s1!=null?fmtLap(s1):'—'} &nbsp;S2 ${s2!=null?fmtLap(s2):'—'} &nbsp;S3 ${s3!=null?fmtLap(s3):'—'}</span>
       ${dHtml}<span class="lsb-slip">${slipHtml}</span>
@@ -748,8 +748,8 @@ async function fetchRef(){
       d=await fetch('/sessions/reference-samples?track='+encodeURIComponent(_sess.track||'')+'&type='+_refType).then(r=>r.json());
     }
     if(Array.isArray(d)&&d.length){_refSamples=d;setRefStatus('');}
-    else{_refSamples=null;setRefStatus('Reference unavailable for this track yet.');}
-  }catch(e){_refSamples=null;setRefStatus('Reference unavailable for this track yet.');}
+    else{_refSamples=null;setRefStatus('No lap times available to reference — go out and race.');}
+  }catch(e){_refSamples=null;setRefStatus('No lap times available to reference — go out and race.');}
 }
 
 // ── Cross-session reference picker ───────────────────────────────────────
