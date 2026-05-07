@@ -221,7 +221,9 @@ async function runAnalysis(force){
 }
 // ── Edit modal ────────────────────────────────────────────────
 let _editTrack='',_editRaceType=null,_editWeather='Dry',_editTyre=null;
-let _trackAc=null;  // Autocomplete widget instance for the track field; reused across opens.
+// Autocomplete widget instances reused across modal opens (avoid leaking listeners).
+let _trackAc=null;
+let _carAc=null;
 async function openEdit(){
   if(!_sess)return;
   const cur=_sess.track&&_sess.track!=='unknown'?_sess.track:'';
@@ -247,9 +249,21 @@ async function openEdit(){
     _trackAc.setOptions(tracks);
     trackInput.value=cur;
   }
-  // Pre-fill the car free-text input. "Unknown Car" passes through unchanged
-  // so the user can keep it as-is or replace it with the real name.
-  document.getElementById('edit-car').value=(_sess.car && _sess.car!=='unknown')?_sess.car:'';
+  // Car field: searchable autocomplete drawn from CAR_CATALOG (inlined on the
+  // page from FORZA_CARS). Free-text fallback preserved for unmapped ordinals
+  // — the user can hunt down the actual name later. "Unknown Car (#NNN)"
+  // pre-fills as the initial value so they have a starting point.
+  const carInput=document.getElementById('edit-car');
+  const carInitial=(_sess.car && _sess.car!=='unknown')?_sess.car:'';
+  if(!_carAc){
+    _carAc=Autocomplete.attach(carInput,{
+      options:(typeof CAR_CATALOG!=='undefined')?CAR_CATALOG:[],
+      allowFreeText:true,
+      initialValue:carInitial,
+    });
+  }else{
+    carInput.value=carInitial;
+  }
   // Nickname row: only meaningful when we have a car_ordinal — otherwise
   // there's nothing to key the nickname to.
   const nickRow=document.getElementById('edit-nickname-row');
