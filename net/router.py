@@ -430,7 +430,7 @@ def make_handler(ctx: dict):
                             "SELECT session_id,game,track,car,session_type,race_type,started_at,ended_at,"
                             "best_lap_time_s,lap_count,ai_analysis,ai_analyzed_at,ai_model,"
                             "car_class,car_pi,car_ordinal,drivetrain_type,num_cylinders,"
-                            "finish_pos,grid_pos,weather_condition,track_temp_c,air_temp_c "
+                            "finish_pos,grid_pos,weather_condition,tyre_compound,track_temp_c,air_temp_c "
                             "FROM sessions WHERE session_id=?", (sid,)
                         ).fetchone()
                         lap_rows = conn.execute(
@@ -655,7 +655,7 @@ def make_handler(ctx: dict):
                             wc = body_data["weather_condition"]
                             session_data["weather_condition"] = wc if wc else None
 
-                        # Update tyre compound (Street / Sport / Race / Slick / Rally / Off-Road / Drag)
+                        # Update tyre compound (FM: Soft / Medium / Hard / Wet)
                         if "tyre_compound" in body_data:
                             tc = body_data["tyre_compound"]
                             session_data["tyre_compound"] = tc if tc else None
