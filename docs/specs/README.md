@@ -1,12 +1,37 @@
 # Specs
 
-Canonical home for Pacefinder feature specs. Lives in the product repo because most features are upstream of the marketing site.
+Home for **product** specs only — features and behavior of the Pacefinder app itself. Marketing-site specs live in the `pacefinder` (marketing) repo, not here.
+
+## What goes where
+
+**This repo (`pacefinderapp`)**
+- App code, schema, data, UI inside the app
+- Specs for app behavior: features, performance, telemetry, AI inside the app, install/usage docs
+- Issues: `feature` / `bug` / `enhancement` / `data` / `documentation` (in-app docs only)
+- ✅ References to the marketing site are fine
+- ❌ No marketing copy, hero content, growth experiments, brand assets, or marketing specs
+
+**Marketing repo (`pacefinder`, private)**
+- Site code, copy, assets, brand
+- Specs for marketing content (hero, videos, growth experiments)
+- Issues for marketing-only work
+- ✅ Pulls feature info from this repo's specs/changelog as needed (one-way reference)
+
+**Cross-cutting work** (a feature touches both repos)
+- The spec lives in the repo where the **dominant work** happens.
+- The OTHER repo opens its own slim issue referencing the cross-repo spec — no spec duplication.
 
 ## Convention
 
 - One file per feature: `<feature-slug>.md` (e.g. `spotter-v2.md`, `acc-tire-pressure.md`)
 - Write the spec first, commit it, then implement against it
-- Cross-repo features (product + marketing) reference this folder by absolute path from the marketing repo
+- Every spec gets a matching GitHub issue with the standard 3-line body:
+  ```
+  **TL;DR:** <one-sentence summary>
+  **Spec:** [`docs/specs/<slug>.md`](https://github.com/Estetika101/pacefinderapp/blob/main/docs/specs/<slug>.md)
+  **Status:** specified · not implemented
+  ```
+- The spec file is the canonical doc (never closed); the issue is the work item (closeable, linkable from PRs via `Closes #N`).
 
 ## Template
 
