@@ -183,21 +183,30 @@ SETUP_HTML = """<!DOCTYPE html>
   </div>
 
   <div class="autostart-panel" id="panel-mac">
-    <div class="step">Run <b>install-mac.sh</b> once. It copies a launchd plist and loads it — Pacefinder will start on login and restart if it crashes.</div>
-    <div class="code-block">curl -fsSL https://pacefinder.app/install-mac.sh | bash</div>
-    <div class="step">Or download <b>install-mac.sh</b> from the GitHub release, edit the path at the top, then run it.</div>
+    <div class="step">From the cloned repo, run <b>install-mac.sh</b> once. It copies a launchd plist and loads it — Pacefinder will start on login and restart if it crashes.</div>
+    <div class="code-block">bash install-mac.sh</div>
     <div class="step">Check status: <span style="font-family:monospace;color:#888">launchctl list | grep pacefinder</span></div>
     <div class="step">View logs: <span style="font-family:monospace;color:#888">tail -f ~/Library/Logs/pacefinder.log</span></div>
   </div>
 
   <div class="autostart-panel" id="panel-linux">
     <div class="step">Copy the service file and enable it with systemd:</div>
-    <div class="code-block">sudo cp simtelemetry.service /etc/systemd/system/
+    <div class="code-block">sudo cp pacefinder.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable simtelemetry
-sudo systemctl start simtelemetry</div>
-    <div class="step">Check status: <span style="font-family:monospace;color:#888">sudo systemctl status simtelemetry</span></div>
-    <div class="step">View logs: <span style="font-family:monospace;color:#888">sudo journalctl -u simtelemetry -f</span></div>
+sudo systemctl enable pacefinder
+sudo systemctl start pacefinder</div>
+    <div class="step">Check status: <span style="font-family:monospace;color:#888">sudo systemctl status pacefinder</span></div>
+    <div class="step">View logs: <span style="font-family:monospace;color:#888">sudo journalctl -u pacefinder -f</span></div>
+    <div class="step" style="margin-top:14px;font-size:.75rem;color:var(--color-text-muted)">
+      <b>Already installed under the old <code>simtelemetry</code> name?</b> Migrate once:
+    </div>
+    <div class="code-block">sudo systemctl stop simtelemetry
+sudo systemctl disable simtelemetry
+sudo rm /etc/systemd/system/simtelemetry.service
+sudo cp pacefinder.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable pacefinder
+sudo systemctl start pacefinder</div>
   </div>
 
   <div class="autostart-panel" id="panel-windows">
