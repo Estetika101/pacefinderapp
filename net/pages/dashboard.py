@@ -209,6 +209,25 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
       </div>
       <div class="fo-section">
+        <div class="fo-lbl">Weather</div>
+        <div class="type-chips">
+          <button class="type-chip" data-val="Dry"  onclick="selWeather(this)">Dry</button>
+          <button class="type-chip" data-val="Damp" onclick="selWeather(this)">Damp</button>
+          <button class="type-chip" data-val="Wet"  onclick="selWeather(this)">Wet</button>
+          <button class="type-chip" data-val="Snow" onclick="selWeather(this)">Snow</button>
+        </div>
+      </div>
+      <div class="fo-section">
+        <div class="fo-lbl">Tyres</div>
+        <!-- Forza Motorsport compounds; FH5 has its own set (issue #84). -->
+        <div class="type-chips">
+          <button class="type-chip" data-val="Soft"   onclick="selTyre(this)">Soft</button>
+          <button class="type-chip" data-val="Medium" onclick="selTyre(this)">Medium</button>
+          <button class="type-chip" data-val="Hard"   onclick="selTyre(this)">Hard</button>
+          <button class="type-chip" data-val="Wet"    onclick="selTyre(this)">Wet</button>
+        </div>
+      </div>
+      <div class="fo-section">
         <div class="fo-lbl">Laps</div>
         <div class="fo-lap-list" id="fo-laps"></div>
       </div>

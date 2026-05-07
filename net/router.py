@@ -389,7 +389,8 @@ def make_handler(ctx: dict):
                     try:
                         cd_row = conn.execute(
                             "SELECT session_id,game,track,car,session_type,race_type,"
-                            "started_at,ended_at,best_lap_time_s,lap_count,track_ordinal "
+                            "started_at,ended_at,best_lap_time_s,lap_count,track_ordinal,"
+                            "weather_condition,tyre_compound "
                             "FROM sessions WHERE session_id=?", (sid,)
                         ).fetchone()
                     finally:

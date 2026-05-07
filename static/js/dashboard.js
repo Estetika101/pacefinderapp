@@ -225,16 +225,27 @@ function clearDebug(){_dbgLines.length=0;$('dbg-log').innerHTML='';}
 // ── Finish Race overlay ───────────────────────────────────────────────────────
 let _foSid=null, _foRaceType=null, _foDropLast=false, _foLaps=[], _foClosed=false;
 let _foTrackOrdinal=null, _foAutoTimer=null;
+let _foWeather=null, _foTyre=null;
 // True after the modal has been auto-opened (or manually opened) for the
 // current race_ended phase. Resets when status leaves race_ended (on next
 // race or after the 30s _clear_race_ended timeout). Prevents the modal from
 // re-popping every dashboard tick after the user has saved or skipped.
 let _foShown=false;
 
-function selType(el){
-  document.querySelectorAll('#fo .type-chip').forEach(c=>c.classList.remove('sel'));
+// Each chip-group selector clears chips inside its own .fo-section so a Type
+// pick doesn't accidentally clear Weather/Tyres (they all share .type-chip).
+function _foSelChip(el){
+  const section=el.closest('.fo-section');
+  if(section)section.querySelectorAll('.type-chip').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
-  _foRaceType=el.dataset.val;
+}
+function selType(el){_foSelChip(el);_foRaceType=el.dataset.val;}
+function selWeather(el){_foSelChip(el);_foWeather=el.dataset.val;}
+function selTyre(el){
+  // Tyre is optional — clicking the active chip toggles it off (matches
+  // session-detail behavior).
+  if(el.classList.contains('sel')){el.classList.remove('sel');_foTyre=null;return;}
+  _foSelChip(el);_foTyre=el.dataset.val;
 }
 
 async function openFinish(editSid){
@@ -265,6 +276,9 @@ async function openFinish(editSid){
     }
   }
   _foSid=sid; _foRaceType=null; _foDropLast=false; _foClosed=false; _foTrackOrdinal=null;
+  _foWeather=null; _foTyre=null;
+  // Reset chip selections from a previous open before re-render.
+  document.querySelectorAll('#fo .type-chip').forEach(c=>c.classList.remove('sel'));
   if(!_foSid){
     // Couldn't recover a session id — back out cleanly so the user isn't
     // stuck on a "Finishing race…" placeholder.
@@ -324,11 +338,22 @@ async function openFinish(editSid){
     // Car input
     $('fo-car').value=cur.car&&cur.car!=='unknown'?cur.car:'';
 
-    // Pre-select race_type
-    if(cur.race_type){
-      const chip=document.querySelector(`#fo .type-chip[data-val="${cur.race_type}"]`);
-      if(chip) selType(chip);
+    // Pre-select race_type / weather / tyres if the session already has them.
+    // CSS selectors scoped to each .fo-section so the same data-val (e.g.
+    // "Wet" appears for both Weather and Tyres) doesn't cross-fire.
+    const sections=$('fo').querySelectorAll('.fo-section');
+    function _preselect(handler, val){
+      if(!val) return;
+      for(const sec of sections){
+        const chip=sec.querySelector(`.type-chip[data-val="${val}"]`);
+        if(chip && handler.name === 'selType' && sec.querySelector('[onclick*="selType"]')){handler(chip);break;}
+        if(chip && handler.name === 'selWeather' && sec.querySelector('[onclick*="selWeather"]')){handler(chip);break;}
+        if(chip && handler.name === 'selTyre' && sec.querySelector('[onclick*="selTyre"]')){handler(chip);break;}
+      }
     }
+    _preselect(selType, cur.race_type);
+    _preselect(selWeather, cur.weather_condition);
+    _preselect(selTyre, cur.tyre_compound);
     renderFoLaps();
   } catch(e){
     // Don't strand the user on a "Finishing race…" placeholder if any of the
@@ -378,6 +403,9 @@ async function saveFinish(){
   if(selTrack&&!selTrack.startsWith('Track #')) body.track=selTrack;
   const carVal=$('fo-car').value.trim();
   if(carVal) body.car=carVal;
+  // Always send weather + tyre (empty string clears, matches session-detail flow).
+  body.weather_condition=_foWeather||'';
+  body.tyre_compound=_foTyre||'';
   // Learn the ordinal if user identified an unknown track
   if(_foTrackOrdinal&&selTrack&&!selTrack.startsWith('Track #')){
     body.learned_ordinal={ordinal:_foTrackOrdinal,game:'forza_motorsport',track_name:selTrack};
