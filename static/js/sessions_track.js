@@ -276,7 +276,7 @@ async function loadReferences(){
     const rows=document.getElementById('ref-rows');
     document.getElementById('ref-card-title').textContent=(_track.toUpperCase()||'TRACK')+' References';
     let html='';
-    if(d.best_lap){const bl=d.best_lap;html+=`<div class="ref-row"><span class="ref-row-type">Best Lap</span><span class="ref-row-time green">${fmtLap(bl.lap_time_s)}</span><span class="ref-row-meta">${bl.session_date}&nbsp;&nbsp;Lap ${bl.lap_number}</span></div>`;}
+    if(d.best_lap){const bl=d.best_lap;html+=`<div class="ref-row"><span class="ref-row-type">Best Lap</span><span class="ref-row-time green">${fmtLap(bl.lap_time_s)}</span><span class="ref-row-meta">${bl.session_date}&nbsp;&nbsp;Lap ${bl.lap_number != null ? bl.lap_number + 1 : '—'}</span></div>`;}
     if(d.theoretical){const th=d.theoretical;html+=`<div class="ref-row"><span class="ref-row-type">Theoretical</span><span class="ref-row-time">${fmtLap(th.theoretical_best_s)}</span><span class="ref-row-meta"></span></div><div class="ref-sectors">S1 ${th.s1_s!=null?fmtLap(th.s1_s):'—'} ${th.s1_session_date||''} &nbsp;·&nbsp; S2 ${th.s2_s!=null?fmtLap(th.s2_s):'—'} ${th.s2_session_date||''} &nbsp;·&nbsp; S3 ${th.s3_s!=null?fmtLap(th.s3_s):'—'} ${th.s3_session_date||''}</div>`;if(d.best_lap&&d.best_lap.lap_time_s&&th.theoretical_best_s){const gap=d.best_lap.lap_time_s-th.theoretical_best_s;if(gap>0.01){document.getElementById('ref-gap-val').textContent='+'+gap.toFixed(3)+'s';document.getElementById('ref-gap').style.display='flex';}}}
     rows.innerHTML=html;card.classList.add('on');
   }catch(e){}

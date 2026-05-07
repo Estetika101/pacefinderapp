@@ -1,4 +1,8 @@
 const $=id=>document.getElementById(id);
+// Forza UDP lap_number is 0-indexed (race lap 1 = lap_number 0). Forza's
+// on-screen "Lap N" is 1-indexed, so add 1 for display. ACC support is
+// parked; if/when it returns, gate this on game.
+const lapLabel = n => (n == null ? '—' : 'L' + (Number(n) + 1));
 const es=new EventSource('/stream');
 let _maxRpm=8500,_dbgEs=null,_dbgOpen=false,_bestLap=null;
 let state_sid=null;
@@ -125,7 +129,7 @@ es.onmessage=e=>{
   $('t-cur').textContent=fmt(d.current_lap_time);
   $('t-best').textContent=fmt(d.best_lap_time_s);
   $('t-last').textContent=fmt(d.last_lap_time_s);
-  $('t-lap').textContent=d.lap!=null?'L'+d.lap:'—';
+  $('t-lap').textContent=lapLabel(d.lap);
 
   // Live in-race delta vs this session's best lap (computed server-side per
   // packet from the best-lap distance→time timeline). Null on lap 1 (no
@@ -352,7 +356,7 @@ function renderFoLaps(){
       ?`<button class="fo-lap-del${_foDropLast?' undone':''}" onclick="toggleDropLast()">${_foDropLast?'Restore':'Delete'}</button>`
       :'';
     return `<div class="fo-lap${isPartial?' partial':''}">
-      <span class="fo-lap-num">L${lap.lap_number}</span>
+      <span class="fo-lap-num">${lapLabel(lap.lap_number)}</span>
       <span class="fo-lap-time${isBest&&!_foDropLast?' best':''}">${timeStr}</span>
       ${isPartial&&!_foDropLast?'<span class="fo-lap-badge">PARTIAL</span>':''}
       ${delBtn}
