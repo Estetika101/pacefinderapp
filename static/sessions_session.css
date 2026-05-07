@@ -97,6 +97,11 @@ tr.best-row td:first-child{color:var(--accent-bd2)}
 .edit-ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center}
 .edit-ovl.open{display:flex}
 .edit-panel{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:24px 28px;min-width:320px;max-width:90vw}
+/* Wider on desktop so the Type / Weather / Tyres triple-row has room for chips. */
+@media(min-width:780px){.edit-panel{min-width:680px}}
+/* Multi-column row: Type | Weather | Tyres side by side. Wraps on narrow viewports. */
+.edit-row-multi{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.edit-row-multi .edit-col{flex:1 1 200px;min-width:0}
 .edit-ttl{font-size:var(--text-sm);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.1em;color:var(--color-text-secondary);margin-bottom:16px}
 .edit-row{margin-bottom:12px}
 .edit-lbl{display:block;font-size:.6rem;color:var(--color-text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
