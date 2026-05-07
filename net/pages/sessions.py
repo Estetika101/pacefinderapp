@@ -278,7 +278,8 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   <span class="type-chip" id="hdr-type" style="display:none"></span>
   <span class="type-chip" id="hdr-weather" style="display:none"></span>
   <span class="type-chip" id="hdr-tyre" style="display:none"></span>
-  <button class="btn-re" onclick="openEdit()" style="font-size:var(--text-xs);padding:4px 12px">Edit</button>
+  <button class="btn-re" onclick="openEdit()" style="font-size:var(--text-xs);padding:4px 12px"
+          title="Edit session metadata — track, car, race type, weather, tyres, nickname">Edit</button>
 </div>
 <!-- Edit modal -->
 <div class="edit-ovl" id="edit-ovl">
