@@ -72,6 +72,7 @@ def make_handler(ctx: dict):
     db_get_car_nicknames = ctx["db_get_car_nicknames"]
     db_set_car_nickname = ctx["db_set_car_nickname"]
     db_get_lap_samples     = ctx["db_get_lap_samples"]
+    decode_samples         = ctx["decode_samples"]
     build_inject_packets   = ctx["build_inject_packets"]
     build_analysis_prompt  = ctx["build_analysis_prompt"]
     clear_race_ended       = ctx["clear_race_ended"]
@@ -579,8 +580,11 @@ def make_handler(ctx: dict):
                         finally:
                             conn.close()
                     if row:
+                        # samples_json is now gzipped (legacy rows are still
+                        # accepted via the sniff in _decode_samples).
+                        decoded = decode_samples(row["samples_json"])
                         writer.write(_http_response("200 OK", "application/json",
-                                                    row["samples_json"].encode()))
+                                                    json.dumps(decoded).encode()))
                     else:
                         writer.write(_http_response("404 Not Found", "application/json", b"[]"))
 

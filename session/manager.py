@@ -94,6 +94,41 @@ class LapRecord:
             v = parsed.get(f"tire_temp_{corner}")
             if v is not None:
                 sample[f"tyre_{corner}"] = round(v, 1)
+        # ── Bundle: per-sample field expansion (storage spec) ─────────────
+        # Only store when the parser actually populated the field — keeps
+        # the JSON compact for FM vs FH variants and skips fields the user's
+        # game doesn't broadcast. Short keys to keep the per-sample payload
+        # small (gzip handles the rest).
+        for corner in ("fl", "fr", "rl", "rr"):
+            if (v := parsed.get(f"wheel_on_rumble_strip_{corner}")) is not None:
+                sample[f"rumble_{corner}"] = round(v, 3)
+            if (v := parsed.get(f"wheel_in_puddle_{corner}")) is not None:
+                sample[f"puddle_{corner}"] = round(v, 3)
+            if (v := parsed.get(f"surface_rumble_{corner}")) is not None:
+                sample[f"surf_rumble_{corner}"] = round(v, 3)
+            if (v := parsed.get(f"wheel_rotation_speed_{corner}")) is not None:
+                sample[f"wsp_{corner}"] = round(v, 2)
+            if (v := parsed.get(f"tire_slip_angle_{corner}")) is not None:
+                sample[f"sa_{corner}"] = round(v, 4)
+            if (v := parsed.get(f"tire_combined_slip_{corner}")) is not None:
+                sample[f"cs_{corner}"] = round(v, 4)
+            if (v := parsed.get(f"normalized_suspension_travel_{corner}")) is not None:
+                sample[f"sus_n_{corner}"] = round(v, 4)
+            if (v := parsed.get(f"suspension_travel_meters_{corner}")) is not None:
+                sample[f"sus_m_{corner}"] = round(v, 4)
+            # FH5 only — silently absent on FM
+            if (v := parsed.get(f"tire_wear_{corner}")) is not None:
+                sample[f"wear_{corner}"] = round(v, 4)
+        # Front slip ratios — rears already stored above as slip_rl/slip_rr
+        if (v := parsed.get("tire_slip_ratio_fl")) is not None:
+            sample["slip_fl"] = round(abs(v), 4)
+        if (v := parsed.get("tire_slip_ratio_fr")) is not None:
+            sample["slip_fr"] = round(abs(v), 4)
+        # Driving-line / AI-brake hints (signed bytes from Forza)
+        if (v := parsed.get("normalized_driving_lane")) is not None:
+            sample["lane"] = int(v)
+        if (v := parsed.get("normalized_ai_brake_difference")) is not None:
+            sample["ai_brk_diff"] = int(v)
         self.samples.append(sample)
 
     def close(self, lap_time_s: Optional[float] = None):
