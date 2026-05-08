@@ -341,6 +341,7 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <!-- Tab bar -->
 <div class="sess-tab-bar">
   <button class="sess-tab active" id="st-overview" onclick="switchTab('overview')">Overview</button>
+  <button class="sess-tab" id="st-deepdive" onclick="switchTab('deepdive')">Deep Dive</button>
   <button class="sess-tab" id="st-telemetry" onclick="switchTab('telemetry')">Telemetry</button>
 </div>
 <!-- Layout -->
@@ -385,6 +386,61 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
         <div class="ai-err" id="ai-err"></div>
       </div>
     </div>
+    <div id="tab-deepdive" style="display:none">
+      <div class="dd-headline" id="dd-headline"></div>
+      <div class="dd-empty" id="dd-empty" style="display:none"></div>
+      <div class="dd-grid">
+        <section class="dd-card dd-card-map">
+          <div class="dd-card-head">
+            <h3>Track Map</h3>
+            <div class="dd-channel-row" id="dd-channels">
+              <button class="dd-chip active" data-ch="speed">Speed</button>
+              <button class="dd-chip" data-ch="throttle">Throttle</button>
+              <button class="dd-chip" data-ch="brake">Brake</button>
+              <button class="dd-chip" data-ch="slip">Slip</button>
+              <button class="dd-chip" data-ch="gear">Gear</button>
+            </div>
+          </div>
+          <div class="dd-lap-row" id="dd-lap-row"></div>
+          <div class="dd-map-wrap">
+            <svg id="dd-map" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="dd-tip" id="dd-map-tip" style="display:none"></div>
+          </div>
+        </section>
+
+        <section class="dd-card">
+          <div class="dd-card-head"><h3>G-G Diagram</h3></div>
+          <div class="dd-gg-wrap">
+            <canvas id="dd-gg" width="320" height="320"></canvas>
+            <div class="dd-tip" id="dd-gg-tip" style="display:none"></div>
+          </div>
+        </section>
+
+        <section class="dd-card">
+          <div class="dd-card-head"><h3>Speed Trace</h3></div>
+          <div class="dd-speed-wrap">
+            <svg id="dd-speed" preserveAspectRatio="none"></svg>
+          </div>
+        </section>
+
+        <section class="dd-card dd-card-cmp">
+          <div class="dd-card-head">
+            <h3>Lap Comparison</h3>
+            <div class="dd-cmp-pickers">
+              <label>Reference <select id="dd-cmp-ref"></select></label>
+              <label>Compare <select id="dd-cmp-cmp"></select></label>
+            </div>
+          </div>
+          <div class="dd-cmp-summary" id="dd-cmp-summary"></div>
+        </section>
+
+        <section class="dd-card">
+          <div class="dd-card-head"><h3>Mistakes &amp; Events</h3></div>
+          <div class="dd-events" id="dd-events"></div>
+        </section>
+      </div>
+    </div>
+
     <div id="tab-telemetry" style="display:none">
       <iframe id="tele-frame" src="" style="width:100%;height:calc(100vh - 120px);border:none;display:block"></iframe>
     </div>
@@ -401,6 +457,7 @@ const CAR_CATALOG=
 
 SESSION_DETAIL_HTML_POST = """;</script>
 <script src="/static/js/widgets/autocomplete.js"></script>
+<script src="/static/js/sessions_deepdive.js"></script>
 <script src="/static/js/sessions_session.js"></script>
 </body>
 </html>

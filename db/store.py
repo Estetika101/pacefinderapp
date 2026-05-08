@@ -1059,6 +1059,32 @@ def _db_get_lap_samples(session_id: str, lap_number: int) -> Optional[dict]:
             conn.close()
 
 
+def _db_get_all_lap_samples(session_id: str) -> list:
+    """Fetch every stored lap's samples for a session in lap-number order.
+
+    Returns a list of {lap_number, samples, distance_m} dicts. Used by the
+    Deep Dive endpoint which needs every valid lap at once.
+    """
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            rows = conn.execute(
+                "SELECT lap_number, samples_json, distance_m_json FROM lap_samples "
+                "WHERE session_id=? ORDER BY lap_number",
+                (session_id,)
+            ).fetchall()
+            return [
+                {
+                    "lap_number": r["lap_number"],
+                    "samples":    _decode_samples(r["samples_json"]),
+                    "distance_m": _decode_samples(r["distance_m_json"]),
+                }
+                for r in rows
+            ]
+        finally:
+            conn.close()
+
+
 def _store_session_lap_samples(session_id: str, completed_laps: list):
     """
     Normalise and persist lap_samples rows for every lap within 102% of

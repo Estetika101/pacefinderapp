@@ -72,6 +72,7 @@ def make_handler(ctx: dict):
     db_get_car_nicknames = ctx["db_get_car_nicknames"]
     db_set_car_nickname = ctx["db_set_car_nickname"]
     db_get_lap_samples     = ctx["db_get_lap_samples"]
+    db_get_all_lap_samples = ctx["db_get_all_lap_samples"]
     decode_samples         = ctx["decode_samples"]
     build_inject_packets   = ctx["build_inject_packets"]
     build_analysis_prompt  = ctx["build_analysis_prompt"]
@@ -617,6 +618,53 @@ def make_handler(ctx: dict):
                         # empty array as 200 so it doesn't read as a real error
                         # in dev tools. Client treats [] and 404+[] identically.
                         writer.write(_http_response("200 OK", "application/json", b"[]"))
+
+            elif path == "/sessions/session/deepdive":
+                # Compute the Deep Dive tab payload from a session's stored
+                # lap_samples + the sessions/laps rows. Pure compute — no DB
+                # writes, no external calls. See docs/specs/deep-dive-tab.md.
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                sid = qs.get("id", "")
+                ref_lap = qs.get("ref")
+                cmp_lap = qs.get("cmp")
+                try:
+                    ref_lap = int(ref_lap) if ref_lap is not None else None
+                    cmp_lap = int(cmp_lap) if cmp_lap is not None else None
+                except ValueError:
+                    ref_lap = cmp_lap = None
+                with db_lock:
+                    conn = db_connect()
+                    try:
+                        sess_row = conn.execute(
+                            "SELECT session_id,game,track,car,session_type,race_type,"
+                            "best_lap_time_s,lap_count,grid_pos,finish_pos "
+                            "FROM sessions WHERE session_id=?", (sid,)
+                        ).fetchone()
+                        lap_rows = conn.execute(
+                            "SELECT lap_number,lap_time_s,max_speed_mph,"
+                            "avg_throttle,avg_brake,avg_slip,peak_slip,slip_above_pct "
+                            "FROM laps WHERE session_id=? ORDER BY lap_number",
+                            (sid,)
+                        ).fetchall() if sess_row else []
+                    finally:
+                        conn.close()
+                if not sess_row:
+                    writer.write(_http_response("404 Not Found", "application/json",
+                                                json.dumps({"error": "Session not found"}).encode()))
+                else:
+                    laps_with_samples = db_get_all_lap_samples(sid)
+                    from analysis.deepdive import compute_deepdive
+                    payload = compute_deepdive(
+                        sess=dict(sess_row),
+                        laps=[dict(r) for r in lap_rows],
+                        laps_with_samples=laps_with_samples,
+                        ref_lap=ref_lap,
+                        cmp_lap=cmp_lap,
+                    )
+                    writer.write(_http_response("200 OK", "application/json",
+                                                json.dumps(payload).encode()))
 
             elif path == "/sessions/update" and method == "POST":
                 try:

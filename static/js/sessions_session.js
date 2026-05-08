@@ -31,13 +31,19 @@ const SGAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
 let _sess=null,_laps=[],_allTracks=[];
 
 // ── Tab switching ─────────────────────────────────────────────
-let _teleInited=false;
+let _teleInited=false,_ddInited=false;
 function switchTab(tab){
   document.getElementById('tab-overview').style.display=tab==='overview'?'':'none';
+  document.getElementById('tab-deepdive').style.display=tab==='deepdive'?'':'none';
   document.getElementById('tab-telemetry').style.display=tab==='telemetry'?'':'none';
   document.getElementById('st-overview').classList.toggle('active',tab==='overview');
+  document.getElementById('st-deepdive').classList.toggle('active',tab==='deepdive');
   document.getElementById('st-telemetry').classList.toggle('active',tab==='telemetry');
   const url=new URL(location.href);url.searchParams.set('tab',tab);history.replaceState({},'',url);
+  if(tab==='deepdive'&&!_ddInited&&typeof DeepDive!=='undefined'){
+    _ddInited=true;
+    DeepDive.init(_id);
+  }
   if(tab==='telemetry'&&!_teleInited){
     _teleInited=true;
     const game=_sgame||(_sess&&_sess.game)||'';
