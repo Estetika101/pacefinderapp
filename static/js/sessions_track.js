@@ -18,7 +18,7 @@ function spark(times){
 }
 const _track=new URLSearchParams(location.search).get('name')||'';
 const _game=new URLSearchParams(location.search).get('game')||'';
-let _sessions=[], _allTracks=[], _classFilter=null, _typeFilter=null;
+let _sessions=[], _allTracks=[], _typeFilter=null;
 // Race-type filter buckets — mirrors the previous accordion groupings so the
 // filter chips replace the same conceptual sections users were navigating.
 const TYPE_BUCKETS=[
@@ -29,7 +29,6 @@ const TYPE_BUCKETS=[
 ];
 function filteredSessions(){
   return _sessions.filter(s=>{
-    if(_classFilter!==null && s.car_class!==_classFilter)return false;
     if(_typeFilter!==null && sessGroup(s,_game)!==_typeFilter)return false;
     return true;
   });
@@ -74,7 +73,6 @@ async function init(){
   try{_allTracks=await fetch('/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'')).then(r=>r.json());}catch(e){_allTracks=[];}
   renderLeftRail();
   renderHeader();
-  renderClassFilter();
   renderTypeFilter();
   renderSessionsTable();
   loadTip();
@@ -105,14 +103,6 @@ function renderLeftRail(){
   }).join('');
 }
 
-function renderClassFilter(){
-  const classes=[...new Set(_sessions.map(s=>s.car_class).filter(c=>c!=null))].sort((a,b)=>b-a);
-  const bar=document.getElementById('class-filter');
-  if(!classes.length){bar.style.display='none';return;}
-  bar.style.display='flex';
-  bar.innerHTML=[{label:'ALL',val:null},...classes.map(c=>({label:CLASS_NAMES[c]||String(c),val:c}))].map(p=>`<button class="cf-pill${p.val===_classFilter?' active':''}" onclick="setClass(${p.val===null?'null':p.val})">${p.label}</button>`).join('');
-}
-function setClass(c){_classFilter=c;renderClassFilter();renderHeader();renderSessionsTable();}
 function renderTypeFilter(){
   const counts={};
   TYPE_BUCKETS.forEach(b=>counts[b.key]=0);
@@ -124,9 +114,14 @@ function renderTypeFilter(){
   bar.style.display='flex';
   const pills=[{label:`ALL (${_sessions.length})`,val:null}]
     .concat(present.map(b=>({label:`${b.label} (${counts[b.key]})`,val:b.key})));
-  bar.innerHTML=pills.map(p=>
-    `<button class="cf-pill${p.val===_typeFilter?' active':''}" onclick="setType(${p.val===null?'null':JSON.stringify(p.val)})">${p.label}</button>`
-  ).join('');
+  // Quote string values with single quotes so the inline onclick (already
+  // wrapped in double quotes) doesn't break — JSON.stringify here was
+  // emitting `setType("race")` inside `onclick="..."`, which the browser
+  // parsed as truncated and silently dropped the click.
+  bar.innerHTML=pills.map(p=>{
+    const arg=p.val===null?'null':"'"+p.val+"'";
+    return`<button class="cf-pill${p.val===_typeFilter?' active':''}" onclick="setType(${arg})">${p.label}</button>`;
+  }).join('');
 }
 function setType(t){_typeFilter=t;renderTypeFilter();renderHeader();renderSessionsTable();}
 function renderHeader(){
