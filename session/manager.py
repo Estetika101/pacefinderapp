@@ -315,6 +315,23 @@ class Session:
                     f"[{self.game}] Race start detected — current_race_time "
                     f"reset {self._last_crt:.1f}s→{crt:.2f}s, grid=P{rp}"
                 )
+        # Fallback: FM2023 doesn't reliably tick current_race_time during the
+        # pre-race countdown, so the reset-detection above never fires there.
+        # If we see lap_number=0 and a small-but-positive race time on a Forza
+        # session that hasn't latched a grid yet, race_position at that moment
+        # is the starting slot — phantom-P1 from the countdown is gone by
+        # ~0.5s in (the lights-out moment is when crt starts ticking).
+        if (self._grid_pos_at_start is None
+                and self.game in ("forza_motorsport", "forza_horizon_5")
+                and parsed.get("is_race_on") == 1
+                and (parsed.get("lap_number") or 0) == 0
+                and 0.5 < crt < 3.0
+                and rp is not None and rp > 0):
+            self._grid_pos_at_start = rp
+            _log.info(
+                f"[{self.game}] Race start detected (early-lap fallback) — "
+                f"crt={crt:.2f}s, lap_number=0, grid=P{rp}"
+            )
         self._last_crt = crt
 
         if rp is not None and rp > 0 and parsed.get("is_race_on") == 1:
