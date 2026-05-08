@@ -15,6 +15,10 @@ function typeChipClass(t){
 }
 // Forza drivetrain_type spec: 0=FWD, 1=RWD, 2=AWD.
 const DRIVETRAIN_LABELS={0:'FWD',1:'RWD',2:'AWD'};
+// Car-class indices — same FH5 nine-class scheme used by the other sessions
+// pages. Duplicated here because each sessions_*.js is loaded standalone
+// (no shared module). #103 tracks the FM2023 vs FH5 split.
+const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
 function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function scls(v){return v>0.25?'crit':v>0.12?'warn':'';}
