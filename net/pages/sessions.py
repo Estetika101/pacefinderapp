@@ -216,6 +216,7 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
           <span class="ref-gap-val" id="ref-gap-val"></span>
         </div>
       </div>
+      <div class="class-filter" id="type-filter" style="display:none;margin-bottom:8px"></div>
       <div class="class-filter" id="class-filter" style="display:none"></div>
       <div id="acc-container"></div>
       <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
