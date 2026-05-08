@@ -626,6 +626,8 @@ state = {
     "session_id":       None,
     "track":            None,
     "car":              None,
+    "car_class":        None,
+    "car_pi":           None,
     "session_type":     None,
     "started_at":       None,
     "packet_count":     0,
@@ -706,6 +708,8 @@ def update_state(game: str, session: Session, parsed: dict):
     state["session_id"]   = session.session_id
     state["track"]        = session.track
     state["car"]          = session.car
+    state["car_class"]    = session.car_class
+    state["car_pi"]       = session.car_pi
     state["session_type"] = session.session_type
     state["started_at"]   = session.started_at.isoformat()
     state["packet_count"] = session.packet_count

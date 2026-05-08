@@ -21,6 +21,19 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .tb-track{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-bold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.5px}
 .tb-drs{color:var(--color-accent);font-weight:var(--fw-bold);display:none;letter-spacing:2px;font-size:var(--text-xs)}
 .tb-cmp{color:var(--color-text-secondary);font-size:var(--text-xs)}
+.tb-car{font-size:var(--text-xs);color:var(--color-text-primary);font-weight:var(--fw-bold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.5px;max-width:24ch}
+.tb-pi{font-size:var(--text-xs);color:var(--color-text-secondary);font-weight:var(--fw-bold);letter-spacing:1px}
+/* Class badge — palette mirrors sessions_*.css; consolidate later. */
+.cc{font-size:.58rem;font-weight:var(--fw-bold);padding:1px 5px;border-radius:3px;letter-spacing:.5px}
+.cc-X{background:#ef444415;color:#ef4444;border:1px solid #ef444440}
+.cc-S2{background:#a855f715;color:#a855f7;border:1px solid #a855f740}
+.cc-S1{background:#f59e0b15;color:#f59e0b;border:1px solid #f59e0b40}
+.cc-A{background:#3b82f615;color:#3b82f6;border:1px solid #3b82f640}
+.cc-B{background:#22c55e15;color:#22c55e;border:1px solid #22c55e40}
+.cc-C{background:#64748b15;color:#94a3b8;border:1px solid #64748b40}
+.cc-D{background:#33333350;color:#888;border:1px solid #44444460}
+.cc-R{background:#06b6d415;color:#06b6d4;border:1px solid #06b6d440}
+.cc-P{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf640}
 .tb-nav{display:flex;gap:14px;flex:none}
 .tb-nav a{font-size:var(--text-xs);color:var(--color-text-secondary);text-decoration:none;letter-spacing:1px;text-transform:uppercase}
 .tb-nav a:hover{color:var(--color-text-primary)}
