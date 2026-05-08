@@ -34,12 +34,27 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <!-- MAIN PANELS: Throttle | Brake | Rear Slip | Lap Timing -->
   <div class="panels">
 
+    <!-- Throttle (left, 35%) + RPM (right, 65%) share a single panel cell.
+         Throttle is just "how much pedal" — neutral fill, no danger color.
+         RPM gets the green/amber/red zones via .rpm-vfill.lo/.mid/.hi/.shift —
+         that's where engine_max_rpm proximity actually matters. -->
     <div class="panel-col" id="thr-row">
-      <div class="p-lbl">Throttle</div>
-      <div class="vbar-wrap">
-        <div class="vbar-fill thr-fill" id="thr-b"></div>
+      <div class="thr-rpm-row">
+        <div class="thr-col">
+          <div class="p-lbl">Throttle</div>
+          <div class="vbar-wrap">
+            <div class="vbar-fill thr-fill" id="thr-b"></div>
+          </div>
+          <div class="p-num thr-pct" id="thr-v">0%</div>
+        </div>
+        <div class="rpm-col">
+          <div class="p-lbl">RPM <span class="rpm-pct-inline" id="rpm-pct">—</span></div>
+          <div class="vbar-wrap">
+            <div class="vbar-fill rpm-vfill" id="rpm-fill"></div>
+          </div>
+          <div class="p-num" id="rpm-num">—</div>
+        </div>
       </div>
-      <div class="p-num thr-pct" id="thr-v">0%</div>
     </div>
 
     <div class="panel-col" id="brk-row">
@@ -133,7 +148,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   </div>
 
-  <!-- BOTTOM STRIP: Gear · Speed · RPM · Tyres -->
+  <!-- BOTTOM STRIP: Gear · Speed (RPM moved up next to Throttle). -->
   <div class="bot-panels">
     <div class="bp">
       <div class="bp-lbl">Gear</div>
@@ -143,17 +158,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="bp-lbl">Speed</div>
       <div class="speed-val" id="spd">—</div>
       <div class="speed-unit">mph</div>
-    </div>
-    <div class="bp rpm-bp">
-      <div class="rpm-lbl-row">
-        <span class="rpm-lbl">RPM</span>
-        <span class="rpm-pct" id="rpm-pct">—</span>
-      </div>
-      <div class="rpm-track">
-        <div class="rpm-fill" id="rpm-fill"></div>
-        <div class="rpm-gear-mark" id="rpm-mark" style="left:75%"></div>
-      </div>
-      <div class="rpm-num" id="rpm-num">—</div>
     </div>
   </div>
 
