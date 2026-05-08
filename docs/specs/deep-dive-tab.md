@@ -13,9 +13,59 @@ A new **Deep Dive** tab synthesises that stream into focused, actionable panels.
 Add a third tab next to **Overview / Telemetry** on `/sessions/session?id=…`, labelled **Deep Dive**. URL param: `?tab=deepdive`. Inherits the same `_id` / `_sgame` / `_strack` query params used by the existing tabs. Loads from the same `/sessions/session/data` endpoint plus a new `/sessions/session/deepdive` endpoint that returns the panel payloads (computed server-side from `lap_samples` so the client doesn't ship 4 × 60 Hz × 90 s of JSON to render five summary numbers).
 
 ### Panels (v1)
-Three panels, each rendered as a card with a one-line question header and a body. Cards stack vertically on narrow viewports, two-column grid above 1100 px.
+Three panels, each rendered as a card with a one-line question header and a body. Cards stack vertically on narrow viewports, two-column grid above 1100 px. **Facts** is the first card and the simplest delivery — if implementation runs long, ship just Facts as v0 and follow up with the other two.
 
-#### 1. Lap Comparison — "Where did this lap lose time vs my best?"
+#### 1. Facts — "What can I say about this session?"
+A flat bulleted list of objective statements about the session. No subjective scores, no 1–10 ratings, no "smooth / snappy" labels. Each bullet is one sentence with a number and a unit. The user reads it like a postgame stat sheet and knows immediately whether anything stands out.
+
+Two grouping modes, toggled by a small segmented control at the top of the card:
+- **Session** (default) — facts aggregated across all valid laps.
+- **Per-lap** — collapsed accordion, one block per lap, same fact format inside each.
+
+**Fact families** (~15–25 bullets total per view):
+
+*Pace*
+- `Best lap: 1:11.512 (lap 2)`
+- `Slowest valid lap: 1:17.110 (lap 1, +5.6s vs best)`
+- `Lap-time spread: 5.6 s across 4 laps`
+- `Sector splits: S1 0:40.116 · S2 0:52.494 · S3 0:44.841` *(only if sector splits land first)*
+
+*Speed & shifts*
+- `Max speed: 185.7 mph (lap 3 @ 1820 m)`
+- `Average shift RPM: 6,450 (redline 7,000 — shifting at 92%)`
+- `Highest gear used: 6th`
+- `Time at full throttle: 62.3% of lap`
+
+*Inputs*
+- `Trail-braking: 8.4% of samples (throttle + brake both > 5%)`
+- `Coasting: 11.2% of samples (both inputs < 5%)`
+- `Peak brake pressure: 87% (lap 2 @ 1450 m)`
+- `Steering reversals: 142 over the session`
+
+*Grip & slip*
+- `Peak rear slip ratio: 0.61 (lap 3 @ 920 m — power-on)`
+- `Average rear slip: 0.14`
+- `Wheel-on-rumble events: 3 (laps 1, 2, 4)`
+- `Maximum lateral G: 2.1 g`
+
+*Tyres & suspension*
+- `Front tyre temps averaged 175°F, rears 180°F (5°F front-rear delta)`
+- `Hot corner: rear-right at 198°F peak`
+- `Front-left suspension peaked at 0.95 compression — possible kerb hit at lap 1, 850 m`
+- `Tyre wear (FH5 only): FL 1.2% · FR 1.1% · RL 2.4% · RR 2.5%` *(omit on FM2023 sessions)*
+
+*Race outcome (race-type sessions only)*
+- `Started P13, finished P4 (gained 9 positions)`
+- `Closest gap to front: lost 0.34 s on lap 3 segment 2 vs your best lap`
+
+**Generation**
+- All bullets generated server-side from the same `lap_samples` aggregates the rest of the tab uses.
+- Bullets are skipped silently when their underlying data is null — e.g. tyre-wear bullet doesn't render on FM2023 sessions; race-outcome bullets don't render in Time Trial.
+- Each bullet has an internal `kind` tag (e.g. `pace.best_lap`, `inputs.trail_braking`) so we can later A/B which ones the user finds useful and prune the noise.
+
+**Empty state**: single-lap session shows `Need at least 2 valid laps for the full Facts list.` plus the still-computable single-lap subset (max speed, shift RPM, peak slip, etc.).
+
+#### 2. Lap Comparison — "Where did this lap lose time vs my best?"
 Distance-aligned delta between a chosen lap and a reference lap.
 
 - **Reference**: defaults to the session-best lap; user can pick any completed lap from a dropdown.
@@ -27,7 +77,7 @@ Distance-aligned delta between a chosen lap and a reference lap.
 - Click a segment → opens the Telemetry tab pre-zoomed to that distance window with both laps overlaid.
 - Reuse the existing `_interp_dist_to_t` timeline plumbing — same logic the live in-race delta uses, just applied between two completed laps instead of live-vs-best.
 
-#### 2. Mistakes & Events — "What went wrong?"
+#### 3. Mistakes & Events — "What went wrong?"
 Auto-detected per-lap incidents, sorted by severity. Each row: lap number, distance into lap, event label, one-line detail. Click → jump to that point in the telemetry tab.
 
 **Detectors** (all heuristic, all tunable in `db/store.py` or a new `analysis/events.py`):
@@ -39,21 +89,12 @@ Auto-detected per-lap incidents, sorted by severity. Each row: lap number, dista
 
 **Output**: max 10 events per session, sorted by severity. Empty state: "Clean session — no incidents flagged."
 
-#### 3. Driving Style Summary — "How am I driving?"
-Aggregate stats across all valid laps in the session, with per-lap variance to show consistency.
-
-- **Trail-braking %** — fraction of samples where throttle > 5% and brake > 5% simultaneously.
-- **Coasting %** — fraction where both < 5%.
-- **Average shift RPM** — mean RPM at gear-up transitions; flag if > 95% of `engine_max_rpm` (early shifter / over-rev habit) or < 80% (short shifter).
-- **Steering smoothness** — std-dev of `d(steer)/dt`; lower = smoother. Show as a 1–10 score with "smooth" / "snappy" anchors.
-- **Brake aggression** — p95 of brake input. High = stab-and-release; low = progressive.
-- **Lap-time consistency** — std-dev of valid lap times in seconds. Anchor: < 0.5 s = consistent, > 2.0 s = inconsistent.
-
-Each metric shows the session number plus a small spark-grid of per-lap values so the user can see whether their driving improved or degraded over the session.
+#### Numbered out — there's no third panel beyond Comparison and Events
+Driving Style Summary (1–10 scoring panel) is dropped in favour of the Facts list. Subjective anchors ("smooth / snappy") were always going to need calibration data we don't yet have, and the same numbers read better as bullets.
 
 ### Backend
 New endpoint `/sessions/session/deepdive?id=<sid>`:
-- Returns JSON: `{ lap_comparison: {...}, events: [...], style: {...} }`.
+- Returns JSON: `{ facts: { session: [...], per_lap: [{lap_number, bullets: [...]}] }, lap_comparison: {...}, events: [...] }`.
 - Reads `lap_samples` (gzipped per-sample data) for the session, decompresses, computes the three panels.
 - p95 target ≤ 200 ms — these are summary statistics over a few thousand samples, no DB writes, no external calls.
 - Cache-safe: same input → same output, so an `If-None-Match` ETag based on `session_id + ended_at` is trivial to add later.
@@ -78,17 +119,20 @@ All inputs are in `lap_samples` (gzipped JSON blob per lap, written at session c
 - **Time Trial / Practice sessions**. Lap Comparison still works for any session with ≥ 2 valid laps; Mistakes & Events still works; Driving Style Summary still works. No special-casing.
 
 ## Acceptance
-- A session with ≥ 2 completed laps in the DB renders all three panels under the **Deep Dive** tab.
+- A session with ≥ 2 completed laps in the DB renders all three panels (Facts, Lap Comparison, Mistakes & Events) under the **Deep Dive** tab.
+- The Facts panel renders for any session with ≥ 1 lap (single-lap shows the still-computable subset).
+- Per-lap Facts mode shows one accordion block per completed lap.
 - Lap Comparison's "total delta" matches the difference between the two laps' `lap_time_s` values to within 0.05 s (rounding).
 - Switching the reference or comparison lap updates the panel without a page reload.
 - Clicking a Top-Lost segment opens the Telemetry tab pre-zoomed to that distance range.
 - Mistakes & Events flags at least one event for any session containing a known spin (manual sanity check using a session the user remembers crashing in).
 - The deep-dive endpoint p95 ≤ 200 ms on a typical 4-lap session.
+- Bullets render their underlying data verbatim — a user copy-pasting "Best lap: 1:11.512 (lap 2)" must match what the Overview tab says.
 - Session detail page loads with no JS errors when `car_class` is unset (regression guard for #109).
-- Empty / single-lap sessions show a graceful "Need at least 2 laps for Deep Dive" message instead of erroring.
 
 ## Open questions
 - **Severity scoring for events.** Should we cap the displayed list at 10 (current proposal) or show a "show all" expander? On a clean lap there might be 0–2 events; on a chaotic AI race there might be 30. Cap-at-10 keeps the panel scannable but hides info on chaotic sessions. Lean: cap with a "+N more" link that expands.
 - **Reference-lap default**. Best lap is the obvious choice, but for diagnostic purposes "median lap" might be more useful (a typical lap, not the outlier-fast one). Worth picking one and running it; can change later.
-- **Steering smoothness score scale**. Std-dev of d(steer)/dt is the metric, but the 1–10 mapping is arbitrary until we see real data ranges. Ship with placeholder anchors and tune after a few sessions.
-- **AI hints (`lane`, `ai_brk_diff`)**. Forza broadcasts the AI driving line and AI brake-input delta. These are gold for "ideal vs actual" comparison but only meaningful in AI races. Worth surfacing in v1 as a fourth panel? Probably not — most pacefinder users right now seem to be running real races where these are zero. Stretch goal once AI-race usage grows.
+- **Facts pruning**. ~20 bullets is roughly a phone screen — but on Time Trial / Practice the race-outcome bullets disappear, on FM2023 the wear bullet disappears, etc. We could end up with as few as 8 bullets on a TT session. Acceptable to leave it variable, or add filler like "Total samples captured" / "Session duration"? Lean: leave it variable, less noise.
+- **Per-lap accordion default state**. Open all by default (scannable) or closed (compact)? Lean: closed except the highlighted "best lap" — a small "Best" badge on that one entry.
+- **AI hints (`lane`, `ai_brk_diff`)**. Forza broadcasts the AI driving line and AI brake-input delta. These could power a fact like `Average distance from racing line: 1.2 m` or `Brake-point error vs AI: +18 m late on average`. Stretch goal — interesting only in AI races.
