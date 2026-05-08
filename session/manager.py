@@ -458,6 +458,12 @@ class Session:
         return time.time() - self.last_packet > SESSION_TIMEOUT_S
 
     def is_idle_timed_out(self) -> bool:
+        # Don't fire idle-timeout while is_race_on=1 — Forza keeps streaming
+        # is_race_on=1 throughout pit stops, so a stationary stop in the
+        # box must NOT be misread as race-ended. If is_race_on is None
+        # (non-Forza, or no packet yet), fall back to the time-only check.
+        if self._last_is_race_on == 1:
+            return False
         return time.time() - self.last_activity > IDLE_TIMEOUT_S
 
     def close(self) -> dict:
