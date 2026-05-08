@@ -53,8 +53,12 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .p-lbl{font-size:var(--dash-label-size);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;flex:none}
 
 /* vertical bars — throttle / brake */
-.vbar-wrap{flex:1;background:var(--color-surface);border-radius:var(--radius-sm);position:relative;overflow:hidden;margin-bottom:var(--space-3);min-height:0}
+.vbar-wrap{flex:1;background:var(--color-surface);border-radius:var(--radius-sm);position:relative;overflow:hidden;min-height:0}
 .vbar-fill{position:absolute;bottom:0;left:0;right:0;height:0%;border-radius:var(--radius-sm);transition:height .04s linear}
+/* Numbers live INSIDE their gauge to save vertical space — anchored to the
+   bottom-center, white-with-shadow so they read on both empty bg and the
+   colored fill regardless of fill height. */
+.p-num.in-bar,.slip-num.in-bar{position:absolute;left:0;right:0;bottom:8px;color:var(--color-text-primary);text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 6px rgba(0,0,0,.5);z-index:2;pointer-events:none}
 /* Throttle is just "how much pedal" — neutral fill, no danger zones. */
 .thr-fill{background:var(--color-text-secondary,#9aa0a6)}
 .brk-fill{background:var(--color-red)}
@@ -70,8 +74,6 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .rpm-vfill.hi{background:var(--color-accent,#f59e0b)}
 .rpm-vfill.shift{background:var(--color-red);animation:sf .1s infinite}
 .p-num{font-size:var(--dash-value-size);font-weight:var(--fw-black);text-align:center;flex:none;line-height:1}
-.thr-pct{color:var(--color-accent)}
-.brk-pct{color:var(--color-red)}
 
 /* slip column */
 .slip-bars{flex:1;display:flex;gap:var(--space-4);min-height:0}
@@ -93,14 +95,13 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .tyre-inline-cell{display:flex;flex-direction:column}
 .tyre-inline-lbl{font-size:var(--dash-label-size);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.12em;margin-bottom:1px}
 
-/* ── BOTTOM STRIP: Gear · Speed · RPM ── */
-.bot-panels{flex:none;min-height:clamp(56px,8vh,80px);display:flex;align-items:stretch;border-bottom:1px solid var(--color-surface);overflow:visible}
-.bp{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 var(--space-4);border-right:1px solid var(--color-border-subtle);flex:none}
-.bp-lbl{font-size:var(--dash-label-size);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:2px}
-.gear-val{font-size:var(--dash-gear-size);font-weight:var(--fw-black);color:var(--color-text-secondary);line-height:1}
+/* ── Gear + Speed live below Tyres in the timing column ── */
+.gs-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-top:12px;padding-top:10px;border-top:1px solid var(--color-border-subtle)}
+.gs-cell{display:flex;flex-direction:column;align-items:flex-start}
+.gear-val{font-size:var(--text-xl);font-weight:var(--fw-black);color:var(--color-text-primary);line-height:1;letter-spacing:-1px}
 .gear-val.N{color:var(--color-text-dim)}.gear-val.R{color:#7a222288}
-.speed-val{font-size:var(--dash-speed-size);font-weight:var(--fw-black);color:var(--color-text-secondary);line-height:1}
-.speed-unit{font-size:var(--text-xs);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:2px;margin-top:1px}
+.speed-val{font-size:var(--text-xl);font-weight:var(--fw-black);color:var(--color-text-primary);line-height:1;letter-spacing:-1px;white-space:nowrap}
+.speed-unit{font-size:var(--text-xs);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:2px;font-weight:var(--fw-bold)}
 @keyframes sf{0%,100%{box-shadow:inset 0 0 20px var(--danger-glow)}50%{box-shadow:inset 0 0 40px #ff440099}}
 .tyre-temp{font-size:var(--text-lg);font-weight:var(--fw-black);transition:color .2s;letter-spacing:-.5px;line-height:1}
 .tyre-inline-lbl{font-size:var(--dash-label-size)}
@@ -173,8 +174,6 @@ select.fo-input{cursor:pointer}
   .panel-col:nth-child(3),.panel-col:nth-child(4){display:none}
   .panel-col:last-child{grid-column:1 / -1;border-right:none;border-top:1px solid var(--color-border-subtle)}
   .t-val{font-size:var(--text-xl)}
-  .bot-panels{flex-direction:row}
-  .bp:nth-child(3){flex:1}
   .tyre-temp{display:none}
   .tyre-inline-grid{display:none}
 }
