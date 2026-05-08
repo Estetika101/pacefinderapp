@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 import logging
 
-from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, RACE_END_DETECTION_PACKETS, MIN_VALID_LAP_S
+from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, MIN_VALID_LAP_S
 from db.store import (
     _classify_race_type,
     _db_write_session,
@@ -187,8 +187,16 @@ class Session:
 
         # Race-end detection state (see docs/specs/race-end-detection.md)
         self._last_is_race_on: Optional[int] = None
-        self._race_off_streak: int = 0
-        self._should_close_for_race_end: bool = False
+        # Pause / restart awareness — see _update_race_state. Pausing in
+        # Forza flips is_race_on 1→0 with current_race_time held steady;
+        # restarting flips back to 1 with CRT reset to ~0. Race-end is
+        # indistinguishable from a long pause via telemetry alone, so we
+        # rely on the UDP-stop watchdog to close at end-of-race instead of
+        # an aggressive is_race_on=0 streak counter (which fragmented every
+        # AI race that paused for >0.5s).
+        self._paused_since: Optional[float] = None
+        self._paused_at_crt: Optional[float] = None
+        self._should_close_for_restart: bool = False
         self.closed_reason: Optional[str] = None
 
         # Race-start detection: Forza ticks current_race_time during the
@@ -367,44 +375,58 @@ class Session:
         parsed["_t"] = time.time() - self.current_lap.started_at
         self.current_lap.add_sample(parsed)
 
-        self._update_race_end_state(parsed.get("is_race_on"))
+        self._update_race_state(parsed)
 
-    def _update_race_end_state(self, new_is_race_on):
-        """Detect a sustained is_race_on 1 → 0 transition that signals a real
-        race end (vs. a brief blip). See docs/specs/race-end-detection.md.
+    def _update_race_state(self, parsed):
+        """Track pause / restart / race-end via is_race_on + current_race_time.
 
-        We require: (a) the previous packet had is_race_on=1, (b) the current
-        and a sustained run of subsequent packets are 0 (RACE_END_DETECTION_PACKETS),
-        and (c) at least one lap was completed in this session — so a session
-        that ends before any lap finishes still falls back to the timeout path.
+        - **Pause**: is_race_on flips 1→0 with current_race_time held steady
+          (Forza freezes the race timer during the pause overlay). The session
+          stays open; is_idle_timed_out() honors _paused_since with a long
+          grace cap so AI races that pause for a phone call don't fragment.
+        - **Restart**: is_race_on=1 with current_race_time just reset to ~0,
+          on a session that already had race progress (grid latched). Mark
+          _should_close_for_restart so protocol.py closes this session and
+          the next packet spawns a fresh one.
+        - **Race-end**: telemetry alone can't distinguish "abandoned mid-race"
+          from "paused for a long time" until UDP stops, so we let the
+          watchdog (UDP-stop timeout) close the session naturally. No early
+          close on is_race_on=0 — the previous 0.5s threshold caused
+          fragmentation on every AI-race pause.
         """
+        new_is_race_on = parsed.get("is_race_on")
         if new_is_race_on is None:
             return
-        if self._last_is_race_on == 1 and new_is_race_on == 0:
-            self._race_off_streak = 1
+        crt = parsed.get("current_race_time", 0) or 0
+
+        # Restart detection — CRT just reset on a session that already raced.
+        if (new_is_race_on == 1
+                and self._last_crt is not None
+                and self._last_crt > 5.0
+                and crt < 1.0
+                and self._grid_pos_at_start is not None
+                and not self._should_close_for_restart):
+            self._should_close_for_restart = True
+            self.closed_reason = "restart"
             _log.info(
-                f"[{self.game}] is_race_on 1→0 transition (race-end candidate) — "
-                f"{len(self.completed_laps)} lap(s) completed so far"
+                f"[{self.game}] Race restart detected (CRT {self._last_crt:.1f}s→{crt:.2f}s) — "
+                f"closing current session"
             )
-        elif new_is_race_on == 0 and self._race_off_streak > 0:
-            self._race_off_streak += 1
-            if (self._race_off_streak >= RACE_END_DETECTION_PACKETS
-                    and self.completed_laps
-                    and not self._should_close_for_race_end):
-                self._should_close_for_race_end = True
-                self.closed_reason = "race_end"
-            elif (self._race_off_streak == RACE_END_DETECTION_PACKETS
-                    and not self.completed_laps):
-                # Threshold reached but the no-completed-laps guard held — log once
-                # so we know why early-close didn't fire (will fall through to the
-                # 10s timeout watchdog instead).
-                _log.info(
-                    f"[{self.game}] is_race_on=0 sustained {RACE_END_DETECTION_PACKETS} "
-                    f"packets but no lap completed — early-close skipped, "
-                    f"falling back to timeout watchdog"
-                )
-        elif new_is_race_on == 1:
-            self._race_off_streak = 0
+
+        # Pause / resume tracking.
+        if new_is_race_on == 0 and self._last_is_race_on == 1:
+            self._paused_since = time.time()
+            self._paused_at_crt = self._last_crt
+            _log.info(
+                f"[{self.game}] is_race_on 1→0 (pause or race-end) — "
+                f"crt={self._last_crt or 0:.1f}s, completed_laps={len(self.completed_laps)}"
+            )
+        elif new_is_race_on == 1 and self._paused_since is not None:
+            paused_dur = time.time() - self._paused_since
+            _log.info(f"[{self.game}] is_race_on 0→1 — pause ended after {paused_dur:.1f}s")
+            self._paused_since = None
+            self._paused_at_crt = None
+
         self._last_is_race_on = new_is_race_on
 
     def _transition_lap(self, new_lap: int, lap_time_s: Optional[float] = None):
@@ -477,10 +499,15 @@ class Session:
     def is_idle_timed_out(self) -> bool:
         # Don't fire idle-timeout while is_race_on=1 — Forza keeps streaming
         # is_race_on=1 throughout pit stops, so a stationary stop in the
-        # box must NOT be misread as race-ended. If is_race_on is None
-        # (non-Forza, or no packet yet), fall back to the time-only check.
+        # box must NOT be misread as race-ended.
         if self._last_is_race_on == 1:
             return False
+        # Paused (is_race_on flipped 1→0 with race progress in flight). Give
+        # a long grace before giving up so a phone call mid-AI-race doesn't
+        # fragment the session. Beyond 10 minutes paused, assume abandoned.
+        if self._paused_since is not None:
+            return time.time() - self._paused_since > 600
+        # Non-Forza or pre-race idle: fall through to the time-only check.
         return time.time() - self.last_activity > IDLE_TIMEOUT_S
 
     def close(self) -> dict:
