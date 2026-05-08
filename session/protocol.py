@@ -105,20 +105,21 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
         session.ingest(data, parsed)
         update_state(self.game, session, parsed)
 
-        # Early close on detected race end — see docs/specs/race-end-detection.md.
-        # Bypasses the watchdog's 10s timeout so the post-race UI can react in <1s.
-        if session._should_close_for_race_end:
+        # Restart detection — Session sees current_race_time reset to ~0
+        # while a session is already in flight. Close the current session
+        # right away so the next packet spawns a fresh one. We do NOT flip
+        # state.status to race_ended (that would pop the post-race modal
+        # mid-restart); the new session starting on the next packet keeps
+        # the dashboard in 'receiving' continuously.
+        # Race-end (cross-line, abandon-to-menu) is handled by the watchdog
+        # timeout when UDP stops — telemetry alone can't distinguish a long
+        # pause from a quiet abandon, so the cheap-and-correct close path is
+        # "no packets for SESSION_TIMEOUT_S seconds".
+        if session._should_close_for_restart:
             closed = active_sessions.pop(self.game, None)
             if closed is not None:
-                _log.info(f"[{self.game}] Closing session — race ended (is_race_on 1→0 sustained)")
+                _log.info(f"[{self.game}] Closing session — race restarted (CRT reset)")
                 closed.close()
-                if not active_sessions:
-                    state["status"]     = "race_ended"
-                    state["game"]       = None
-                    state["session_id"] = None
-                    # Defer-import to avoid circular dependency with watchdog.
-                    from session.watchdog import _clear_race_ended
-                    asyncio.create_task(_clear_race_ended())
 
     def error_received(self, exc):
         _log.error(f"[{self.game}] UDP error: {exc}")
