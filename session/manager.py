@@ -749,12 +749,19 @@ def update_state(game: str, session: Session, parsed: dict):
     # showing race_position from that window would mislead. Once
     # _grid_pos_at_start is set (current_race_time reset detected), we
     # have real position data and can populate the dashboard.
-    if session._grid_pos_at_start is not None and session._race_positions:
+    # Grid position needs the countdown→race transition (current_race_time
+    # reset) to be confident; otherwise we'd lock in the phantom P1 Forza
+    # broadcasts during the countdown. Race position is safer — we'll show it
+    # whenever we've clearly passed the countdown phase, even if the listener
+    # missed the start-of-race packet boundary (e.g. dashboard opened
+    # mid-race). "Past countdown" = at least one lap completed, OR
+    # current_race_time has been observed > 5s.
+    _past_countdown = bool(session.completed_laps) or (session._last_crt or 0) > 5
+    if session._race_positions and (session._grid_pos_at_start is not None or _past_countdown):
         state["race_position"] = session._race_positions[-1]
-        state["grid_pos"]      = session._grid_pos_at_start
     else:
         state["race_position"] = None
-        state["grid_pos"]      = None
+    state["grid_pos"] = session._grid_pos_at_start if session._race_positions else None
     state["fuel_remaining_laps"] = parsed.get("fuel_remaining_laps", state["fuel_remaining_laps"])
     state["current_lap_time"]    = parsed.get("current_lap_time", state["current_lap_time"])
     if parsed.get("last_lap_time"):
