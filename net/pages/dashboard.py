@@ -17,6 +17,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <span class="tb-game game-none" id="tb-game">—</span>
     <span class="tb-sep">·</span>
     <span class="tb-track" id="tb-track">—</span>
+    <span class="tb-sep tb-car-sep" id="tb-car-sep" style="display:none">·</span>
+    <span class="tb-car" id="tb-car" style="display:none"></span>
+    <span class="cc tb-cc" id="tb-cc" style="display:none"></span>
+    <span class="tb-pi" id="tb-pi" style="display:none"></span>
     <span class="tb-drs" id="tb-drs">DRS</span>
     <span class="tb-cmp" id="tb-cmp"></span>
   </div>

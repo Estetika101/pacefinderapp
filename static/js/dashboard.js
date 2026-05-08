@@ -69,6 +69,26 @@ es.onmessage=e=>{
   gEl.textContent=d.game?gameLabels[d.game]||d.game.replace(/_/g,' ').toUpperCase():'—';
   gEl.className='tb-game game-'+(d.game?gameClsMap[d.game]||'none':'none');
   $('tb-track').textContent=d.track&&d.track!=='unknown'?d.track:'—';
+  // Car name + class badge + PI. Class indices follow the FH5 scheme today
+  // (D/C/B/A/S1/S2/X/R/P) — FM2023 only has 7 classes so an FM session may
+  // mislabel S as S1. See issue: FM/FH split.
+  const TB_CC={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+  const carName=d.car&&d.car!=='unknown'?d.car:null;
+  const hasCar=!!(carName||d.car_class!=null||d.car_pi!=null);
+  $('tb-car-sep').style.display=hasCar?'inline':'none';
+  const carEl=$('tb-car');
+  carEl.style.display=carName?'inline':'none';
+  carEl.textContent=carName||'';
+  const ccEl=$('tb-cc');
+  if(d.car_class!=null && TB_CC[d.car_class]){
+    const n=TB_CC[d.car_class];
+    ccEl.textContent=n;
+    ccEl.className='cc tb-cc cc-'+n;
+    ccEl.style.display='inline';
+  } else { ccEl.style.display='none'; }
+  const piEl=$('tb-pi');
+  if(d.car_pi!=null){ piEl.textContent=d.car_pi; piEl.style.display='inline'; }
+  else { piEl.style.display='none'; }
   $('tb-drs').style.display=d.drs?'inline':'none';
   $('tb-cmp').textContent=d.tyre_compound||'';
 
