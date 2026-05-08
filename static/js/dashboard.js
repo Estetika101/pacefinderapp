@@ -102,9 +102,11 @@ es.onmessage=e=>{
   const rpm=d.rpm||0;
   if(d.engine_max_rpm&&d.engine_max_rpm>2000)_maxRpm=d.engine_max_rpm;
   const rPct=Math.min(100,rpm/_maxRpm*100);
+  // RPM moved from horizontal bottom-strip track to a vertical column next to
+  // Throttle. Drive height instead of width; use .rpm-vfill (vbar-fill) zones.
   const rf=$('rpm-fill');
-  rf.style.width=rPct+'%';
-  rf.className='rpm-fill '+(rPct>=88?'shift':rPct>=75?'hi':rPct>=55?'mid':'lo');
+  rf.style.height=rPct+'%';
+  rf.className='vbar-fill rpm-vfill '+(rPct>=88?'shift':rPct>=75?'hi':rPct>=55?'mid':'lo');
   $('rpm-pct').textContent=rPct>0?Math.round(rPct)+'%':'—';
   $('rpm-num').textContent=rpm?Math.round(rpm).toLocaleString()+' rpm':'—';
 
@@ -140,7 +142,6 @@ es.onmessage=e=>{
     const sign=delta<0?'':'+';
     dEl.textContent=sign+delta.toFixed(2)+'s';
     dEl.className='delta-val '+(delta<-0.01?'ahead':delta>0.01?'behind':'even');
-    if(recv&&delta>1.5) flash('t-delta');
   } else {
     dEl.textContent='—'; dEl.className='delta-val even';
   }

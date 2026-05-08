@@ -42,8 +42,20 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 /* vertical bars — throttle / brake */
 .vbar-wrap{flex:1;background:var(--color-surface);border-radius:var(--radius-sm);position:relative;overflow:hidden;margin-bottom:var(--space-3);min-height:0}
 .vbar-fill{position:absolute;bottom:0;left:0;right:0;height:0%;border-radius:var(--radius-sm);transition:height .04s linear}
-.thr-fill{background:linear-gradient(to top,var(--color-green) 0%,var(--color-green) 70%,var(--color-accent) 70%,var(--color-accent) 90%,var(--color-red) 90%,var(--color-red) 100%)}
+/* Throttle is just "how much pedal" — neutral fill, no danger zones. */
+.thr-fill{background:var(--color-text-secondary,#9aa0a6)}
 .brk-fill{background:var(--color-red)}
+/* Throttle/RPM combo cell — Throttle 35%, RPM 65% per request. */
+.thr-rpm-row{display:flex;flex:1;gap:14px;min-height:0}
+.thr-col{flex:35;display:flex;flex-direction:column;min-height:0}
+.rpm-col{flex:65;display:flex;flex-direction:column;min-height:0}
+.rpm-pct-inline{font-size:.7em;color:var(--color-text-muted);font-weight:normal;letter-spacing:0;margin-left:6px}
+/* Vertical RPM bar — same green/amber/red zones as the old horizontal track,
+   keyed to engine_max_rpm via .rpm-vfill.lo / .mid / .hi / .shift. */
+.rpm-vfill.lo{background:#0f2a18}
+.rpm-vfill.mid{background:#143a1e}
+.rpm-vfill.hi{background:var(--color-accent,#f59e0b)}
+.rpm-vfill.shift{background:var(--color-red);animation:sf .1s infinite}
 .p-num{font-size:var(--dash-value-size);font-weight:var(--fw-black);text-align:center;flex:none;line-height:1}
 .thr-pct{color:var(--color-accent)}
 .brk-pct{color:var(--color-red)}
@@ -76,19 +88,7 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .gear-val.N{color:var(--color-text-dim)}.gear-val.R{color:#7a222288}
 .speed-val{font-size:var(--dash-speed-size);font-weight:var(--fw-black);color:var(--color-text-secondary);line-height:1}
 .speed-unit{font-size:var(--text-xs);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:2px;margin-top:1px}
-.rpm-bp{flex:1;align-items:stretch;padding:var(--space-2) var(--space-4);justify-content:center}
-.rpm-lbl-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
-.rpm-lbl{font-size:var(--dash-label-size);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:2px}
-.rpm-pct{font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--color-text-secondary)}
-.rpm-track{background:var(--color-bg);border-radius:2px;overflow:hidden;height:clamp(6px,1vh,10px);position:relative}
-.rpm-fill{height:100%;width:0%;transition:width .04s linear}
-.rpm-fill.lo  {background:#0f2a18}
-.rpm-fill.mid {background:#143a1e}
-.rpm-fill.hi  {background:#2a2208}
-.rpm-fill.shift{background:var(--color-red);animation:sf .1s infinite}
 @keyframes sf{0%,100%{box-shadow:inset 0 0 20px var(--danger-glow)}50%{box-shadow:inset 0 0 40px #ff440099}}
-.rpm-gear-mark{position:absolute;top:0;bottom:0;width:2px;background:var(--color-border-subtle)}
-.rpm-num{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:3px;letter-spacing:1px}
 .tyre-temp{font-size:var(--text-lg);font-weight:var(--fw-black);transition:color .2s;letter-spacing:-.5px;line-height:1}
 .tyre-inline-lbl{font-size:var(--dash-label-size)}
 .tyre-temp.cold{color:var(--color-blue)}
