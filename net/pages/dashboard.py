@@ -48,15 +48,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="p-lbl">Throttle</div>
           <div class="vbar-wrap">
             <div class="vbar-fill thr-fill" id="thr-b"></div>
+            <div class="p-num in-bar" id="thr-v">0%</div>
           </div>
-          <div class="p-num thr-pct" id="thr-v">0%</div>
         </div>
         <div class="rpm-col">
           <div class="p-lbl">RPM <span class="rpm-pct-inline" id="rpm-pct">—</span></div>
           <div class="vbar-wrap">
             <div class="vbar-fill rpm-vfill" id="rpm-fill"></div>
+            <div class="p-num in-bar" id="rpm-num">—</div>
           </div>
-          <div class="p-num" id="rpm-num">—</div>
         </div>
       </div>
     </div>
@@ -65,8 +65,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="p-lbl">Brake</div>
       <div class="vbar-wrap">
         <div class="vbar-fill brk-fill" id="brk-b"></div>
+        <div class="p-num in-bar" id="brk-v">0%</div>
       </div>
-      <div class="p-num brk-pct" id="brk-v">0%</div>
     </div>
 
     <div class="panel-col" id="slip-panel">
@@ -76,15 +76,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="slip-bar-lbl">RL</div>
           <div class="vbar-wrap">
             <div class="vbar-fill" id="srl-b"></div>
+            <div class="slip-num in-bar" id="srl-v">—</div>
           </div>
-          <div class="slip-num" id="srl-v">—</div>
         </div>
         <div class="slip-bar-col">
           <div class="slip-bar-lbl">RR</div>
           <div class="vbar-wrap">
             <div class="vbar-fill" id="srr-b"></div>
+            <div class="slip-num in-bar" id="srr-v">—</div>
           </div>
-          <div class="slip-num" id="srr-v">—</div>
         </div>
       </div>
     </div>
@@ -148,21 +148,21 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
         </div>
       </div>
+      <!-- Gear + Speed used to live in a full-width bottom strip; moved
+           here below Tyres so the gauge columns can use that vertical space
+           for taller bars. -->
+      <div class="gs-row">
+        <div class="gs-cell">
+          <div class="t-lbl">Gear</div>
+          <div class="gear-val" id="gear">—</div>
+        </div>
+        <div class="gs-cell">
+          <div class="t-lbl">Speed</div>
+          <div class="speed-val"><span id="spd">—</span><span class="speed-unit"> mph</span></div>
+        </div>
+      </div>
     </div>
 
-  </div>
-
-  <!-- BOTTOM STRIP: Gear · Speed (RPM moved up next to Throttle). -->
-  <div class="bot-panels">
-    <div class="bp">
-      <div class="bp-lbl">Gear</div>
-      <div class="gear-val" id="gear">—</div>
-    </div>
-    <div class="bp">
-      <div class="bp-lbl">Speed</div>
-      <div class="speed-val" id="spd">—</div>
-      <div class="speed-unit">mph</div>
-    </div>
   </div>
 
 </div><!-- /main -->

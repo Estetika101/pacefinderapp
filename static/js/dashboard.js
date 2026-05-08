@@ -51,7 +51,6 @@ function setSlip(pfx,val){
   $(pfx+'-b').style.height=pct+'%';
   $(pfx+'-b').style.background=col;
   $(pfx+'-v').textContent=val!=null?v.toFixed(3):'—';
-  $(pfx+'-v').style.color=col;
 }
 
 es.onmessage=e=>{
