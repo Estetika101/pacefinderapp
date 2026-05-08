@@ -1296,10 +1296,29 @@ def update_track_references(track: str, game: str):
         if not lap_data or not lap_data["samples"]:
             continue
         samples = lap_data["samples"]
-        for i, (lo, hi) in enumerate(sector_bounds):
-            st = _sector_time_from_samples(samples, lo, hi)
-            if st is None:
-                continue
+        # Sanity: compute all three sectors first and skip the entire lap if
+        # their sum diverges meaningfully from the recorded lap_time_s. A
+        # paused-mid-lap or glitched-sample lap can still have lap_time_s
+        # >= MIN_VALID_LAP_S (passes the SQL filter) but produce nonsensical
+        # sector times (e.g. 6.7s × 3 = 20s for a 51s lap on Maple Valley).
+        # Letting those through poisons the theoretical-best calc.
+        sec_times = [_sector_time_from_samples(samples, lo, hi)
+                     for (lo, hi) in sector_bounds]
+        if any(st is None for st in sec_times):
+            continue
+        sec_sum = sum(sec_times)
+        lap_time = row["lap_time_s"]
+        # Allow up to 5% drift between Σsectors and lap_time_s — covers
+        # sampling jitter at the 1/3 and 2/3 boundaries. Beyond that the
+        # samples can't be trusted as a representative full-lap trace.
+        if lap_time and abs(sec_sum - lap_time) > 0.05 * lap_time:
+            _log.info(
+                f"track_references: skipping {row['session_id']} L{row['lap_number']} "
+                f"— sector sum {sec_sum:.2f}s diverges from lap {lap_time:.2f}s "
+                f"(probably partial / glitched samples)"
+            )
+            continue
+        for i, st in enumerate(sec_times):
             if best_s[i] is None or st < best_s[i]:
                 best_s[i] = st
                 best_meta[i] = {

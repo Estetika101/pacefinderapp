@@ -18,8 +18,22 @@ function spark(times){
 }
 const _track=new URLSearchParams(location.search).get('name')||'';
 const _game=new URLSearchParams(location.search).get('game')||'';
-let _sessions=[], _allTracks=[], _classFilter=null;
-function filteredSessions(){return _classFilter===null?_sessions:_sessions.filter(s=>s.car_class===_classFilter);}
+let _sessions=[], _allTracks=[], _classFilter=null, _typeFilter=null;
+// Race-type filter buckets — mirrors the previous accordion groupings so the
+// filter chips replace the same conceptual sections users were navigating.
+const TYPE_BUCKETS=[
+  {key:'race',       label:'Race'},
+  {key:'ai',         label:'AI Race'},
+  {key:'qualifying', label:'Qualifying / Hotlap'},
+  {key:'practice',   label:'Practice / Time Trial'},
+];
+function filteredSessions(){
+  return _sessions.filter(s=>{
+    if(_classFilter!==null && s.car_class!==_classFilter)return false;
+    if(_typeFilter!==null && sessGroup(s,_game)!==_typeFilter)return false;
+    return true;
+  });
+}
 
 // ── Game tab setup ────────────────────────────────────────────
 (async()=>{
@@ -61,7 +75,8 @@ async function init(){
   renderLeftRail();
   renderHeader();
   renderClassFilter();
-  renderAccordions();
+  renderTypeFilter();
+  renderSessionsTable();
   loadTip();
   loadReferences();
 }
@@ -97,7 +112,23 @@ function renderClassFilter(){
   bar.style.display='flex';
   bar.innerHTML=[{label:'ALL',val:null},...classes.map(c=>({label:CLASS_NAMES[c]||String(c),val:c}))].map(p=>`<button class="cf-pill${p.val===_classFilter?' active':''}" onclick="setClass(${p.val===null?'null':p.val})">${p.label}</button>`).join('');
 }
-function setClass(c){_classFilter=c;renderClassFilter();renderHeader();renderAccordions();}
+function setClass(c){_classFilter=c;renderClassFilter();renderHeader();renderSessionsTable();}
+function renderTypeFilter(){
+  const counts={};
+  TYPE_BUCKETS.forEach(b=>counts[b.key]=0);
+  _sessions.forEach(s=>{const g=sessGroup(s,_game);if(counts[g]!=null)counts[g]++;});
+  const present=TYPE_BUCKETS.filter(b=>counts[b.key]>0);
+  const bar=document.getElementById('type-filter');
+  if(!bar){return;}  // graceful if the page template hasn't been updated
+  if(!present.length){bar.style.display='none';return;}
+  bar.style.display='flex';
+  const pills=[{label:`ALL (${_sessions.length})`,val:null}]
+    .concat(present.map(b=>({label:`${b.label} (${counts[b.key]})`,val:b.key})));
+  bar.innerHTML=pills.map(p=>
+    `<button class="cf-pill${p.val===_typeFilter?' active':''}" onclick="setType(${p.val===null?'null':JSON.stringify(p.val)})">${p.label}</button>`
+  ).join('');
+}
+function setType(t){_typeFilter=t;renderTypeFilter();renderHeader();renderSessionsTable();}
 function renderHeader(){
   const fs=filteredSessions();
   document.getElementById('hdr-name').textContent=_track;
@@ -127,32 +158,6 @@ function sessGroup(s,game){
   return'practice';
 }
 
-// ── Accordion spark (80×24, amber) ───────────────────────────────────────────
-function hdrSpark(sessChron){
-  const v=sessChron.map(s=>s.best_lap_time_s).filter(t=>t>0);
-  if(!v.length)return'';
-  if(v.length===1)return`<svg width="80" height="24" style="vertical-align:middle"><circle class="sp-dot" cx="40" cy="12" r="2.5" fill="#f59e0b" data-t="${v[0].toFixed(3)}"/></svg>`;
-  const mn=Math.min(...v),mx=Math.max(...v),W=80,H=24,p=2;
-  const xf=i=>p+i/(v.length-1)*(W-p*2);
-  const yf=t=>H-p-(mx===mn?(H-p*2)/2:(t-mn)/(mx-mn)*(H-p*2));
-  const pts=v.map((t,i)=>xf(i).toFixed(1)+','+yf(t).toFixed(1)).join(' ');
-  const dots=v.map((t,i)=>`<circle class="sp-dot" cx="${xf(i).toFixed(1)}" cy="${yf(t).toFixed(1)}" r="2.5" fill="#f59e0b" data-t="${t.toFixed(3)}"/>`).join('');
-  return`<svg width="80" height="24" style="vertical-align:middle;overflow:visible"><polyline points="${pts}" fill="none" stroke="#f59e0b55" stroke-width="1.5" stroke-linejoin="round"/>${dots}</svg>`;
-}
-function trendArrow(sessChron){
-  const v=sessChron.map(s=>s.best_lap_time_s).filter(t=>t>0);
-  if(v.length<2)return'<span style="color:var(--color-text-dim)">—</span>';
-  const d=v[v.length-1]-v[v.length-2];
-  if(d<-0.5)return'<span style="color:var(--color-green)">↑</span>';
-  if(d>0.5)return'<span style="color:var(--color-red)">↓</span>';
-  return'<span style="color:var(--color-text-muted)">→</span>';
-}
-
-// ── sessionStorage open/close state ─────────────────────────────────────────
-const _skey='acc_'+_track+'_'+_game;
-function _loadAccState(){try{return JSON.parse(sessionStorage.getItem(_skey)||'null');}catch(e){return null;}}
-function _saveAccState(st){try{sessionStorage.setItem(_skey,JSON.stringify(st));}catch(e){}}
-
 // ── Session table body ────────────────────────────────────────────────────────
 function sessTableHtml(sessArr){
   const bests=sessArr.map(s=>s.best_lap_time_s).filter(v=>v);
@@ -169,103 +174,29 @@ function sessTableHtml(sessArr){
     +'</tbody></table>';
 }
 
-// ── Render accordions ─────────────────────────────────────────────────────────
-const ACC_DEFS=[
-  {key:'race',    label:'Race'},
-  {key:'qualifying',label:'Qualifying / Hotlap'},
-  {key:'practice',label:'Practice / Time Trial'},
-  {key:'ai',      label:'AI Race',muted:true},
-];
-const _urlSection=new URLSearchParams(location.search).get('section')||null;
-
-function renderAccordions(){
+// ── Flat sessions table (replaces former race/qualifying/practice/ai
+// accordion). Filter chips above (race-type + class) drive the visible rows.
+function renderSessionsTable(){
   const fs=filteredSessions();
   const container=document.getElementById('acc-container');
   const empty=document.getElementById('empty');
-
-  // Group sessions (sessions come newest-first; reverse for chronological spark)
-  const groups={};
-  ACC_DEFS.forEach(d=>groups[d.key]=[]);
-  fs.forEach(s=>groups[sessGroup(s,_game)].push(s));
-
-  const nonEmpty=ACC_DEFS.filter(d=>groups[d.key].length);
-  if(!nonEmpty.length){container.innerHTML='';empty.style.display='block';return;}
+  if(!fs.length){
+    container.innerHTML='';
+    empty.style.display='block';
+    return;
+  }
   empty.style.display='none';
-
-  // Determine which section should be open
-  const saved=_loadAccState();
-  const defaultOpen=_urlSection||'race';
-
-  container.innerHTML=nonEmpty.map(def=>{
-    const key=def.key;
-    const arr=groups[key]; // newest-first
-    const chron=[...arr].reverse(); // chronological for spark/trend
-    const bestAll=arr.map(s=>s.best_lap_time_s).filter(v=>v);
-    const bestLap=bestAll.length?Math.min(...bestAll):null;
-    const count=arr.length;
-    const isOpen=saved?!!saved[key]:(key===defaultOpen);
-    return`<div class="acc-section">
-      <button class="acc-hdr${isOpen?' open':''}${def.muted?' muted':''}" id="acc-hdr-${key}" onclick="toggleAcc('${key}')">
-        <span class="acc-arrow">&#9654;</span>
-        <span class="acc-label">${def.label}</span>
-        <span class="acc-count">${count} session${count===1?'':'s'}</span>
-        <span class="acc-best">${bestLap?'Best: '+fmtLap(bestLap):''}</span>
-        <span class="acc-spark">${hdrSpark(chron)}</span>
-        <span class="acc-trend">${trendArrow(chron)}</span>
-      </button>
-      <div class="acc-body${isOpen?' open':''}" id="acc-body-${key}">
-        <div class="acc-tbl" id="acc-tbl-${key}">${sessTableHtml(arr)}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  // Wire row clicks for each group
-  nonEmpty.forEach(def=>{
-    const arr=groups[def.key];
-    document.querySelectorAll(`#acc-tbl-${def.key} tr.clickable`).forEach(tr=>{
-      const i=parseInt(tr.dataset.idx);
-      tr.addEventListener('click',()=>{
-        let u='/sessions/session?id='+encodeURIComponent(arr[i].session_id);
-        if(_game)u+='&game='+encodeURIComponent(_game);
-        if(_track)u+='&track='+encodeURIComponent(_track);
-        location.href=u;
-      });
+  container.innerHTML=`<div class="acc-tbl">${sessTableHtml(fs)}</div>`;
+  // Wire row clicks
+  document.querySelectorAll('#acc-container tr.clickable').forEach(tr=>{
+    const i=parseInt(tr.dataset.idx);
+    tr.addEventListener('click',()=>{
+      let u='/sessions/session?id='+encodeURIComponent(fs[i].session_id);
+      if(_game)u+='&game='+encodeURIComponent(_game);
+      if(_track)u+='&track='+encodeURIComponent(_track);
+      location.href=u;
     });
   });
-
-  // Wire spark dot tooltips
-  const tip=document.getElementById('sp-tip');
-  document.querySelectorAll('#acc-container .sp-dot').forEach(dot=>{
-    dot.addEventListener('mouseenter',e=>{
-      tip.textContent=fmtLap(parseFloat(dot.dataset.t));
-      tip.style.display='block';
-      tip.style.left=(e.clientX+12)+'px';
-      tip.style.top=(e.clientY-24)+'px';
-    });
-    dot.addEventListener('mousemove',e=>{
-      tip.style.left=(e.clientX+12)+'px';
-      tip.style.top=(e.clientY-24)+'px';
-    });
-    dot.addEventListener('mouseleave',()=>{tip.style.display='none';});
-  });
-}
-
-function toggleAcc(key){
-  const hdr=document.getElementById('acc-hdr-'+key);
-  const body=document.getElementById('acc-body-'+key);
-  if(!hdr||!body)return;
-  const opening=!hdr.classList.contains('open');
-  hdr.classList.toggle('open',opening);
-  body.classList.toggle('open',opening);
-  // Persist
-  const saved=_loadAccState()||{};
-  saved[key]=opening;
-  _saveAccState(saved);
-  // Update URL section param without reload
-  const url=new URL(location.href);
-  if(opening)url.searchParams.set('section',key);
-  else url.searchParams.delete('section');
-  history.replaceState({},'',url);
 }
 async function loadReferences(){
   try{
