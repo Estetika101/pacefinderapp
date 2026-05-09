@@ -140,17 +140,6 @@ class LapRecord:
         self.ended_at   = time.time()
         self.lap_time_s = lap_time_s
 
-    def reset_for_race_start(self):
-        """Wipe accumulated samples + re-anchor the LapRecord. Used when the
-        listener was running before the race actually started — without this,
-        every meter the user drove in the lobby/pre-race phase gets baked
-        into start_distance_m and the lap's distance accounting is offset
-        by however much pre-race motion was captured. See issue #114."""
-        self.samples = []
-        self.start_distance_m = None
-        self.max_speed = 0.0
-        self.sector_times = []
-        self.started_at = time.time()
 
     def to_dict(self) -> dict:
         return {
@@ -357,8 +346,7 @@ class Session:
                         f"[{self.game}] Race start detected — current_race_time "
                         f"reset {self._last_crt:.1f}s→{crt:.2f}s, grid=P{rp}"
                     )
-                if self.current_lap is not None:
-                    self.current_lap.reset_for_race_start()
+                self._reset_to_race_start()
             elif not self._should_close_for_restart:
                 self._should_close_for_restart = True
                 self.closed_reason = "restart"
@@ -378,8 +366,7 @@ class Session:
                 and 0.5 < crt < 3.0
                 and rp is not None and rp > 0):
             self._grid_pos_at_start = rp
-            if self.current_lap is not None:
-                self.current_lap.reset_for_race_start()
+            self._reset_to_race_start()
             _log.info(
                 f"[{self.game}] Race start detected (early-lap fallback) — "
                 f"crt={crt:.2f}s, lap_number=0, grid=P{rp}"
@@ -460,6 +447,30 @@ class Session:
             self._paused_at_crt = None
 
         self._last_is_race_on = new_is_race_on
+
+    def _reset_to_race_start(self):
+        """Re-anchor lap counting to Forza's actual lights-out state.
+        Called when we detect race-start mid-session lifecycle.
+
+        Two things have to be reset together — they were the cause of the
+        'Last lap shows —' bug after #119:
+
+        1. **current_lap_num back to 0.** Forza's lap_number can be stale
+           when the listener joins (e.g. lap_number=1 carried over from a
+           previous race attempt in the menu). The first packet's
+           `if lap_num and lap_num != current_lap_num` gate fires a
+           transition, setting current_lap_num to that stale value. After
+           the actual race starts and the user completes the real lap 1,
+           Forza sets lap_number=1 — but our current_lap_num is already 1,
+           so no transition fires, no LapRecord gets closed, and
+           completed_laps stays empty.
+        2. **A fresh LapRecord(0)**, replacing whatever LapRecord was in
+           flight. Resets samples / start_distance_m / etc. (the work the
+           old LapRecord.reset_for_race_start did) AND fixes the
+           lap_number mismatch above.
+        """
+        self.current_lap_num = 0
+        self.current_lap = LapRecord(0)
 
     def _transition_lap(self, new_lap: int, lap_time_s: Optional[float] = None):
         if self.current_lap is not None:
