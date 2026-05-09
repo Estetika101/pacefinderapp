@@ -788,12 +788,12 @@ def update_state(game: str, session: Session, parsed: dict):
     state["started_at"]   = session.started_at.isoformat()
     state["packet_count"] = session.packet_count
     state["lap"]          = session.current_lap_num
+    # Drive best_lap_time_s purely from THIS session's completed laps.
+    # Forza's parsed["best_lap_time"] persists across races (the user's
+    # personal best on the track), so trusting it would show a previous
+    # race's PB on lap 1 of a new race. Worse for "Last" — shows the
+    # last lap of the PREVIOUS race until the current race's lap 1 ends.
     state["best_lap_time_s"] = session.best_lap_time_s
-    bl_pkt = parsed.get("best_lap_time")
-    if bl_pkt and bl_pkt > 0:
-        state["best_lap_time_s"] = round(bl_pkt, 3)
-        if session.best_lap_time_s is None or bl_pkt < session.best_lap_time_s:
-            session.best_lap_time_s = bl_pkt
     _driving = session._is_driving(parsed)
     state["speed_mph"]    = parsed.get("speed_mph", state["speed_mph"]) if _driving else 0
     state["throttle_pct"] = parsed.get("throttle_pct", state["throttle_pct"]) if _driving else 0
@@ -832,8 +832,13 @@ def update_state(game: str, session: Session, parsed: dict):
     state["grid_pos"] = session._grid_pos_at_start if session._race_positions else None
     state["fuel_remaining_laps"] = parsed.get("fuel_remaining_laps", state["fuel_remaining_laps"])
     state["current_lap_time"]    = parsed.get("current_lap_time", state["current_lap_time"])
-    if parsed.get("last_lap_time"):
-        state["last_lap_time_s"] = parsed["last_lap_time"]
+    # Same reasoning as best_lap_time above — Forza broadcasts the previous
+    # race's last_lap_time until the current race completes a lap. Source
+    # from this session's completed laps only.
+    if session.completed_laps and session.completed_laps[-1].lap_time_s:
+        state["last_lap_time_s"] = session.completed_laps[-1].lap_time_s
+    else:
+        state["last_lap_time_s"] = None
 
     # Live in-race delta vs THIS session's best lap.
     # Reference is rebuilt in _transition_lap whenever a new in-session best
