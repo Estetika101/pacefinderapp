@@ -19,6 +19,11 @@ a{color:inherit;text-decoration:none}
 .breadcrumb a{color:var(--n-400)}.breadcrumb a:hover{color:var(--n-200)}
 .tele-layout{display:flex;min-height:calc(100vh - 90px)}
 .ctrl-col{width:220px;flex-shrink:0;border-right:1px solid var(--border-sub);padding:var(--sp-3) var(--sp-4);overflow-y:auto;position:sticky;top:50px;max-height:calc(100vh - 50px)}
+/* In embed mode the iframe's own .tb is hidden, so anchor sticky to 0 and
+   give the iframe body min-height:0 so it doesn't double-scroll the parent. */
+html.embed body{min-height:0}
+html.embed .tele-layout{min-height:0}
+html.embed .ctrl-col{top:0;max-height:100vh}
 @media(max-width:768px){.tele-layout{flex-direction:column}.ctrl-col{width:100%;position:static;max-height:none;border-right:none;border-bottom:1px solid var(--border-sub)}}
 .ctrl-section{margin-bottom:var(--sp-4)}
 .ctrl-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:2px;margin-bottom:var(--space-2)}
@@ -66,7 +71,10 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 #tele-tip{position:fixed;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);font-size:var(--text-xs);padding:5px 10px;border-radius:4px;pointer-events:none;display:none;z-index:200;white-space:pre;line-height:1.7;font-family:var(--font-mono);min-width:160px}
 .track-map-wrap{margin-top:var(--sp-4);border:1px solid var(--border-sub);border-radius:2px;background:var(--bg-raised);overflow:hidden}
 .tm-lbl{font-size:.56rem;color:var(--n-500);text-transform:uppercase;letter-spacing:1.5px;padding:4px var(--sp-3)}
-#drag-sel{position:absolute;background:rgba(74,154,239,.1);border:1px solid rgba(74,154,239,.35);pointer-events:none;display:none;top:0;bottom:0}
+#drag-sel{position:absolute;background:rgba(245,158,11,.18);border:2px dashed rgba(245,158,11,.85);box-shadow:inset 0 0 0 1px rgba(0,0,0,.4),0 0 8px rgba(245,158,11,.35);pointer-events:none;display:none;top:0;bottom:0;border-radius:2px;z-index:5}
+.tele-help{display:flex;flex-wrap:wrap;gap:10px;padding:6px 10px;margin-bottom:var(--sp-3);background:var(--bg-raised);border:1px solid var(--border-sub);border-radius:4px;font-size:.66rem;color:var(--n-400)}
+.tele-help kbd{background:var(--surface);border:1px solid var(--surface-bd);border-bottom-width:2px;border-radius:3px;padding:1px 5px;font-family:var(--font-mono);font-size:.6rem;color:var(--n-200)}
+.tele-help-sep{color:var(--n-700,#444)}
 .x-lbl-row{display:flex;justify-content:space-between;font-size:.56rem;color:var(--n-600);margin-top:3px;padding:0 1px}
 /* Per-chart mini-axis (issue #12 polish bundle). Same percentages as
    .x-lbl-row but rendered under every chart for at-a-glance scanning. */
@@ -105,6 +113,11 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';
 if(new URLSearchParams(location.search).get('embed')==='1'){
   document.querySelector('.tb').style.display='none';
+  // Hide the in-iframe breadcrumb — the parent session detail page already
+  // shows one. Pin .ctrl-col to top:0 since the iframe topbar is gone.
+  document.documentElement.classList.add('embed');
+  const bc=document.getElementById('tele-breadcrumb');
+  if(bc) bc.style.display='none';
 }
 </script>
 <div class="breadcrumb" id="tele-breadcrumb">
@@ -160,6 +173,17 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
   <div id="panels-inner" style="display:none">
     <div id="sector-hdr" class="sector-hdr"></div>
     <div id="lap-summaries" class="lap-summaries"></div>
+    <div class="tele-help" id="tele-help">
+      <span><kbd>drag</kbd> zoom to selection</span>
+      <span class="tele-help-sep">·</span>
+      <span><kbd>space</kbd>+<kbd>drag</kbd> pan when zoomed</span>
+      <span class="tele-help-sep">·</span>
+      <span><kbd>click</kbd> lock cursor</span>
+      <span class="tele-help-sep">·</span>
+      <span><kbd>←</kbd> <kbd>→</kbd> nudge (with <kbd>shift</kbd> = 10×)</span>
+      <span class="tele-help-sep">·</span>
+      <span><kbd>esc</kbd> unlock</span>
+    </div>
     <div id="charts-area" style="position:relative">
       <div class="chart-zoom-ctrl">
         <button class="czc-btn" onclick="resetZoom()">Reset</button>
