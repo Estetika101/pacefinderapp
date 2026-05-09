@@ -490,6 +490,48 @@ def scenario_restart_from_menu(rng: random.Random) -> Scenario:
     )
 
 
+def scenario_race_end_at_finish(rng: random.Random) -> Scenario:
+    """User crosses the FINAL line and Forza flips is_race_on=0 within a
+    second — the cross-the-line race-end pattern. Tests that
+    is_likely_race_end() fires within ~5s, distinct from a mid-race pause."""
+    track = rng.choice(TRACKS)
+    grid = rng.randint(2, 24)
+    pre_race = gen_pre_race_packets(track, n=track.pkt_hz * 3, rng=rng)
+    race_start = [gen_race_start_packet(track, distance_offset=pre_race[-1]["distance_traveled"],
+                                         rng=rng, race_position=grid)]
+    distance = race_start[0]["distance_traveled"]
+    race_time = 0.0
+    last_llt = 0.0
+    expected = []
+    laps = []
+    n_laps = rng.randint(2, 3)
+    for lap_n in range(n_laps):
+        lt = track.lap_time_with_jitter(rng)
+        expected.append(round(lt, 3))
+        laps += gen_lap_packets(track, lap_num=lap_n, lap_time_s=lt,
+                                distance_offset=distance, race_time_offset=race_time,
+                                last_lap_time_carry=last_llt, rng=rng)
+        distance += track.length_m
+        race_time += lt
+        last_llt = lt
+    # Post-race cooldown: is_race_on=0, lap_number stays at n_laps, CRT held
+    # at race-end time. Forza streams these for the results screen. We
+    # generate enough packets to span the 2s pause-detection threshold.
+    final_clt = 0.5
+    for i in range(track.pkt_hz * 4):   # 4 seconds of post-race packets
+        laps.append(base_packet(distance=distance, clt=final_clt, crt=race_time + final_clt,
+                                lap_num=n_laps, last_lap_time=last_llt, is_race_on=0,
+                                speed_mph=10, throttle_pct=0, brake_pct=20, gear=2))
+    return Scenario(
+        label="race_end_at_finish",
+        packets=pre_race + race_start + laps,
+        track=track,
+        expected_completed_lap_times=expected,
+        grid_pos=grid,
+        total_distance_at_session_end=distance,
+    )
+
+
 SCENARIO_BUILDERS: list[Callable[[random.Random], Scenario]] = [
     scenario_clean_cold_start,
     scenario_stale_lap_number,
@@ -497,6 +539,7 @@ SCENARIO_BUILDERS: list[Callable[[random.Random], Scenario]] = [
     scenario_delayed_last_lap_time,
     scenario_pause_resume,
     scenario_restart_from_menu,
+    scenario_race_end_at_finish,
 ]
 
 
