@@ -327,6 +327,20 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
         <button class="etype" data-val="Wet"     onclick="editSelTyre(this)">Wet</button>
       </div>
     </div>
+    <div class="edit-row">
+      <!-- Grid + finish — Forza assesses penalties post-race in a screen
+           we never see, so the captured finish_pos is the on-track result.
+           Manual override here so corrected positions can be recorded. -->
+      <label class="edit-lbl">Grid → Finish</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:.7rem;color:var(--color-text-muted)">P</span>
+        <input id="edit-grid" type="number" min="1" max="100" placeholder="—"
+               style="width:60px;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);font-family:var(--font-mono);font-size:var(--text-sm);padding:6px 8px;border-radius:var(--radius-sm)"/>
+        <span style="font-size:.7rem;color:var(--color-text-muted)">→ P</span>
+        <input id="edit-finish" type="number" min="1" max="100" placeholder="—"
+               style="width:60px;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);font-family:var(--font-mono);font-size:var(--text-sm);padding:6px 8px;border-radius:var(--radius-sm)"/>
+      </div>
+    </div>
     <div class="edit-row" id="edit-conditions-row" style="display:none">
       <label class="edit-lbl">Conditions</label>
       <span id="edit-conditions" style="font-size:.7rem;color:var(--color-text-secondary);font-variant-numeric:tabular-nums"></span>

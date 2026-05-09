@@ -709,6 +709,18 @@ def make_handler(ctx: dict):
                             tc = body_data["tyre_compound"]
                             session_data["tyre_compound"] = tc if tc else None
 
+                        # Manual grid/finish override — Forza assesses penalties
+                        # post-race in a screen we never see, so the captured
+                        # finish_pos is the on-track result. Allow correction
+                        # here so the recorded final classification matches the
+                        # official one. Null clears.
+                        if "grid_pos" in body_data:
+                            v = body_data["grid_pos"]
+                            session_data["grid_pos"] = int(v) if v is not None else None
+                        if "finish_pos" in body_data:
+                            v = body_data["finish_pos"]
+                            session_data["finish_pos"] = int(v) if v is not None else None
+
                         # Learn a new track ordinal mapping
                         if "learned_ordinal" in body_data:
                             lo = body_data["learned_ordinal"]
@@ -752,6 +764,12 @@ def make_handler(ctx: dict):
                         if "tyre_compound" in body_data:
                             tc = body_data["tyre_compound"]
                             db_kwargs["tyre_compound"] = tc if tc else None
+                        if "grid_pos" in body_data:
+                            v = body_data["grid_pos"]
+                            db_kwargs["grid_pos"] = int(v) if v is not None else None
+                        if "finish_pos" in body_data:
+                            v = body_data["finish_pos"]
+                            db_kwargs["finish_pos"] = int(v) if v is not None else None
                         if db_kwargs:
                             db_update_session(sid, **db_kwargs)
                         if body_data.get("drop_last_lap"):

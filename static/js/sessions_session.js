@@ -343,6 +343,9 @@ async function openEdit(){
     nickRow.style.display='none';
     nickInput.value='';
   }
+  // Pre-fill grid + finish — empty input = no value, server treats as null.
+  document.getElementById('edit-grid').value   = _sess.grid_pos   != null ? _sess.grid_pos   : '';
+  document.getElementById('edit-finish').value = _sess.finish_pos != null ? _sess.finish_pos : '';
   _editTrack=cur;
   _editRaceType=_sess.race_type||_sess.session_type||null;
   // Default weather to Dry per spec; tyre has no default.
@@ -432,6 +435,14 @@ async function saveEdit(){
   // Free-text car override (covers Unknown Car / unmapped ordinals — see #6).
   const car=document.getElementById('edit-car').value.trim();
   body.car=car;  // empty string clears the override; "Unknown Car" passes through
+  // Grid / finish overrides — empty input means "clear" (null), so we always
+  // send the field rather than skip it. Coerce non-numeric input to null.
+  const gp=document.getElementById('edit-grid').value.trim();
+  const fp=document.getElementById('edit-finish').value.trim();
+  body.grid_pos   = gp ? parseInt(gp, 10) : null;
+  body.finish_pos = fp ? parseInt(fp, 10) : null;
+  if(Number.isNaN(body.grid_pos))   body.grid_pos = null;
+  if(Number.isNaN(body.finish_pos)) body.finish_pos = null;
   await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   // Nickname is keyed to car_ordinal, not the session — separate POST.
   // Empty string deletes the nickname (matches server-side semantics).
