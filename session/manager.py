@@ -392,6 +392,24 @@ class Session:
         llt = parsed.get("last_lap_time")
         if llt and 0 < llt < 600:
             self._last_seen_lap_time = llt
+            # Backfill: Forza is sometimes one packet late updating last_lap_time
+            # at the finish line, so _transition_lap fired with lap_time_s=0
+            # → stored as None → lap stayed unmeasured. The very next packet
+            # has the real value. If the most recent completed lap is missing
+            # its time, this is the value to fill in.
+            if (self.completed_laps
+                    and self.completed_laps[-1].lap_time_s is None):
+                last_lap = self.completed_laps[-1]
+                last_lap.lap_time_s = llt
+                if self.best_lap_time_s is None or llt < self.best_lap_time_s:
+                    self.best_lap_time_s = llt
+                if (llt >= MIN_VALID_LAP_S
+                        and (self._delta_ref_time_s is None or llt < self._delta_ref_time_s)):
+                    self._rebuild_delta_reference(last_lap, llt)
+                _log.info(
+                    f"[{self.game}] Backfilled lap {last_lap.lap_number} time: "
+                    f"{llt:.3f}s (Forza late on last_lap_time at the line)"
+                )
 
         lap_num = parsed.get("lap_number", 0)
         if lap_num and lap_num != self.current_lap_num:
@@ -473,6 +491,12 @@ class Session:
         self.current_lap = LapRecord(0)
 
     def _transition_lap(self, new_lap: int, lap_time_s: Optional[float] = None):
+        # Forza is sometimes one packet late updating last_lap_time at the
+        # finish line — the transition packet carries lap_time_s=0.0 and
+        # the real value lands on the next packet. Treat 0 as None so the
+        # backfill path in ingest can rescue it from _last_seen_lap_time.
+        if lap_time_s == 0:
+            lap_time_s = None
         if self.current_lap is not None:
             # Log what Forza gave us BEFORE close() applies its wall-clock
             # fallback, so when laps go missing later we can see whether the
