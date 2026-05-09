@@ -830,6 +830,24 @@ def update_state(game: str, session: Session, parsed: dict):
                 ref_t = _interp_dist_to_t(session._delta_ref_timeline, d_in_lap)
                 if ref_t is not None:
                     delta_val = round(cur_t - ref_t, 2)
+                    # Defensive guard against the start_distance_m-stale bug:
+                    # if we've been on this lap for >5s but d_in_lap is still
+                    # tiny (<25m), start_distance_m was set too late or to a
+                    # bogus value (e.g. session-start mid-lap). The interp
+                    # collapses to ref_t≈0 and produces delta == cur_t, which
+                    # reads as "+91s slower than best" when it really means
+                    # "we don't know". Suppress + log for diagnosis.
+                    if cur_t > 5 and d_in_lap < 25:
+                        _log.warning(
+                            f"[delta] suppressing suspicious delta — "
+                            f"cur_t={cur_t:.1f}s d_in_lap={d_in_lap:.1f}m "
+                            f"start_d={session.current_lap.start_distance_m:.1f} "
+                            f"cur_d={cur_d:.1f} ref_total_m={session._delta_ref_total_m:.0f} "
+                            f"ref_t={ref_t:.2f} timeline_len={len(session._delta_ref_timeline)} "
+                            f"current_lap_num={session.current_lap_num} "
+                            f"samples={len(session.current_lap.samples)}"
+                        )
+                        delta_val = None
     state["delta_to_best_s"] = delta_val
     for corner in ("fl", "fr", "rl", "rr"):
         v = parsed.get(f"tire_temp_{corner}")

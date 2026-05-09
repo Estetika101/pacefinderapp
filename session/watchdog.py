@@ -31,5 +31,12 @@ async def session_watchdog():
                 state["status"]     = "race_ended"
                 state["game"]       = None
                 state["session_id"] = None
+                # Clear live-only fields so /stream consumers don't see the
+                # last active value frozen forever — particularly delta_to_best_s
+                # which used to read +91s after a stale-state-on-close bug.
+                state["delta_to_best_s"] = None
+                state["current_lap_time"] = None
+                state["race_position"] = None
+                state["grid_pos"] = None
                 _log.info("All sessions closed. Listening...")
                 asyncio.create_task(_clear_race_ended())

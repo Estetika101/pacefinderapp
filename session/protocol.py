@@ -120,6 +120,10 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
             if closed is not None:
                 _log.info(f"[{self.game}] Closing session — race restarted (CRT reset)")
                 closed.close()
+                # Clear live-only state so the dashboard doesn't show a
+                # stale delta against the just-closed session's reference
+                # while the next packet spawns the new one.
+                state["delta_to_best_s"] = None
 
     def error_received(self, exc):
         _log.error(f"[{self.game}] UDP error: {exc}")
