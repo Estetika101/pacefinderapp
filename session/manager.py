@@ -140,6 +140,18 @@ class LapRecord:
         self.ended_at   = time.time()
         self.lap_time_s = lap_time_s
 
+    def reset_for_race_start(self):
+        """Wipe accumulated samples + re-anchor the LapRecord. Used when the
+        listener was running before the race actually started — without this,
+        every meter the user drove in the lobby/pre-race phase gets baked
+        into start_distance_m and the lap's distance accounting is offset
+        by however much pre-race motion was captured. See issue #114."""
+        self.samples = []
+        self.start_distance_m = None
+        self.max_speed = 0.0
+        self.sector_times = []
+        self.started_at = time.time()
+
     def to_dict(self) -> dict:
         return {
             "lap_number":    self.lap_number,
@@ -320,20 +332,45 @@ class Session:
         # at that reset packet is the real grid slot — Forza broadcasts a
         # phantom P1 throughout the entire countdown that we want to skip.
         crt = parsed.get("current_race_time", 0) or 0
-        if (self._last_crt is not None and self._last_crt > 1.0 and crt < 0.5
-                and self._grid_pos_at_start is None):
-            if rp is not None and rp > 0:
-                self._grid_pos_at_start = rp
+
+        # CRT-reset detection — lights-out fires a current_race_time reset
+        # from a meaningful pre-race value (countdown ticks) to ~0. Same
+        # signal serves two distinct cases:
+        #   1) FIRST race-start in the session: latch grid + wipe LapRecord
+        #      so it doesn't carry pre-race lobby/queue distance into the
+        #      lap reference (#114).
+        #   2) SUBSEQUENT race-start: user restarted from menu → close this
+        #      session and let the next packet spawn fresh (#115). The
+        #      previous restart detector lived in _update_race_state and
+        #      could never fire because _last_crt had been mutated to crt
+        #      by the time it ran — moving the check here uses the
+        #      pre-update value.
+        crt_reset = (self._last_crt is not None
+                     and self._last_crt > 1.0
+                     and crt < 0.5
+                     and parsed.get("is_race_on") == 1)
+        if crt_reset:
+            if self._grid_pos_at_start is None:
+                if rp is not None and rp > 0:
+                    self._grid_pos_at_start = rp
+                    _log.info(
+                        f"[{self.game}] Race start detected — current_race_time "
+                        f"reset {self._last_crt:.1f}s→{crt:.2f}s, grid=P{rp}"
+                    )
+                if self.current_lap is not None:
+                    self.current_lap.reset_for_race_start()
+            elif not self._should_close_for_restart:
+                self._should_close_for_restart = True
+                self.closed_reason = "restart"
                 _log.info(
-                    f"[{self.game}] Race start detected — current_race_time "
-                    f"reset {self._last_crt:.1f}s→{crt:.2f}s, grid=P{rp}"
+                    f"[{self.game}] Race restart detected (CRT {self._last_crt:.1f}s→{crt:.2f}s) "
+                    f"— closing current session"
                 )
-        # Fallback: FM2023 doesn't reliably tick current_race_time during the
-        # pre-race countdown, so the reset-detection above never fires there.
-        # If we see lap_number=0 and a small-but-positive race time on a Forza
-        # session that hasn't latched a grid yet, race_position at that moment
-        # is the starting slot — phantom-P1 from the countdown is gone by
-        # ~0.5s in (the lights-out moment is when crt starts ticking).
+
+        # FM2023 fallback: when CRT didn't tick during the countdown, the
+        # reset above never fires. Detect race-start instead via lap_number=0
+        # with a small-but-positive CRT (we're inside the actual race lap 1).
+        # Reset the LapRecord too — see #114.
         if (self._grid_pos_at_start is None
                 and self.game in ("forza_motorsport", "forza_horizon_5")
                 and parsed.get("is_race_on") == 1
@@ -341,6 +378,8 @@ class Session:
                 and 0.5 < crt < 3.0
                 and rp is not None and rp > 0):
             self._grid_pos_at_start = rp
+            if self.current_lap is not None:
+                self.current_lap.reset_for_race_start()
             _log.info(
                 f"[{self.game}] Race start detected (early-lap fallback) — "
                 f"crt={crt:.2f}s, lap_number=0, grid=P{rp}"
@@ -402,21 +441,9 @@ class Session:
         new_is_race_on = parsed.get("is_race_on")
         if new_is_race_on is None:
             return
-        crt = parsed.get("current_race_time", 0) or 0
 
-        # Restart detection — CRT just reset on a session that already raced.
-        if (new_is_race_on == 1
-                and self._last_crt is not None
-                and self._last_crt > 5.0
-                and crt < 1.0
-                and self._grid_pos_at_start is not None
-                and not self._should_close_for_restart):
-            self._should_close_for_restart = True
-            self.closed_reason = "restart"
-            _log.info(
-                f"[{self.game}] Race restart detected (CRT {self._last_crt:.1f}s→{crt:.2f}s) — "
-                f"closing current session"
-            )
+        # Restart detection moved to ingest() so it sees the pre-update
+        # _last_crt value — the version that lived here could never fire.
 
         # Pause / resume tracking.
         if new_is_race_on == 0 and self._last_is_race_on == 1:
