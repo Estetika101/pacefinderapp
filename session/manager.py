@@ -520,6 +520,19 @@ class Session:
                 pass
 
         if self.current_lap and self.current_lap.samples:
+            # Recover the in-flight lap ONLY when Forza confirms it crossed
+            # the line. The signal: _last_seen_lap_time differs from the
+            # previous completed lap (Forza updates last_lap_time at the
+            # finish line, so a fresh value means "this lap just ended"
+            # and we missed the lap_number transition).
+            #
+            # The previous behaviour fell back to current_lap_time when the
+            # last_lap_time check failed — but current_lap_time is just
+            # "seconds since this lap started", with no statement about
+            # whether the lap finished. So a user who stopped racing 35s
+            # into a Mugello lap got their incomplete drive stored as a
+            # 35s lap, which would beat their real 1:30 lap times and
+            # become the session "best". See issue with the recovery path.
             inferred_time: Optional[float] = None
             last_completed_time = (self.completed_laps[-1].lap_time_s
                                    if self.completed_laps else None)
@@ -527,17 +540,23 @@ class Session:
             if (llt and 0 < llt < 600 and
                     (last_completed_time is None or abs(llt - last_completed_time) > 0.01)):
                 inferred_time = llt
-            elif self.current_lap.samples:
-                t = self.current_lap.samples[-1].get("t", 0)
-                if t and t > 1:
-                    inferred_time = round(t, 3)
             self.current_lap.close(inferred_time)
             if inferred_time:
                 if self.best_lap_time_s is None or inferred_time < self.best_lap_time_s:
                     self.best_lap_time_s = inferred_time
                 _log.info(
                     f"[{self.game}] Final lap {self.current_lap.lap_number} recovered "
-                    f"| time={inferred_time:.3f}s (source={'last_lap_time' if llt and abs(llt-inferred_time)<0.01 else 'current_lap_time'})"
+                    f"| time={inferred_time:.3f}s (source=last_lap_time)"
+                )
+            else:
+                # Lap didn't complete — keep the LapRecord (its samples are
+                # still useful for telemetry charts) but lap_time_s stays
+                # None so the MIN_VALID_LAP_S filter drops it from
+                # completed_laps when we recompute the best lap below.
+                cur_t = self.current_lap.samples[-1].get("t", 0) if self.current_lap.samples else 0
+                _log.info(
+                    f"[{self.game}] Final lap {self.current_lap.lap_number} not recovered "
+                    f"— last_lap_time wasn't updated (user stopped mid-lap at ~{cur_t:.1f}s)"
                 )
             self.completed_laps.append(self.current_lap)
 
