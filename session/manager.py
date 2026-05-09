@@ -132,8 +132,13 @@ class LapRecord:
         self.samples.append(sample)
 
     def close(self, lap_time_s: Optional[float] = None):
+        # Honor None as None — the previous `or wall_clock` fallback masked
+        # session-close-mid-lap as a fake completed lap. Caller is responsible
+        # for passing the real Forza last_lap_time when the lap actually
+        # finished. Wall-clock duration was a misleading approximation
+        # anyway (inflated by pauses, idle time).
         self.ended_at   = time.time()
-        self.lap_time_s = lap_time_s or (self.ended_at - self.started_at)
+        self.lap_time_s = lap_time_s
 
     def to_dict(self) -> dict:
         return {
