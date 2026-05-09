@@ -20,6 +20,8 @@ async def session_watchdog():
         for game, session in active_sessions.items():
             if session.is_timed_out():
                 to_close.append((game, "no packets", "timeout"))
+            elif session.is_likely_race_end():
+                to_close.append((game, "race ended (cross-line + is_race_on=0)", "race_end"))
             elif session.is_idle_timed_out():
                 to_close.append((game, "idle", "idle_timeout"))
         for game, reason, closed_reason in to_close:

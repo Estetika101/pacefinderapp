@@ -167,6 +167,11 @@ class Session:
         self.completed_laps: list = []
         self.best_lap_time_s: Optional[float] = None
         self._last_seen_lap_time: Optional[float] = None
+        # Wall-clock when last_lap_time most recently CHANGED (a new lap was
+        # completed). Used by is_likely_race_end to detect "user just crossed
+        # the final line" — distinguishes from a mid-race pause where the
+        # last lap-line crossing was much earlier.
+        self._last_lap_completed_at: Optional[float] = None
 
         self._motion_cache: dict = {}
         self._lap_cache: dict = {}
@@ -391,6 +396,10 @@ class Session:
 
         llt = parsed.get("last_lap_time")
         if llt and 0 < llt < 600:
+            if self._last_seen_lap_time != llt:
+                # last_lap_time CHANGED → a new lap just completed at the
+                # line. Stamp wall-clock for the race-end heuristic.
+                self._last_lap_completed_at = time.time()
             self._last_seen_lap_time = llt
             # Backfill: Forza is sometimes one packet late updating last_lap_time
             # at the finish line, so _transition_lap fired with lap_time_s=0
@@ -577,6 +586,33 @@ class Session:
         # Non-Forza or pre-race idle: fall through to the time-only check.
         return time.time() - self.last_activity > IDLE_TIMEOUT_S
 
+    def is_likely_race_end(self) -> bool:
+        """Heuristic to fire race-end fast (< ~5s) without waiting for the
+        UDP-stop or 10-min idle cap. Distinguishes from a mid-race pause:
+
+        - is_race_on must be 0 (user's not actively racing)
+        - we must have at least one completed lap
+        - is_race_on=0 must have persisted for 2+ s (avoids flicker)
+        - last_lap_time must have changed within the last 10 s (i.e. the
+          user just crossed a finish line and is_race_on dropped right
+          after — that's the cross-the-final-line pattern)
+
+        A mid-race pause fails the last condition: the most recent
+        last_lap_time update was at lap N's crossing, many seconds before
+        the pause, so the 10s window doesn't match.
+        """
+        if self._last_is_race_on != 0:
+            return False
+        if not self.completed_laps:
+            return False
+        if self._paused_since is None:
+            return False
+        if time.time() - self._paused_since < 2.0:
+            return False
+        if self._last_lap_completed_at is None:
+            return False
+        return time.time() - self._last_lap_completed_at <= 10.0
+
     def close(self) -> dict:
         if self.closed_reason is None:
             self.closed_reason = "timeout"
@@ -725,33 +761,60 @@ class Session:
             "tyre_compound":    self.tyre_compound,
         }
 
+        # Synchronous: write the session row + per-lap aggregates so the
+        # post-race modal can populate immediately. Fast (~50–100ms even on
+        # the Pi) — single SQLite transaction with the laps in laps_summary.
         _db_write_session(session_data)
-        _store_session_lap_samples(self.session_id, self.completed_laps)
+
+        # Background: per-sample compression (gzip + INSERT per lap), JSON
+        # file mirrors, and track-reference rebuild. These together can take
+        # 5–30s on the Pi for a multi-lap race; running them on a daemon
+        # thread lets POST /finish return in ~100ms instead of ~30s, which
+        # in turn unblocks the dashboard's "Finishing race…" placeholder.
         threading.Thread(
-            target=_update_track_references_bg,
-            args=(self.track, self.game),
+            target=_close_finalize_async,
+            args=(self.session_id, list(self.completed_laps), session_data,
+                  self.track, self.game),
             daemon=True,
         ).start()
 
-        try:
-            sp = storage_path()
-            out_path = sp / "sessions" / f"{self.session_id}.json"
-            with open(out_path, "w") as f:
-                json.dump(session_data, f, indent=2)
-
-            samples_path = sp / "sessions" / f"{self.session_id}_laps.json"
-            with open(samples_path, "w") as f:
-                json.dump([lap.to_dict() for lap in self.completed_laps], f, indent=2)
-        except OSError as e:
-            _log.error(f"Failed to write session files: {e}")
-
         _log.info(
-            f"Session closed: {self.session_id} | "
+            f"Session closed (sync): {self.session_id} | "
             f"{self.packet_count} packets | {len(self.completed_laps)} laps | "
-            f"best={self.best_lap_time_s:.3f}s" if self.best_lap_time_s
-            else f"Session closed: {self.session_id} | {self.packet_count} packets"
+            f"best={self.best_lap_time_s:.3f}s — finalising in background" if self.best_lap_time_s
+            else f"Session closed (sync): {self.session_id} | {self.packet_count} packets"
         )
         return session_data
+
+
+def _close_finalize_async(session_id: str, completed_laps: list,
+                          session_data: dict, track: Optional[str],
+                          game: str):
+    """The slow tail of session.close() — runs on a daemon thread so the
+    main close call returns immediately. Order: lap_samples write
+    (gzipped), JSON file mirrors, then track-references rebuild."""
+    try:
+        _store_session_lap_samples(session_id, completed_laps)
+    except Exception as e:
+        _log.error(f"close_finalize: lap_samples write failed for {session_id}: {e}")
+
+    try:
+        sp = storage_path()
+        out_path = sp / "sessions" / f"{session_id}.json"
+        with open(out_path, "w") as f:
+            json.dump(session_data, f, indent=2)
+        samples_path = sp / "sessions" / f"{session_id}_laps.json"
+        with open(samples_path, "w") as f:
+            json.dump([lap.to_dict() for lap in completed_laps], f, indent=2)
+    except OSError as e:
+        _log.error(f"close_finalize: JSON file write failed for {session_id}: {e}")
+
+    try:
+        _update_track_references_bg(track, game)
+    except Exception as e:
+        _log.error(f"close_finalize: track_references update failed for {session_id}: {e}")
+
+    _log.info(f"Session finalised (async): {session_id}")
 
 
 # ─── Shared State ─────────────────────────────────────────────────────────────
