@@ -31,13 +31,19 @@ const SGAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
 let _sess=null,_laps=[],_allTracks=[];
 
 // ── Tab switching ─────────────────────────────────────────────
-let _teleInited=false;
+let _teleInited=false,_ddInited=false;
 function switchTab(tab){
   document.getElementById('tab-overview').style.display=tab==='overview'?'':'none';
+  document.getElementById('tab-deepdive').style.display=tab==='deepdive'?'':'none';
   document.getElementById('tab-telemetry').style.display=tab==='telemetry'?'':'none';
   document.getElementById('st-overview').classList.toggle('active',tab==='overview');
+  document.getElementById('st-deepdive').classList.toggle('active',tab==='deepdive');
   document.getElementById('st-telemetry').classList.toggle('active',tab==='telemetry');
   const url=new URL(location.href);url.searchParams.set('tab',tab);history.replaceState({},'',url);
+  if(tab==='deepdive'&&!_ddInited&&typeof DeepDive!=='undefined'){
+    _ddInited=true;
+    DeepDive.init(_id);
+  }
   if(tab==='telemetry'&&!_teleInited){
     _teleInited=true;
     const game=_sgame||(_sess&&_sess.game)||'';
@@ -337,6 +343,9 @@ async function openEdit(){
     nickRow.style.display='none';
     nickInput.value='';
   }
+  // Pre-fill grid + finish — empty input = no value, server treats as null.
+  document.getElementById('edit-grid').value   = _sess.grid_pos   != null ? _sess.grid_pos   : '';
+  document.getElementById('edit-finish').value = _sess.finish_pos != null ? _sess.finish_pos : '';
   _editTrack=cur;
   _editRaceType=_sess.race_type||_sess.session_type||null;
   // Default weather to Dry per spec; tyre has no default.
@@ -426,6 +435,14 @@ async function saveEdit(){
   // Free-text car override (covers Unknown Car / unmapped ordinals — see #6).
   const car=document.getElementById('edit-car').value.trim();
   body.car=car;  // empty string clears the override; "Unknown Car" passes through
+  // Grid / finish overrides — empty input means "clear" (null), so we always
+  // send the field rather than skip it. Coerce non-numeric input to null.
+  const gp=document.getElementById('edit-grid').value.trim();
+  const fp=document.getElementById('edit-finish').value.trim();
+  body.grid_pos   = gp ? parseInt(gp, 10) : null;
+  body.finish_pos = fp ? parseInt(fp, 10) : null;
+  if(Number.isNaN(body.grid_pos))   body.grid_pos = null;
+  if(Number.isNaN(body.finish_pos)) body.finish_pos = null;
   await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   // Nickname is keyed to car_ordinal, not the session — separate POST.
   // Empty string deletes the nickname (matches server-side semantics).
