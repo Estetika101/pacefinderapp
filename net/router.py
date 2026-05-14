@@ -988,11 +988,26 @@ def make_handler(ctx: dict):
                     b"Access-Control-Allow-Origin: *\r\n"
                     b"Connection: keep-alive\r\n\r\n"
                 )
+                # Idle-aware emit: 10 Hz when a session is live, 0.5 Hz when idle.
+                # After 60 s of continuous idle, close so a forgotten tab can't
+                # stream MBs overnight — EventSource auto-reconnects when the
+                # user comes back, and traffic resumes the moment UDP does.
+                idle_since = None
                 while True:
+                    is_idle = state.get("status") == "idle"
+                    if is_idle:
+                        if idle_since is None:
+                            idle_since = time.monotonic()
+                        elif time.monotonic() - idle_since > 60:
+                            writer.write(b"event: bye\ndata: idle-timeout\n\n")
+                            await writer.drain()
+                            break
+                    else:
+                        idle_since = None
                     data = f"data: {json.dumps(state)}\n\n"
                     writer.write(data.encode())
                     await writer.drain()
-                    await asyncio.sleep(0.1)  # 10 Hz
+                    await asyncio.sleep(2.0 if is_idle else 0.1)
 
             elif path == "/health":
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
