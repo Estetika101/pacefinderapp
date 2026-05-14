@@ -40,12 +40,11 @@
     border-radius: 999px;
     font-size: var(--text-sm);
     color: var(--color-text-secondary);
-    cursor: pointer;
     text-decoration: none;
     transition: border-color 120ms;
   }
-  a.pill { color: var(--color-text-secondary); }
-  .pill:hover { border-color: #2a2a2a; }
+  a.pill { cursor: pointer; color: var(--color-text-secondary); }
+  a.pill:hover { border-color: #2a2a2a; }
   .pill .label { color: #777; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; }
   .pill .val { color: var(--color-text-primary); }
   .pill .class-badge {
@@ -278,6 +277,73 @@
   }
   .crumb:hover { color: var(--color-text-primary); }
 
+  /* ─── Page head: H1 (track) + H2 (car link) ─────────────────────── */
+  .page-head {
+    padding: var(--space-4) 0 var(--space-3);
+  }
+  .page-h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .page-h2 {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: clamp(18px, 2.4vw, 22px);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: color 120ms;
+  }
+  .page-h2:hover { color: var(--color-text-primary); }
+  .page-h2-arrow {
+    color: var(--color-text-quaternary);
+    font-size: 16px;
+    transition: color 120ms, transform 120ms;
+  }
+  .page-h2:hover .page-h2-arrow {
+    color: var(--color-text-primary);
+    transform: translateX(3px);
+  }
+  .page-h2 .class-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    background: var(--color-accent); color: #000;
+    border-radius: 4px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  }
+  .page-h2 .pi {
+    color: var(--color-text-tertiary);
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  /* ─── Subnav (views of this session) ────────────────────────────── */
+  .subnav {
+    display: flex; align-items: center; gap: 2px;
+    padding: 4px 0 var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    flex-wrap: wrap;
+  }
+  .subnav-item {
+    font-size: var(--text-sm);
+    color: var(--color-text-tertiary);
+    text-decoration: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    transition: color 120ms, background 120ms;
+  }
+  .subnav-item:hover { color: var(--color-text-primary); background: var(--color-surface); }
+  .subnav-item.active {
+    color: var(--color-text-primary);
+    background: var(--color-surface);
+    box-shadow: inset 0 -2px 0 var(--color-accent);
+  }
+
   /* ─── Top bar (global nav) ──────────────────────────────────────── */
   .topbar {
     display: flex; align-items: center; gap: var(--space-3);
@@ -347,15 +413,25 @@
 
   <a href="/static/circuit-mock.html" class="crumb">← Le Mans Full Circuit</a>
 
-  <!-- ─── HEADER STRIP ─── -->
-  <div class="strip">
-    <a class="pill" href="/static/circuit-mock.html"><span class="label">Track</span><span class="val">Le Mans Full Circuit</span></a>
-    <a class="pill" href="/static/car-mock.html">
-      <span class="label">Car</span>
-      <span class="val">Pink Pig</span>
+  <!-- ─── SUBNAV (views of this session) ─── -->
+  <div class="subnav">
+    <span class="subnav-item active">Overview</span>
+    <a href="/static/telemetry-mock.html" class="subnav-item">Full telemetry</a>  </div>
+
+  <!-- ─── PAGE HEAD ─── -->
+  <div class="page-head">
+    <h1 class="page-h1">Le Mans Full Circuit</h1>
+    <a class="page-h2" href="/static/car-mock.html">
+      Pink Pig
       <span class="class-badge">R</span>
       <span class="pi">850</span>
+      <span class="page-h2-arrow">→</span>
     </a>
+  </div>
+
+  <!-- ─── METADATA STRIP ─── -->
+  <div class="strip">
+    <span class="pill"><span class="label">When</span><span class="val">Sat May 11 · 14:02 – 14:34</span></span>
     <span class="pill"><span class="label">Cond</span><span class="val">Dry · Hard · 28°C</span></span>
     <span class="pill type-practice"><span class="val">Practice</span></span>
     <span class="spacer"></span>
@@ -455,44 +531,6 @@
     </div>
   </div>
 
-  <!-- ─── THREE CARDS ─── -->
-  <div class="cards">
-
-    <div class="card">
-      <div class="card-title">Where you lost it</div>
-      <div class="card-headline"><em>3 corners</em> cost you 0.60 s</div>
-      <div class="card-body">
-        <span class="card-corner">T7 entry +0.23</span><br>
-        <span class="card-corner">T11 exit +0.19</span><br>
-        <span class="card-corner">T3 mid +0.18</span>
-      </div>
-      <a class="card-link" href="/static/layer1-mock.html">Open lap comparison →</a>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Car context</div>
-      <div class="card-headline">Your <em>3rd-best</em> of 8 sessions in this car</div>
-      <div class="card-body">
-        Best ever in Pink Pig:<br>
-        <strong style="color:var(--color-text-primary)">1:41.892</strong>
-        — Le Mans, 2026-04-12
-      </div>
-      <a class="card-link" href="/static/car-mock.html">Show car history →</a>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Coaching</div>
-      <div class="card-body quote">
-        "Trail-brake T7 too long — you carry brake to the apex; lift earlier and let the car rotate."
-      </div>
-      <div class="card-body" style="color:var(--color-text-quaternary);font-size:11px;">
-        — Claude · 2026-05-14
-      </div>
-      <a class="card-link" href="/static/layer1-mock.html">Read full analysis →</a>
-    </div>
-
-  </div>
-
   <!-- ─── LAP TIMES ─── -->
   <div class="laps">
     <div class="laps-head">
@@ -587,21 +625,46 @@
     <button id="lap-toggle" class="laps-toggle" type="button">Show all 9 ▾</button>
   </div>
 
-  <!-- ─── DRILL-INS ─── -->
-  <div class="drills">
-    <a class="drill" href="/static/layer1-mock.html">
-      <div class="drill-title">Lap comparison →</div>
-      <div class="drill-sub">Side-by-side traces, every channel</div>
-    </a>
-    <a class="drill" href="/sessions/telemetry?id=2026-05-11_le-mans">
-      <div class="drill-title">Full telemetry →</div>
-      <div class="drill-sub">Multi-lap charts, cursor sync</div>
-    </a>
-    <a class="drill" href="/static/circuit-mock.html">
-      <div class="drill-title">Track history →</div>
-      <div class="drill-sub">Where this session sits in your arc at Le Mans</div>
-    </a>
+
+
+  <!-- ─── THREE CARDS ─── -->
+  <div class="cards">
+
+    <div class="card">
+      <div class="card-title">Where you lost it</div>
+      <div class="card-headline"><em>3 corners</em> cost you 0.60 s</div>
+      <div class="card-body">
+        <span class="card-corner">T7 entry +0.23</span><br>
+        <span class="card-corner">T11 exit +0.19</span><br>
+        <span class="card-corner">T3 mid +0.18</span>
+      </div>
+      <a class="card-link" href="/static/telemetry-mock.html">View in telemetry →</a>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Car context</div>
+      <div class="card-headline">Your <em>3rd-best</em> of 8 sessions in this car</div>
+      <div class="card-body">
+        Best ever in Pink Pig:<br>
+        <strong style="color:var(--color-text-primary)">1:41.892</strong>
+        — Le Mans, 2026-04-12
+      </div>
+      <a class="card-link" href="/static/car-mock.html">Show car history →</a>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Coaching</div>
+      <div class="card-body quote">
+        "Trail-brake T7 too long — you carry brake to the apex; lift earlier and let the car rotate."
+      </div>
+      <div class="card-body" style="color:var(--color-text-quaternary);font-size:11px;">
+        — Claude · 2026-05-14
+      </div>
+      <a class="card-link" href="/static/layer1-mock.html">Read full analysis →</a>
+    </div>
+
   </div>
+
 
 </div>
 
