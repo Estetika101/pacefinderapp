@@ -125,6 +125,14 @@ def _db_init():
                     nickname   TEXT NOT NULL,
                     updated_at TEXT
                 );
+                CREATE TABLE IF NOT EXISTS discarded_sessions (
+                    session_id  TEXT PRIMARY KEY,
+                    game        TEXT,
+                    track       TEXT,
+                    started_at  TEXT,
+                    reason      TEXT,
+                    culled_at   TEXT DEFAULT (datetime('now'))
+                );
                 CREATE INDEX IF NOT EXISTS idx_laps_session  ON laps(session_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_track ON sessions(track);
                 CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(started_at);
@@ -190,6 +198,12 @@ def _db_migrate():
                     if not sid:
                         continue
                     if conn.execute("SELECT 1 FROM sessions WHERE session_id=?", (sid,)).fetchone():
+                        continue
+                    if conn.execute("SELECT 1 FROM discarded_sessions WHERE session_id=?", (sid,)).fetchone():
+                        try:
+                            f.unlink(missing_ok=True)
+                        except OSError:
+                            pass
                         continue
                     ai_text = ai_at = ai_model = None
                     af = sessions_dir / f"{sid}_analysis.json"
@@ -343,26 +357,16 @@ def _classify_race_type(positions: list, lap_count: int) -> Optional[str]:
 
 def _db_cull_ghost_sessions():
     """
-    Move sessions with lap_count=1 AND best_lap_time_s IS NULL to
+    Move sessions with lap_count<=1 AND best_lap_time_s IS NULL to
     discarded_sessions — these are Forza menu-browse artifacts.
-    Deletes the corresponding _laps.json files but keeps .bin files.
+    Deletes the source <sid>.json and <sid>_laps.json so migration
+    won't re-import them on next boot. Keeps .bin files.
     Runs once at startup; idempotent.
     """
     sessions_dir = _storage_path() / "sessions"
     with _db_lock:
         conn = _db_connect()
         try:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS discarded_sessions (
-                    session_id  TEXT PRIMARY KEY,
-                    game        TEXT,
-                    track       TEXT,
-                    started_at  TEXT,
-                    reason      TEXT,
-                    culled_at   TEXT DEFAULT (datetime('now'))
-                )
-            """)
-            conn.commit()
             ghosts = conn.execute(
                 "SELECT session_id, game, track, started_at "
                 "FROM sessions WHERE lap_count <= 1 AND best_lap_time_s IS NULL"
@@ -385,11 +389,11 @@ def _db_cull_ghost_sessions():
 
     if sessions_dir.exists():
         for sid in ids:
-            laps_file = sessions_dir / f"{sid}_laps.json"
-            try:
-                laps_file.unlink(missing_ok=True)
-            except OSError:
-                pass
+            for name in (f"{sid}.json", f"{sid}_laps.json"):
+                try:
+                    (sessions_dir / name).unlink(missing_ok=True)
+                except OSError:
+                    pass
     _log.info(f"Culled {len(ghosts)} ghost session(s) to discarded_sessions table")
 
 
