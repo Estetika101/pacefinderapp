@@ -412,9 +412,9 @@ function renderCards(){
       const meta = [lap, dm].filter(Boolean).join(' · ');
       return `<div style="margin-bottom:6px"><span class="card-corner">${label}</span><span style="color:var(--color-text-quaternary);font-size:11px">${meta}</span></div>`;
     }).join('');
-    const teleHref = '/sessions/telemetry?id=' + encodeURIComponent(_id);
-    document.getElementById('card-loss-link').href = teleHref;
-    document.getElementById('card-loss-link').textContent = 'Open in telemetry →';
+    document.getElementById('card-loss-link').href =
+      '/sessions/session/events?id=' + encodeURIComponent(_id);
+    document.getElementById('card-loss-link').textContent = 'View all ' + _events.length + ' events →';
     document.getElementById('card-loss-link').style.display = '';
   } else {
   const bestLap = _laps.find(l => l.lap_time_s != null && s.best_lap_time_s != null && Math.abs(l.lap_time_s - s.best_lap_time_s) < 0.001);
