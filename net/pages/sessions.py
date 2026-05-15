@@ -13,7 +13,8 @@ GAMES_HTML = """<!DOCTYPE html>
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
     <a href="/dashboard">Live</a>
-    <a href="/sessions" class="cur">Sessions</a>
+    <a href="/">Home</a>
+    <a href="/sessions" class="cur">Career</a>
     <a href="/setup">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
   </nav>
@@ -21,9 +22,13 @@ GAMES_HTML = """<!DOCTYPE html>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
 <div class="page">
 
-  <!-- Game Tabs -->
+  <h1 class="title">Career</h1>
+  <div class="subtitle">Your overall racing record. Per-track and per-car detail lives on
+    <a href="/">Home</a> &rarr; circuits / cars.</div>
+
+  <!-- Game filter -->
   <div class="gtab-bar">
-    <a class="gtab active" href="/sessions">All Sessions<span class="cnt" id="cnt-all"></span></a>
+    <a class="gtab active" href="/sessions">All<span class="cnt" id="cnt-all"></span></a>
     <a class="gtab" href="/sessions/game?name=forza_motorsport">Forza<span class="cnt" id="cnt-forza"></span></a>
     <a class="gtab" href="/sessions/game?name=acc">ACC<span class="cnt" id="cnt-acc"></span></a>
     <a class="gtab" href="/sessions/game?name=f1">F1<span class="cnt" id="cnt-f1"></span></a>
@@ -58,35 +63,6 @@ GAMES_HTML = """<!DOCTYPE html>
       </div>
       <div class="form-chart" id="form-chart"><div class="form-empty">No race data<small>Finish a race to populate this chart.</small></div></div>
     </div>
-  </div>
-
-  <!-- Best Laps Pills -->
-  <div class="pills-section">
-    <div class="pills-label">Best Laps by Circuit</div>
-    <div class="pills-row" id="pills-row"></div>
-  </div>
-
-  <!-- Circuit Table -->
-  <div class="table-section">
-    <div class="table-label">Circuits</div>
-    <table class="ctable">
-      <thead><tr>
-        <th>Circuit</th><th>Sessions</th><th>Avg Finish</th><th>Best Lap</th><th>Trend</th>
-      </tr></thead>
-      <tbody id="circuit-tbody"></tbody>
-    </table>
-  </div>
-
-  <!-- Game Cards -->
-  <div class="games-section" id="games-section">
-    <div class="table-label" style="margin-bottom:8px">By Game</div>
-    <div class="games-grid" id="games-grid"></div>
-  </div>
-
-  <!-- Recent Sessions -->
-  <div class="recent-section">
-    <div class="recent-label">Recent Sessions</div>
-    <div id="recent-feed"></div>
   </div>
 
 </div>
