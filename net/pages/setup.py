@@ -6,6 +6,17 @@ SETUP_HTML = """<!DOCTYPE html>
 <title>Pacefinder · Setup</title>
 <link rel="stylesheet" href="/static/tokens.css"><link rel="stylesheet" href="/static/base.css">
 <style>
+/* Page-scoped reskin to match the layered-IA visual language. base.css
+   is shared with admin/debug so we override here, not there. */
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums;
+  max-width:920px;margin:0 auto;padding:var(--space-4) var(--space-4) 60px;
+}
+.topbar{padding-bottom:var(--space-3);border-bottom:1px solid var(--color-border);margin-bottom:var(--space-6)}
+.section-title{color:var(--color-text-tertiary);letter-spacing:0.08em}
+.field label{color:var(--color-text-tertiary)}
+.field .hint{color:var(--color-text-quaternary)}
 .ip-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -96,7 +107,8 @@ SETUP_HTML = """<!DOCTYPE html>
   <h1>Pacefinder</h1>
   <nav>
     <a href="/dashboard">Live</a>
-    <a href="/sessions">Sessions</a>
+    <a href="/">Home</a>
+    <a href="/sessions">Career</a>
     <a href="/setup" class="active">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
   </nav>
@@ -231,11 +243,24 @@ sudo systemctl start pacefinder</div>
   </div>
   <div class="field">
     <label>Model</label>
-    <select id="anthropic_model" style="width:100%;background:var(--color-surface-2);border:1px solid var(--surface-bd);color:var(--color-text-primary);font-family:inherit;font-size:var(--text-sm);padding:8px 10px;border-radius:var(--radius-sm);outline:none">
+    <select id="anthropic_model" style="width:100%;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);font-family:inherit;font-size:var(--text-sm);padding:8px 10px;border-radius:var(--radius-sm);outline:none">
       <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — best balance of speed and quality</option>
       <option value="claude-opus-4-7">Claude Opus 4.7 — most capable, slower</option>
       <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fastest, lowest cost</option>
     </select>
+  </div>
+</div>
+
+<!-- ── Display ────────────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Display</div>
+  <div class="field">
+    <label>Time format</label>
+    <select id="time_format" style="width:100%;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);font-family:inherit;font-size:var(--text-sm);padding:8px 10px;border-radius:var(--radius-sm);outline:none">
+      <option value="24h">24-hour — 14:02 (default)</option>
+      <option value="12h">12-hour — 2:02 PM</option>
+    </select>
+    <div class="hint">Applies to session times across the app. Pi log timestamps stay 24-hour ISO.</div>
   </div>
 </div>
 
@@ -434,6 +459,7 @@ async function load() {
   document.getElementById('anthropic_api_key').value = d.anthropic_api_key || '';
   const modelSel = document.getElementById('anthropic_model');
   if (d.anthropic_model) modelSel.value = d.anthropic_model;
+  document.getElementById('time_format').value = (d.time_format === '12h') ? '12h' : '24h';
   renderDisk(d.disk);
   if (d.storage_path) validatePath(d.storage_path);
 }
@@ -459,6 +485,7 @@ async function save() {
     },
     anthropic_api_key: document.getElementById('anthropic_api_key').value.trim(),
     anthropic_model:   document.getElementById('anthropic_model').value,
+    time_format:       document.getElementById('time_format').value,
   };
   try {
     const r = await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });

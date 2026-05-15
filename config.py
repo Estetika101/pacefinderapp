@@ -15,6 +15,9 @@ DEFAULTS: dict = {
     },
     "anthropic_api_key": "",
     "anthropic_model":   "claude-sonnet-4-6",
+    # UI-only display preference. "24h" (default) or "12h".
+    # See docs/specs/time-format-preference.md.
+    "time_format":       "24h",
 }
 
 
