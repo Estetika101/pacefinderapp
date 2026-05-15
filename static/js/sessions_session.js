@@ -53,6 +53,71 @@ async function init(){
   renderCards();
   renderAI();
   attachSortHandlers();
+  // Hero delta line — async, doesn't block initial render
+  loadHeroDelta();
+}
+
+async function loadHeroDelta(){
+  try{
+    const d = await fetch('/sessions/session/hero-delta?id='+encodeURIComponent(_id)).then(r=>r.json());
+    if(!d || !d.available){
+      const empty = document.getElementById('delta-empty');
+      if(empty){
+        empty.textContent = (d && d.reason) || 'Delta line unavailable.';
+        empty.style.display = '';
+      }
+      return;
+    }
+    renderDelta(d);
+  }catch(e){
+    // Silent fail — the rest of the page is already rendered.
+  }
+}
+
+function renderDelta(d){
+  const svg = document.getElementById('hero-delta-svg');
+  const fill = document.getElementById('hero-delta-fill');
+  const line = document.getElementById('hero-delta-line');
+  const header = document.getElementById('delta-header');
+  const meta = document.getElementById('delta-meta');
+  if(!svg || !line || !d.points || !d.points.length) return;
+
+  // Map dt → y. Symmetric scale based on max |dt| observed, with a floor
+  // of 0.3s so a tight session still looks proportionate. Zero is y=90.
+  const maxAbs = d.points.reduce((m, p) => Math.max(m, Math.abs(p.dt || 0)), 0.3);
+  const W = 1000, H = 180, ZERO = 90;
+  // Range: [-maxAbs, +maxAbs] mapped to [180, 0] (positive dt = above zero
+  // means slower-than-best, so visually higher = worse)
+  const dtToY = (dt) => ZERO - (dt / maxAbs) * (ZERO - 8);
+  const dToX  = (dN)  => dN * W;
+
+  // Path through every point
+  const linePath = d.points.map((p, i) =>
+    (i === 0 ? 'M ' : 'L ') + dToX(p.d).toFixed(1) + ' ' + dtToY(p.dt).toFixed(1)
+  ).join(' ');
+  // Fill area from line down/up to zero (closed polygon)
+  const fillPath = linePath + ' L ' + dToX(d.points[d.points.length - 1].d).toFixed(1) +
+                   ' ' + ZERO + ' L 0 ' + ZERO + ' Z';
+
+  // Color the line and the fill gradient based on which side dominates.
+  // If most points are slower, use the slower (red) gradient + amber line.
+  // If most are faster, switch to faster (green) gradient + green line.
+  const slowerCount = d.points.filter(p => p.dt > 0).length;
+  const dominant = slowerCount > d.points.length / 2 ? 'slower' : 'faster';
+  fill.setAttribute('d', fillPath);
+  fill.setAttribute('fill', dominant === 'slower' ? 'url(#slowerGrad)' : 'url(#fasterGrad)');
+  line.setAttribute('d', linePath);
+  line.setAttribute('stroke', dominant === 'slower' ? 'var(--color-amber)' : 'var(--color-green)');
+
+  // Header meta
+  const bestLabel = 'L' + ((d.best && d.best.lap_number != null) ? d.best.lap_number + 1 : '—');
+  const compLabel = 'L' + ((d.compare && d.compare.lap_number != null) ? d.compare.lap_number + 1 : '—');
+  const totalDelta = d.points[d.points.length - 1].dt;
+  const sign = totalDelta > 0 ? '+' : '';
+  meta.textContent = compLabel + ' vs ' + bestLabel + ' · cumulative ' + sign + totalDelta.toFixed(3) + 's';
+
+  svg.style.display = '';
+  header.style.display = '';
 }
 
 function renderCrumbAndNav(){
@@ -567,6 +632,7 @@ async function saveEdit(){
     renderProfile();
     renderLaps();
     renderCards();
+    loadHeroDelta();
   }
 }
 
