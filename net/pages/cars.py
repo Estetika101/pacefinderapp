@@ -5,6 +5,49 @@
 # whole page each time. No MID splice today — the page reads its data
 # entirely from /cars/<ordinal>/data at load time.
 
+CAR_INDEX_HTML_PRE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Pacefinder &middot; Cars</title>
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/sessions_car.css">
+</head>
+<body>
+<div class="tb">
+  <h1>Pacefinder</h1>
+  <nav class="tb-nav">
+    <a href="/">Live</a>
+    <a href="/sessions" class="cur">Sessions</a>
+    <a href="/setup">Setup</a>
+  </nav>
+</div>
+<div class="page">
+
+  <a href="/sessions" class="crumb">&larr; All sessions</a>
+
+  <div class="titlewrap">
+    <h1 class="nickname">Cars</h1>
+    <span class="canonical" id="cars-subtitle">Loading&hellip;</span>
+  </div>
+
+  <div class="section" style="padding-top:var(--space-3)">
+    <div class="section-head">
+      <h2>All cars driven</h2>
+      <span class="count" id="cars-count">&mdash;</span>
+    </div>
+    <div class="track-list" id="cars-list"></div>
+  </div>
+
+</div>
+
+<script src="/static/js/sessions_cars.js"></script>
+</body>
+</html>
+"""
+
 CAR_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <html lang="en">
 <head>
