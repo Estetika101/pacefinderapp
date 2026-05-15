@@ -105,7 +105,7 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 <div class="tb">
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
-    <a href="/">Live</a><a href="/sessions" class="cur">Sessions</a><a href="/setup">Setup</a>
+    <a href="/dashboard">Live</a><a href="/sessions" class="cur">Sessions</a><a href="/setup">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
   </nav>
 </div>

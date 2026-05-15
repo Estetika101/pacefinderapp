@@ -19,7 +19,7 @@ CAR_INDEX_HTML_PRE = """<!DOCTYPE html>
 <div class="tb">
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
-    <a href="/">Live</a>
+    <a href="/dashboard">Live</a>
     <a href="/sessions" class="cur">Sessions</a>
     <a href="/setup">Setup</a>
   </nav>
@@ -62,7 +62,7 @@ CAR_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <div class="tb">
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
-    <a href="/">Live</a>
+    <a href="/dashboard">Live</a>
     <a href="/sessions" class="cur">Sessions</a>
     <a href="/setup">Setup</a>
   </nav>

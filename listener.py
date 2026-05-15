@@ -31,6 +31,7 @@ from net.pages.cars import (
     CAR_DETAIL_HTML_PRE,
     CAR_INDEX_HTML_PRE,
 )
+from net.pages.home import HOME_HTML_PRE
 from net.pages.telemetry import TELEMETRY_HTML
 from net.pages.debug import DEBUG_RAW_HTML, DEBUG_PERF_HTML
 from net.router import make_handler
@@ -314,6 +315,7 @@ SESSION_DETAIL_HTML = (
 # the whole page. Kept as a constant for parity with the other pages.
 CAR_DETAIL_HTML = CAR_DETAIL_HTML_PRE
 CAR_INDEX_HTML = CAR_INDEX_HTML_PRE
+HOME_HTML = HOME_HTML_PRE
 
 
 # ─── AI Analysis ──────────────────────────────────────────────────────────────
@@ -403,6 +405,7 @@ async def main(demo_mode: bool = False):
         "SESSION_DETAIL_HTML": SESSION_DETAIL_HTML,
         "CAR_DETAIL_HTML": CAR_DETAIL_HTML,
         "CAR_INDEX_HTML": CAR_INDEX_HTML,
+        "HOME_HTML": HOME_HTML,
         "TELEMETRY_HTML": TELEMETRY_HTML,
         "DEBUG_RAW_HTML": DEBUG_RAW_HTML,
         "DEBUG_PERF_HTML": DEBUG_PERF_HTML,

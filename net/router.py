@@ -40,6 +40,7 @@ def make_handler(ctx: dict):
     SESSION_DETAIL_HTML    = ctx["SESSION_DETAIL_HTML"]
     CAR_DETAIL_HTML        = ctx["CAR_DETAIL_HTML"]
     CAR_INDEX_HTML         = ctx["CAR_INDEX_HTML"]
+    HOME_HTML              = ctx["HOME_HTML"]
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
     DEBUG_RAW_HTML         = ctx["DEBUG_RAW_HTML"]
     DEBUG_PERF_HTML        = ctx["DEBUG_PERF_HTML"]
@@ -145,8 +146,142 @@ def make_handler(ctx: dict):
                 else:
                     writer.write(_http_response("404 Not Found", "text/plain", b"Not found"))
 
-            elif path in ("/", "/dashboard"):
+            elif path == "/":
+                # Idle landing — moved from DASHBOARD_HTML to HOME_HTML.
+                # Live dashboard now lives at /dashboard (below). Bookmarks
+                # of / will land here; the top nav links to /dashboard.
+                writer.write(_http_response("200 OK", "text/html", HOME_HTML.encode()))
+
+            elif path == "/dashboard":
                 writer.write(_http_response("200 OK", "text/html", DASHBOARD_HTML.encode()))
+
+            elif path == "/home/data":
+                # Single roll-up for the home page. Cheap: 4 queries against
+                # already-indexed columns plus a uptime/storage snapshot.
+                # See net/pages/home.py for the rendering side.
+                with db_lock:
+                    conn = db_connect()
+                    try:
+                        # Top circuits: most-driven first, capped at 5
+                        circuits = [dict(r) for r in conn.execute(
+                            "SELECT track, COUNT(*) as sessions_count, "
+                            "COALESCE(SUM(lap_count), 0) as laps_count, "
+                            "MIN(best_lap_time_s) as best_lap_s "
+                            "FROM sessions "
+                            "WHERE track IS NOT NULL AND track != '' AND track != 'unknown' "
+                            "GROUP BY track "
+                            "ORDER BY sessions_count DESC "
+                            "LIMIT 5"
+                        ).fetchall()]
+                        # Top cars: same shape as /cars/data but capped
+                        car_rows = [dict(r) for r in conn.execute(
+                            "SELECT car_ordinal, "
+                            "MIN(best_lap_time_s) as best_lap_s, "
+                            "MAX(started_at)     as last_driven, "
+                            "COUNT(*)            as sessions_count, "
+                            "COALESCE(SUM(lap_count), 0) as laps_count, "
+                            "MAX(car_class)      as car_class, "
+                            "MAX(car_pi)         as car_pi "
+                            "FROM sessions "
+                            "WHERE car_ordinal IS NOT NULL "
+                            "GROUP BY car_ordinal "
+                            "ORDER BY sessions_count DESC "
+                            "LIMIT 5"
+                        ).fetchall()]
+                        # Recent sessions: 5 most recent, with the bits the
+                        # row template needs
+                        recents = [dict(r) for r in conn.execute(
+                            "SELECT session_id, started_at, track, car, "
+                            "car_ordinal, car_class, car_pi, best_lap_time_s, "
+                            "weather_condition, tyre_compound, track_temp_c, "
+                            "race_type, session_type "
+                            "FROM sessions "
+                            "ORDER BY started_at DESC "
+                            "LIMIT 5"
+                        ).fetchall()]
+                        # Last session (the very first recent, if any) gets
+                        # an extra lookup for PB at this track
+                        last_sess = recents[0] if recents else None
+                        pb_here = None
+                        if last_sess and last_sess.get("track") and last_sess.get("car_ordinal") is not None:
+                            r = conn.execute(
+                                "SELECT MIN(best_lap_time_s) as pb FROM sessions "
+                                "WHERE track=? AND car_ordinal=? AND best_lap_time_s IS NOT NULL",
+                                (last_sess["track"], last_sess["car_ordinal"])
+                            ).fetchone()
+                            if r:
+                                pb_here = r["pb"]
+                        total_sessions = conn.execute(
+                            "SELECT COUNT(*) FROM sessions"
+                        ).fetchone()[0]
+                    finally:
+                        conn.close()
+
+                # Resolve car names + nicknames once for every car we
+                # reference (top_cars + recents).
+                def _car_payload(ord_):
+                    info = FORZA_CARS.get(int(ord_)) or {}
+                    return {
+                        "name": info.get("name"),
+                        "year": info.get("year"),
+                        "nickname": db_get_car_nickname(int(ord_)),
+                    }
+
+                top_cars = []
+                for r in car_rows:
+                    cp = _car_payload(r["car_ordinal"])
+                    top_cars.append({
+                        "ordinal": r["car_ordinal"],
+                        "name": cp["name"],
+                        "year": cp["year"],
+                        "nickname": cp["nickname"],
+                        "class": r["car_class"],
+                        "pi": r["car_pi"],
+                        "sessions_count": r["sessions_count"],
+                        "laps_count": r["laps_count"],
+                        "best_lap_s": r["best_lap_s"],
+                    })
+
+                for r in recents:
+                    if r.get("car_ordinal") is not None:
+                        cp = _car_payload(r["car_ordinal"])
+                        r["car_name"] = cp["name"]
+                        r["car_nickname"] = cp["nickname"]
+
+                # Status: read from live `state` object so the home page
+                # tells the driver whether to click into /dashboard.
+                udp_last = state.get("udp_last_at", {}) if isinstance(state, dict) else {}
+                last_pkt_iso = None
+                for game_iso in udp_last.values():
+                    if game_iso and (not last_pkt_iso or game_iso > last_pkt_iso):
+                        last_pkt_iso = game_iso
+
+                # Disk usage for the footer
+                try:
+                    disk = disk_info() or {}
+                except Exception:
+                    disk = {}
+
+                udp_rx = state.get("udp_received", {}) if isinstance(state, dict) else {}
+                udp_total = sum(int(v) for v in udp_rx.values() if v) if udp_rx else 0
+
+                payload = {
+                    "status": state.get("status") if isinstance(state, dict) else "idle",
+                    "last_session": dict(last_sess) if last_sess else None,
+                    "pb_at_track_s": pb_here,
+                    "top_circuits": circuits,
+                    "top_cars": top_cars,
+                    "recent_sessions": recents,
+                    "stats": {
+                        "total_sessions": total_sessions,
+                        "udp_received_total": udp_total,
+                        "last_packet_at": last_pkt_iso,
+                        "storage_used_gb": disk.get("used_gb"),
+                        "storage_total_gb": disk.get("total_gb"),
+                    },
+                }
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(payload).encode()))
 
             elif path == "/setup":
                 writer.write(_http_response("200 OK", "text/html", SETUP_HTML.encode()))
