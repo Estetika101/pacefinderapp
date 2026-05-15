@@ -45,10 +45,23 @@ input[type=checkbox]{accent-color:var(--color-accent);width:12px;height:12px;fle
    JS (renderTrackMap) still controls visibility — it only un-hides the
    wrap when the lap actually has px/pz position samples. */
 .track-map-wrap{
-  position:sticky;top:58px;z-index:6;
+  position:sticky;top:58px;z-index:20;
   margin:0 0 var(--sp-3);
   border:1px solid var(--color-border);border-radius:var(--radius-md);
-  background:var(--color-surface);overflow:hidden;
+  background:var(--color-bg);overflow:hidden;
+  /* Hard mask: opaque page-bg + a shadow so charts scrolling under the
+     pinned panel can never read through (was bleeding — the SVG
+     letterboxes with transparent margins inside a wide column). */
+  box-shadow:0 8px 14px -6px rgba(0,0,0,0.95);
+}
+/* The map SVG meet-fits with transparent side margins; give the SVG box
+   the page bg so those margins are solid, not see-through. Cap height so
+   the pinned panel stays compact instead of a tall void. */
+#track-map-inner{background:var(--color-bg)}
+#track-map-inner svg{
+  background:var(--color-bg);
+  max-height:180px !important;
+  width:100%;display:block;
 }
 html.embed .track-map-wrap{top:0}
 .sector-hdr{margin-bottom:var(--sp-3);border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);overflow:hidden}
