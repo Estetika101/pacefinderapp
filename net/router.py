@@ -383,7 +383,7 @@ def make_handler(ctx: dict):
             elif path in ("/sessions", "/sessions/"):
                 # Forza is the only active game; serve the per-game overview as the home page.
                 # See docs/specs/park-acc-f1.md.
-                writer.write(_http_response("200 OK", "text/html", TRACKS_HTML.encode()))
+                writer.write(_http_response("200 OK", "text/html", GAMES_HTML.encode()))
 
             elif path == "/sessions/game":
                 qs = {k: urllib.parse.unquote_plus(v)
