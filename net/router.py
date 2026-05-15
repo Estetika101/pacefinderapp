@@ -695,8 +695,45 @@ def make_handler(ctx: dict):
                       for k, v in [pair.split("=", 1)]}
                 track_name = qs.get("name", "")
                 game_filter = qs.get("game", "") or None
-                result = db_track_sessions(track_name, game_filter)
-                writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
+                sessions = db_track_sessions(track_name, game_filter)
+                # Personal best across all sessions at this track + the
+                # progress series (best lap per session, chronological) for
+                # the hero chart, + theoretical-best with sector provenance.
+                pb = None
+                for s in sessions:
+                    blt = s.get("best_lap_time_s")
+                    if blt is not None and (pb is None or blt < pb["best_lap_time_s"]):
+                        pb = {"best_lap_time_s": blt,
+                              "session_id": s["session_id"],
+                              "started_at": s.get("started_at")}
+                # Chronological (oldest first) so the chart reads left→right
+                progress = sorted(
+                    [{"session_id": s["session_id"],
+                      "started_at": s.get("started_at"),
+                      "best_lap_s": s.get("best_lap_time_s")}
+                     for s in sessions if s.get("best_lap_time_s") is not None],
+                    key=lambda x: x["started_at"] or ""
+                )
+                with db_lock:
+                    conn = db_connect()
+                    try:
+                        theo_row = conn.execute(
+                            "SELECT theoretical_s1_s, theoretical_s1_session_id, theoretical_s1_lap, "
+                            "theoretical_s2_s, theoretical_s2_session_id, theoretical_s2_lap, "
+                            "theoretical_s3_s, theoretical_s3_session_id, theoretical_s3_lap, "
+                            "theoretical_best_s "
+                            "FROM track_references "
+                            "WHERE track=? AND reference_type='theoretical'",
+                            (track_name,)
+                        ).fetchone()
+                    finally:
+                        conn.close()
+                writer.write(_http_response("200 OK", "application/json", json.dumps({
+                    "sessions": sessions,
+                    "personal_best": pb,
+                    "progress": progress,
+                    "theoretical": dict(theo_row) if theo_row else None,
+                }).encode()))
 
             elif path == "/sessions/track/tip":
                 qs = {k: urllib.parse.unquote_plus(v)

@@ -188,40 +188,78 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
   </nav>
 </div>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
-<div class="breadcrumb"><a href="/sessions">Sessions</a> &rsaquo; <a href="#" id="bc-game" style="display:none"></a><span id="bc-sep" style="display:none"> &rsaquo; </span><span id="bc-track">Track</span></div>
-<div class="lr-pills" id="lr-pills"></div>
-<div class="layout">
-  <nav class="left-rail" id="left-rail">
-    <div class="lr-section-lbl">Circuits</div>
-    <div id="lr-items"></div>
-  </nav>
-  <div class="main-content">
-    <div class="track-hdr">
-      <div class="track-name" id="hdr-name">Loading&hellip;</div>
-      <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
-      <div class="hdr-stat"><div class="v" id="hdr-count">&mdash;</div><div class="l">Sessions</div></div>
-      <div class="hdr-stat"><div class="v" id="hdr-trend">&mdash;</div><div class="l">Trend</div></div>
-    </div>
+<div class="page">
 
-    <div id="trk-overview">
-      <div class="track-tip-bar" id="tip-bar">
-        <span id="tip-text"></span>
-        <button class="tip-gen" id="tip-btn" onclick="generateTip()">Generate AI tip</button>
-      </div>
-      <div class="ref-card" id="ref-card">
-        <div class="ref-card-lbl" id="ref-card-title">References</div>
-        <div class="ref-rows" id="ref-rows"></div>
-        <div class="ref-gap" id="ref-gap" style="display:none">
-          <span>Gap to theoretical</span>
-          <span class="ref-gap-val" id="ref-gap-val"></span>
-        </div>
-      </div>
-      <div class="class-filter" id="type-filter" style="display:none;margin-bottom:8px"></div>
-      <div id="acc-container"></div>
-      <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
-    </div>
+  <a href="/sessions" class="crumb">&larr; All circuits</a>
 
+  <h1 class="title" id="hdr-name">Loading&hellip;</h1>
+  <div class="subtitle" id="subtitle">&mdash;</div>
+
+  <!-- Hero: personal best + gap to theoretical + progress chart -->
+  <div class="hero">
+    <div>
+      <div class="hero-time" id="hero-pb">&mdash;</div>
+      <div class="hero-time-sub" id="hero-pb-sub">Personal best</div>
+      <div class="hero-gap" id="hero-gap" style="display:none">&mdash;</div>
+      <div class="hero-gap-sub" id="hero-gap-sub" style="display:none">vs your theoretical</div>
+    </div>
+    <div class="progress">
+      <div class="chart-header">
+        <div class="chart-title">Best lap by session</div>
+        <div class="chart-meta" id="chart-meta"></div>
+      </div>
+      <svg class="progress-svg" id="progress-svg" viewBox="0 0 1000 200" preserveAspectRatio="none"></svg>
+      <div class="progress-empty" id="progress-empty" style="display:none">Not enough sessions to chart progress yet.</div>
+    </div>
   </div>
+
+  <!-- Theoretical breakdown -->
+  <div class="theo" id="theo-card" style="display:none">
+    <div>
+      <div class="theo-label">Theoretical best</div>
+      <div class="theo-time" id="theo-time">&mdash;</div>
+      <div class="theo-note">Sum of your best sectors. Provenance &rarr;</div>
+    </div>
+    <div class="sectors">
+      <div class="sect">
+        <div class="sect-num">S1</div>
+        <div class="sect-time" id="theo-s1">&mdash;</div>
+        <div class="sect-prov" id="theo-s1-prov"></div>
+      </div>
+      <div class="sect">
+        <div class="sect-num">S2</div>
+        <div class="sect-time" id="theo-s2">&mdash;</div>
+        <div class="sect-prov" id="theo-s2-prov"></div>
+      </div>
+      <div class="sect">
+        <div class="sect-num">S3</div>
+        <div class="sect-time" id="theo-s3">&mdash;</div>
+        <div class="sect-prov" id="theo-s3-prov"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI track tip -->
+  <div class="tip" id="tip-card">
+    <div class="tip-head">
+      <h2>Track tip</h2>
+      <span class="tip-meta" id="tip-meta"></span>
+    </div>
+    <div class="tip-body" id="tip-text">No tip generated yet.</div>
+    <button class="tip-gen" id="tip-btn" onclick="generateTip()">Generate AI tip</button>
+  </div>
+
+  <!-- Sessions list -->
+  <div class="sessions">
+    <div class="sessions-head">
+      <h2>Sessions</h2>
+      <span class="count" id="sessions-count">&mdash;</span>
+    </div>
+    <div class="filters" id="type-filter" style="display:none"></div>
+    <div class="session-list" id="session-list"></div>
+    <div class="empty-state" id="empty" style="display:none">No sessions at this track</div>
+  </div>
+
 </div>
 <script>
 const FORZA_TRACK_NAMES=

@@ -1,222 +1,248 @@
-const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Real Race',ai:'AI Race'};
-const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
-const GAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
-function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
-function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
-function classBadge(c){if(c==null)return'';const n=CLASS_NAMES[c]||'?';return`<span class="cc-badge cc-${n}">${n}</span>`;}
-function gainsBadge(gp,fp){if(gp==null||fp==null||gp===0)return'';const g=gp-fp;if(g===0)return'<span class="gains-badge even">—</span>';return g>0?`<span class="gains-badge pos">+${g}</span>`:`<span class="gains-badge neg">${g}</span>`;}
-function spark(times){
-  const v=(times||[]).filter(t=>t>0);
-  if(v.length<2)return '<span style="color:var(--color-text-dim)">—</span>';
-  const mn=Math.min(...v),mx=Math.max(...v),W=80,H=26,p=2;
-  const xf=i=>p+i/(v.length-1)*(W-p*2);
-  const yf=t=>H-p-(mx===mn?(H-p*2)/2:(t-mn)/(mx-mn)*(H-p*2));
-  const pts=v.map((t,i)=>xf(i).toFixed(1)+','+yf(t).toFixed(1)).join(' ');
-  const best=Math.min(...v);
-  const dots=v.map((t,i)=>Math.abs(t-best)<0.001?`<circle cx="${xf(i).toFixed(1)}" cy="${yf(t).toFixed(1)}" r="2" fill="#22c55e"/>`:``).join('');
-  return `<svg width="${W}" height="${H}" style="vertical-align:middle"><polyline points="${pts}" fill="none" stroke="#22c55e66" stroke-width="1.5" stroke-linejoin="round"/>${dots}</svg>`;
-}
-const _track=new URLSearchParams(location.search).get('name')||'';
-const _game=new URLSearchParams(location.search).get('game')||'';
-let _sessions=[], _allTracks=[], _typeFilter=null;
-// Race-type filter buckets — mirrors the previous accordion groupings so the
-// filter chips replace the same conceptual sections users were navigating.
-const TYPE_BUCKETS=[
-  {key:'race',       label:'Race'},
-  {key:'ai',         label:'AI Race'},
-  {key:'qualifying', label:'Qualifying / Hotlap'},
-  {key:'practice',   label:'Practice / Time Trial'},
-];
-function filteredSessions(){
-  return _sessions.filter(s=>{
-    if(_typeFilter!==null && sessGroup(s,_game)!==_typeFilter)return false;
-    return true;
-  });
-}
+// Circuit detail — /sessions/track?name=
+// Rebuilt for the layered-IA design (circuit-mock.html). Fetches the
+// enriched /sessions/track/data payload: { sessions, personal_best,
+// progress, theoretical }.
 
-// ── Game tab setup ────────────────────────────────────────────
-(async()=>{
-  // Tab game navigation — same track in that game if sessions exist, else game tracks index
-  async function gameTabHref(g){
-    if(!_track)return'/sessions/game?name='+encodeURIComponent(g);
-    try{
-      const d=await fetch('/sessions/track/data?name='+encodeURIComponent(_track)+'&game='+encodeURIComponent(g)).then(r=>r.json());
-      if(d&&d.length)return'/sessions/track?name='+encodeURIComponent(_track)+'&game='+encodeURIComponent(g);
-    }catch(e){}
-    return'/sessions/game?name='+encodeURIComponent(g);
-  }
-  const games=['forza_motorsport','acc','f1'];
-  const ids=['tab-forza','tab-acc','tab-f1'];
-  games.forEach(async(g,i)=>{document.getElementById(ids[i]).href=await gameTabHref(g);});
-  // Active tab
-  if(_game){const m={'forza_motorsport':'tab-forza','acc':'tab-acc','f1':'tab-f1'}[_game];if(m)document.getElementById(m).classList.add('active');}
-  else document.getElementById('tab-all').classList.add('active');
-  // Tab counts
-  let gs=[];try{gs=await fetch('/sessions/games').then(r=>r.json());}catch(e){}
-  let all=0;gs.forEach(g=>{const n=g.session_count||0;all+=n;
-    const m={'forza_motorsport':'cnt-forza','acc':'cnt-acc','f1':'cnt-f1'}[g.game];
-    if(m){const el=document.getElementById(m);if(el&&n)el.textContent='('+n+')';}
-  });
-  const ca=document.getElementById('cnt-all');if(ca&&all)ca.textContent='('+all+')';
-})();
+const CLASS_NAMES = {0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+const GAME_LABELS = {'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
+
+function fmtLap(s){if(s==null)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
+function fmtDate(iso){if(!iso)return '—';return new Date(iso).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});}
+function fmtShort(iso){if(!iso)return '—';return new Date(iso).toLocaleDateString([],{month:'short',day:'numeric'});}
+function fmtTime(iso){if(!iso)return '';return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+function escapeHtml(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+const _track = new URLSearchParams(location.search).get('name') || '';
+const _game  = new URLSearchParams(location.search).get('game') || '';
+
+let _sessions = [], _pb = null, _progress = [], _theo = null;
+let _carFilter = null;   // car name string or null
+let _condFilter = null;  // weather string or null
 
 async function init(){
   if(!_track){location.href='/sessions';return;}
-  document.getElementById('bc-track').textContent=_track;
-  document.title='Pacefinder · '+_track;
-  const bcGame=document.getElementById('bc-game');
-  const bcSep=document.getElementById('bc-sep');
-  if(_game&&bcGame){bcGame.textContent=GAME_LABELS[_game]||_game;bcGame.href='/sessions/game?name='+encodeURIComponent(_game);bcGame.style.display='';if(bcSep)bcSep.style.display='';}
-  const dataUrl='/sessions/track/data?name='+encodeURIComponent(_track)+(_game?'&game='+encodeURIComponent(_game):'');
-  try{_sessions=await fetch(dataUrl).then(r=>r.json());}catch(e){_sessions=[];}
-  // Load left rail circuit list
-  try{_allTracks=await fetch('/sessions/tracks'+(_game?'?game='+encodeURIComponent(_game):'')).then(r=>r.json());}catch(e){_allTracks=[];}
-  renderLeftRail();
-  renderHeader();
-  renderTypeFilter();
-  renderSessionsTable();
-  loadTip();
-  loadReferences();
+  document.title = 'Pacefinder · ' + _track;
+  document.getElementById('hdr-name').textContent = _track;
+  let d;
+  const url = '/sessions/track/data?name='+encodeURIComponent(_track)+(_game?'&game='+encodeURIComponent(_game):'');
+  try{ d = await fetch(url).then(r=>r.json()); }
+  catch(e){ document.getElementById('hdr-name').textContent='Track not found'; return; }
+  _sessions = d.sessions || [];
+  _pb       = d.personal_best || null;
+  _progress = d.progress || [];
+  _theo     = d.theoretical || null;
+
+  renderSubtitle();
+  renderHero();
+  renderTheo();
+  renderTip();
+  renderFilters();
+  renderSessions();
 }
 
-function renderLeftRail(){
-  const items=document.getElementById('lr-items');
-  const pills=document.getElementById('lr-pills');
-  const known=_allTracks.filter(t=>t.track!=='unknown');
-  const unk=_allTracks.filter(t=>t.track==='unknown');
-  const sorted=[...known,...unk];
-  items.innerHTML=sorted.map(t=>{
-    const isUnk=t.track==='unknown';
-    const label=isUnk?`Unidentified (${t.session_count})`:t.track;
-    const active=t.track===_track;
-    const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
-    return`<a class="lr-item${active?' active':''}${isUnk?' lr-item-unk':''}" href="${href}">
-      <div class="lr-name">${label}</div>
-      ${isUnk?'':'<div class="lr-sub">'+t.session_count+' session'+(t.session_count===1?'':'s')+'</div>'}
-    </a>`;
-  }).join('');
-  pills.innerHTML=sorted.map(t=>{
-    const isUnk=t.track==='unknown';
-    const active=t.track===_track;
-    const href='/sessions/track?name='+encodeURIComponent(t.track)+(_game?'&game='+encodeURIComponent(_game):'');
-    return`<a class="lr-pill${active?' active':''}${isUnk?' lr-pill-unk':''}" href="${href}">${isUnk?`Unidentified (${t.session_count})`:t.track}</a>`;
-  }).join('');
+function renderSubtitle(){
+  const laps = _sessions.reduce((a,s)=>a+(s.lap_count||0),0);
+  const bits = [
+    _sessions.length + ' session' + (_sessions.length===1?'':'s'),
+    laps + ' lap' + (laps===1?'':'s'),
+  ];
+  if(_game) bits.unshift(GAME_LABELS[_game] || _game);
+  document.getElementById('subtitle').innerHTML =
+    bits.map(b=>`<span>${escapeHtml(b)}</span>`).join('<span class="dot">·</span>');
 }
 
-function renderTypeFilter(){
-  const counts={};
-  TYPE_BUCKETS.forEach(b=>counts[b.key]=0);
-  _sessions.forEach(s=>{const g=sessGroup(s,_game);if(counts[g]!=null)counts[g]++;});
-  const present=TYPE_BUCKETS.filter(b=>counts[b.key]>0);
-  const bar=document.getElementById('type-filter');
-  if(!bar){return;}  // graceful if the page template hasn't been updated
-  if(!present.length){bar.style.display='none';return;}
-  bar.style.display='flex';
-  const pills=[{label:`ALL (${_sessions.length})`,val:null}]
-    .concat(present.map(b=>({label:`${b.label} (${counts[b.key]})`,val:b.key})));
-  // Quote string values with single quotes so the inline onclick (already
-  // wrapped in double quotes) doesn't break — JSON.stringify here was
-  // emitting `setType("race")` inside `onclick="..."`, which the browser
-  // parsed as truncated and silently dropped the click.
-  bar.innerHTML=pills.map(p=>{
-    const arg=p.val===null?'null':"'"+p.val+"'";
-    return`<button class="cf-pill${p.val===_typeFilter?' active':''}" onclick="setType(${arg})">${p.label}</button>`;
-  }).join('');
-}
-function setType(t){_typeFilter=t;renderTypeFilter();renderHeader();renderSessionsTable();}
-function renderHeader(){
-  const fs=filteredSessions();
-  document.getElementById('hdr-name').textContent=_track;
-  const allBest=fs.map(s=>s.best_lap_time_s).filter(v=>v);
-  document.getElementById('hdr-best').textContent=allBest.length?fmtLap(Math.min(...allBest)):'—';
-  document.getElementById('hdr-count').textContent=fs.length;
-  const last3=fs.slice(0,3).map(s=>s.best_lap_time_s).filter(v=>v);
-  let trendHtml='—';
-  if(last3.length>=2){const d=last3[0]-last3[1];trendHtml=d<-0.5?'<span style="color:var(--color-green)">▲ Improving</span>':d>0.5?'<span style="color:var(--color-red)">▼ Declining</span>':'<span style="color:var(--color-text-muted)">Stable</span>';}
-  document.getElementById('hdr-trend').innerHTML=trendHtml;
-}
-
-// ── Session grouping ──────────────────────────────────────────────────────────
-function sessGroup(s,game){
-  const rt=s.race_type, st=s.session_type;
-  if(game==='forza_motorsport'){
-    if(rt==='real')return'race';
-    if(rt==='ai')return'ai';
-    if(rt==='time_trial'||rt==='hot_lap')return'practice';
-    if(st==='race')return'race';
-    if(st==='qualifying'||st==='hot_lap')return'qualifying';
-    return'practice';
+function renderHero(){
+  if(_pb && _pb.best_lap_time_s != null){
+    document.getElementById('hero-pb').textContent = fmtLap(_pb.best_lap_time_s);
+    document.getElementById('hero-pb-sub').textContent =
+      'Personal best · ' + (_pb.started_at ? fmtDate(_pb.started_at) : '—');
+  } else {
+    document.getElementById('hero-pb').textContent = '—';
+    document.getElementById('hero-pb-sub').textContent = 'No completed laps yet';
   }
-  // ACC and F1 — session_type is already normalised
-  if(st==='race')return'race';
-  if(st==='qualifying'||st==='hot_lap')return'qualifying';
-  return'practice';
+  // Gap to theoretical
+  if(_pb && _theo && _theo.theoretical_best_s && _pb.best_lap_time_s){
+    const gap = _pb.best_lap_time_s - _theo.theoretical_best_s;
+    if(gap > 0.001){
+      const g = document.getElementById('hero-gap');
+      g.textContent = '+' + gap.toFixed(3) + 's';
+      g.style.display = '';
+      document.getElementById('hero-gap-sub').style.display = '';
+    }
+  }
+  renderProgressChart();
 }
 
-// ── Session table body ────────────────────────────────────────────────────────
-function sessTableHtml(sessArr){
-  const bests=sessArr.map(s=>s.best_lap_time_s).filter(v=>v);
-  const gb=bests.length?Math.min(...bests):null;
-  return`<table><thead><tr><th>Date</th><th>Type</th><th>Best Lap</th><th>Laps</th><th>Grid</th><th>Finish</th><th>±</th><th>Class</th></tr></thead><tbody>`
-    +sessArr.map((s,i)=>{
-      const isGB=gb&&s.best_lap_time_s&&Math.abs(s.best_lap_time_s-gb)<0.001;
-      const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
-      const typeHtml=effType?`<span class="type-chip">${TYPE_LABELS[effType]||effType}</span>`:'';
-      const gridHtml=s.grid_pos!=null && s.grid_pos>0 ? `P${s.grid_pos}` : '—';
-      const posHtml =s.finish_pos!=null ? `P${s.finish_pos}` : '—';
-      return`<tr class="clickable" data-idx="${i}"><td class="date-col">${fmtDt(s.started_at)}</td><td>${typeHtml}</td><td class="${isGB?'best-time':''}">${fmtLap(s.best_lap_time_s)}</td><td>${s.lap_count||0}</td><td>${gridHtml}</td><td>${posHtml}</td><td>${gainsBadge(s.grid_pos,s.finish_pos)}</td><td>${classBadge(s.car_class)}</td></tr>`;
-    }).join('')
-    +'</tbody></table>';
-}
-
-// ── Flat sessions table (replaces former race/qualifying/practice/ai
-// accordion). Filter chips above (race-type + class) drive the visible rows.
-function renderSessionsTable(){
-  const fs=filteredSessions();
-  const container=document.getElementById('acc-container');
-  const empty=document.getElementById('empty');
-  if(!fs.length){
-    container.innerHTML='';
-    empty.style.display='block';
+function renderProgressChart(){
+  const svg = document.getElementById('progress-svg');
+  const empty = document.getElementById('progress-empty');
+  const meta = document.getElementById('chart-meta');
+  const pts = _progress.filter(p => p.best_lap_s != null);
+  if(pts.length < 2){
+    svg.style.display = 'none';
+    empty.style.display = '';
     return;
   }
-  empty.style.display='none';
-  container.innerHTML=`<div class="acc-tbl">${sessTableHtml(fs)}</div>`;
-  // Wire row clicks
-  document.querySelectorAll('#acc-container tr.clickable').forEach(tr=>{
-    const i=parseInt(tr.dataset.idx);
-    tr.addEventListener('click',()=>{
-      let u='/sessions/session?id='+encodeURIComponent(fs[i].session_id);
-      if(_game)u+='&game='+encodeURIComponent(_game);
-      if(_track)u+='&track='+encodeURIComponent(_track);
-      location.href=u;
-    });
+  const W = 1000, H = 200, padL = 8, padR = 8, padT = 16, padB = 24;
+  const times = pts.map(p => p.best_lap_s);
+  const minT = Math.min(...times), maxT = Math.max(...times);
+  const span = (maxT - minT) || 1;
+  const xAt = i => padL + (i / (pts.length - 1)) * (W - padL - padR);
+  // Lower time = faster = should sit HIGHER on the chart (better).
+  const yAt = t => padT + ((t - minT) / span) * (H - padT - padB);
+
+  const linePts = pts.map((p,i) => xAt(i).toFixed(1)+','+yAt(p.best_lap_s).toFixed(1)).join(' ');
+  const best = Math.min(...times);
+
+  let dots = '';
+  pts.forEach((p,i) => {
+    const isBest = Math.abs(p.best_lap_s - best) < 0.001;
+    const r = isBest ? 6 : 4;
+    const fill = isBest ? 'var(--color-accent)' : 'var(--color-blue)';
+    dots += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.best_lap_s).toFixed(1)}" r="${r}" fill="${fill}" stroke="#0a0a0a" stroke-width="2"/>`;
   });
+
+  // PB baseline (dashed) at the fastest lap's y
+  const pbY = yAt(best).toFixed(1);
+
+  svg.innerHTML =
+    `<line x1="${padL}" y1="${pbY}" x2="${W-padR}" y2="${pbY}" stroke="var(--color-accent)" stroke-width="1" stroke-dasharray="2,4" opacity="0.4"/>` +
+    `<polyline points="${linePts}" fill="none" stroke="var(--color-blue)" stroke-width="2"/>` +
+    `<polyline points="${padL},${H} ${linePts} ${W-padR},${H}" fill="var(--color-blue)" opacity="0.06" stroke="none"/>` +
+    dots +
+    `<text x="${padL}" y="${H-6}" fill="#666" font-size="10" font-family="monospace">${fmtShort(pts[0].started_at)}</text>` +
+    `<text x="${W-padR}" y="${H-6}" fill="#666" font-size="10" font-family="monospace" text-anchor="end">${fmtShort(pts[pts.length-1].started_at)}</text>`;
+  meta.textContent = pts.length + ' sessions · PB ' + fmtLap(best);
+  svg.style.display = '';
+  empty.style.display = 'none';
 }
-async function loadReferences(){
+
+function renderTheo(){
+  if(!_theo || _theo.theoretical_best_s == null) return;
+  document.getElementById('theo-card').style.display = '';
+  document.getElementById('theo-time').textContent = fmtLap(_theo.theoretical_best_s);
+  const prov = (s_s, sid, lap) => {
+    if(s_s == null) return '';
+    const lapTxt = (lap != null) ? 'L'+(lap+1) : '';
+    if(sid){
+      return `${lapTxt} · <a href="/sessions/session?id=${encodeURIComponent(sid)}">view</a>`;
+    }
+    return lapTxt;
+  };
+  document.getElementById('theo-s1').textContent = _theo.theoretical_s1_s != null ? _theo.theoretical_s1_s.toFixed(3) : '—';
+  document.getElementById('theo-s2').textContent = _theo.theoretical_s2_s != null ? _theo.theoretical_s2_s.toFixed(3) : '—';
+  document.getElementById('theo-s3').textContent = _theo.theoretical_s3_s != null ? _theo.theoretical_s3_s.toFixed(3) : '—';
+  document.getElementById('theo-s1-prov').innerHTML = prov(_theo.theoretical_s1_s, _theo.theoretical_s1_session_id, _theo.theoretical_s1_lap);
+  document.getElementById('theo-s2-prov').innerHTML = prov(_theo.theoretical_s2_s, _theo.theoretical_s2_session_id, _theo.theoretical_s2_lap);
+  document.getElementById('theo-s3-prov').innerHTML = prov(_theo.theoretical_s3_s, _theo.theoretical_s3_session_id, _theo.theoretical_s3_lap);
+}
+
+async function renderTip(){
   try{
-    const url='/sessions/references?track='+encodeURIComponent(_track)+(_game?'&game='+encodeURIComponent(_game):'');
-    const d=await fetch(url).then(r=>r.json());
-    if(!d.best_lap&&!d.theoretical)return;
-    const card=document.getElementById('ref-card');
-    const rows=document.getElementById('ref-rows');
-    document.getElementById('ref-card-title').textContent=(_track.toUpperCase()||'TRACK')+' References';
-    let html='';
-    if(d.best_lap){const bl=d.best_lap;html+=`<div class="ref-row"><span class="ref-row-type">Best Lap</span><span class="ref-row-time green">${fmtLap(bl.lap_time_s)}</span><span class="ref-row-meta">${bl.session_date}&nbsp;&nbsp;Lap ${bl.lap_number != null ? bl.lap_number + 1 : '—'}</span></div>`;}
-    if(d.theoretical){const th=d.theoretical;html+=`<div class="ref-row"><span class="ref-row-type">Theoretical</span><span class="ref-row-time">${fmtLap(th.theoretical_best_s)}</span><span class="ref-row-meta"></span></div><div class="ref-sectors">S1 ${th.s1_s!=null?fmtLap(th.s1_s):'—'} ${th.s1_session_date||''} &nbsp;·&nbsp; S2 ${th.s2_s!=null?fmtLap(th.s2_s):'—'} ${th.s2_session_date||''} &nbsp;·&nbsp; S3 ${th.s3_s!=null?fmtLap(th.s3_s):'—'} ${th.s3_session_date||''}</div>`;if(d.best_lap&&d.best_lap.lap_time_s&&th.theoretical_best_s){const gap=d.best_lap.lap_time_s-th.theoretical_best_s;if(gap>0.01){document.getElementById('ref-gap-val').textContent='+'+gap.toFixed(3)+'s';document.getElementById('ref-gap').style.display='flex';}}}
-    rows.innerHTML=html;card.classList.add('on');
+    const d = await fetch('/sessions/track/tip?name='+encodeURIComponent(_track)).then(r=>r.json());
+    if(d && d.tip){
+      document.getElementById('tip-text').textContent = d.tip;
+      document.getElementById('tip-text').style.fontStyle = 'italic';
+      const btn = document.getElementById('tip-btn');
+      btn.textContent = '↻ Re-generate';
+      if(d.generated_at){
+        document.getElementById('tip-meta').textContent =
+          '— ' + (d.model || 'Claude') + ' · ' + fmtDate(d.generated_at);
+      }
+    }
   }catch(e){}
 }
-async function loadTip(){
-  try{
-    const d=await fetch('/sessions/track/tip?name='+encodeURIComponent(_track)).then(r=>r.json());
-    document.getElementById('tip-bar').classList.add('on');
-    if(d&&d.tip){document.getElementById('tip-text').textContent=d.tip;document.getElementById('tip-btn').style.display='none';}
-  }catch(e){}
-}
+
 async function generateTip(){
-  const btn=document.getElementById('tip-btn');btn.textContent='Generating…';btn.disabled=true;
-  try{const d=await fetch('/sessions/track/tip?name='+encodeURIComponent(_track)+'&generate=true').then(r=>r.json());if(d&&d.tip){document.getElementById('tip-text').textContent=d.tip;btn.style.display='none';}else{btn.textContent='Generate AI tip';btn.disabled=false;}}catch(e){btn.textContent='Error — retry';btn.disabled=false;}
+  const btn = document.getElementById('tip-btn');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  try{
+    const d = await fetch('/sessions/track/tip?name='+encodeURIComponent(_track)+'&generate=true').then(r=>r.json());
+    if(d && d.tip){
+      document.getElementById('tip-text').textContent = d.tip;
+      document.getElementById('tip-text').style.fontStyle = 'italic';
+      btn.textContent = '↻ Re-generate'; btn.disabled = false;
+      if(d.generated_at){
+        document.getElementById('tip-meta').textContent =
+          '— ' + (d.model || 'Claude') + ' · ' + fmtDate(d.generated_at);
+      }
+    } else {
+      btn.textContent = 'Generate AI tip'; btn.disabled = false;
+    }
+  }catch(e){
+    btn.textContent = 'Error — retry'; btn.disabled = false;
+  }
+}
+
+function renderFilters(){
+  // Distinct cars + conditions across this track's sessions
+  const cars = [...new Set(_sessions.map(s => s.car).filter(Boolean))];
+  const conds = [...new Set(_sessions.map(s => s.weather_condition).filter(Boolean))];
+  if(cars.length <= 1 && conds.length <= 1){
+    document.getElementById('type-filter').style.display = 'none';
+    return;
+  }
+  const wrap = document.getElementById('type-filter');
+  let html = '';
+  if(cars.length > 1){
+    html += `<span class="chip ${_carFilter===null?'on':''}" data-car="">All cars</span>`;
+    cars.forEach(c => {
+      html += `<span class="chip ${_carFilter===c?'on':''}" data-car="${escapeHtml(c)}">${escapeHtml(c)}</span>`;
+    });
+  }
+  if(conds.length > 1){
+    html += `<span class="chip ${_condFilter===null?'on':''}" data-cond="">All conditions</span>`;
+    conds.forEach(c => {
+      html += `<span class="chip ${_condFilter===c?'on':''}" data-cond="${escapeHtml(c)}">${escapeHtml(c)}</span>`;
+    });
+  }
+  wrap.innerHTML = html;
+  wrap.style.display = '';
+  wrap.querySelectorAll('[data-car]').forEach(el => el.addEventListener('click', () => {
+    _carFilter = el.dataset.car || null;
+    renderFilters(); renderSessions();
+  }));
+  wrap.querySelectorAll('[data-cond]').forEach(el => el.addEventListener('click', () => {
+    _condFilter = el.dataset.cond || null;
+    renderFilters(); renderSessions();
+  }));
+}
+
+function renderSessions(){
+  const filtered = _sessions.filter(s => {
+    if(_carFilter !== null && s.car !== _carFilter) return false;
+    if(_condFilter !== null && s.weather_condition !== _condFilter) return false;
+    return true;
+  });
+  document.getElementById('sessions-count').textContent =
+    filtered.length + ' session' + (filtered.length===1?'':'s');
+  const list = document.getElementById('session-list');
+  const empty = document.getElementById('empty');
+  if(!filtered.length){
+    list.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  const bestId = _pb ? _pb.session_id : null;
+  list.innerHTML = filtered.map(s => {
+    const isBest = s.session_id === bestId;
+    const href = '/sessions/session?id=' + encodeURIComponent(s.session_id) +
+                 (s.game ? '&game=' + encodeURIComponent(s.game) : '');
+    const cls = s.car_class != null ? `<span class="cc cc-${CLASS_NAMES[s.car_class]||'?'}">${CLASS_NAMES[s.car_class]||'?'}</span>` : '';
+    const condBits = [];
+    if(s.weather_condition) condBits.push(escapeHtml(s.weather_condition));
+    if(s.tyre_compound) condBits.push(escapeHtml(s.tyre_compound));
+    const cond = condBits.join('<span class="sep">·</span>');
+    const star = isBest ? '<span class="best-star">★</span>' : '';
+    return `<a href="${href}" class="session-row${isBest?' is-best':''}">
+      <span class="session-date">${fmtShort(s.started_at)}<small>${fmtTime(s.started_at)}</small></span>
+      <span class="session-car">${escapeHtml(s.car || '—')} ${cls}</span>
+      <span class="session-cond">${cond}</span>
+      <span class="session-time">${fmtLap(s.best_lap_time_s)}${star}</span>
+      <span class="session-arrow">→</span>
+    </a>`;
+  }).join('');
 }
 
 init();
