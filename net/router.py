@@ -930,12 +930,26 @@ def make_handler(ctx: dict):
                         sess_dict["car_nickname"] = db_get_car_nickname(int(car_ord))
                     laps = [dict(r) for r in lap_rows]
                     theo = dict(theo_row) if theo_row else None
+                    # Lap events — same connection, cheap. Sorted by
+                    # severity DESC so the UI can lift the top-N quickly.
+                    with db_lock:
+                        conn = db_connect()
+                        try:
+                            event_rows = [dict(r) for r in conn.execute(
+                                "SELECT lap_number, event_type, distance_m, "
+                                "distance_norm, severity, description "
+                                "FROM lap_events WHERE session_id=? "
+                                "ORDER BY severity DESC", (sid,)
+                            ).fetchall()]
+                        finally:
+                            conn.close()
                     writer.write(_http_response("200 OK", "application/json",
                                                 json.dumps({
                                                     "session": sess_dict,
                                                     "laps": laps,
                                                     "theoretical": theo,
                                                     "car_context": car_ctx,
+                                                    "events": event_rows,
                                                 }).encode()))
 
             elif path == "/sessions/laps":

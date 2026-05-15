@@ -36,7 +36,7 @@ const _id=_qs.get('id')||'';
 const _sgame=_qs.get('game')||'';
 const _strack=_qs.get('track')||'';
 
-let _sess=null,_laps=[],_theo=null,_carCtx=null;
+let _sess=null,_laps=[],_theo=null,_carCtx=null,_events=[];
 let _sortKey='lap', _sortDir='asc';
 
 async function init(){
@@ -44,7 +44,7 @@ async function init(){
   let d;
   try{d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());}
   catch(e){document.getElementById('hdr-track').textContent='Session not found';return;}
-  _sess=d.session;_laps=d.laps||[];_theo=d.theoretical||null;_carCtx=d.car_context||null;
+  _sess=d.session;_laps=d.laps||[];_theo=d.theoretical||null;_carCtx=d.car_context||null;_events=d.events||[];
   renderCrumbAndNav();
   renderHeader();
   renderHero();
@@ -390,10 +390,31 @@ function renderLaps(){
 function renderCards(){
   const s = _sess;
 
-  // Card A — Where you lost time (simplified: slowest sector vs theoretical)
-  // The full top-3 corner-window detector is a separate spec (Mistakes &
-  // Events). Until that ships, surface the cheapest meaningful insight:
-  // which sector left the most time on the table, with its gap value.
+  // Card A — Where you lost time.
+  // Prefer real lap_events from the detector (lockup / oversteer / bad
+  // shift). Fall back to sector-vs-theoretical gaps when no events fired
+  // or detector data isn't available.
+  const EVENT_LABELS = {
+    lockup: 'Lockup',
+    power_oversteer: 'Power-on oversteer',
+    bad_shift: 'Bad shift',
+  };
+  if(_events && _events.length){
+    const top = _events.slice(0, 3);
+    document.getElementById('card-loss-headline').innerHTML =
+      `<em>${_events.length}</em> event${_events.length === 1 ? '' : 's'} detected`;
+    document.getElementById('card-loss-body').innerHTML = top.map(e => {
+      const label = EVENT_LABELS[e.event_type] || e.event_type;
+      const lap = e.lap_number != null ? `L${e.lap_number + 1}` : '';
+      const dm = e.distance_m != null ? `d ≈ ${Math.round(e.distance_m)} m` : '';
+      const meta = [lap, dm].filter(Boolean).join(' · ');
+      return `<div style="margin-bottom:6px"><span class="card-corner">${label}</span><span style="color:var(--color-text-quaternary);font-size:11px">${meta}</span></div>`;
+    }).join('');
+    const teleHref = '/sessions/telemetry?id=' + encodeURIComponent(_id);
+    document.getElementById('card-loss-link').href = teleHref;
+    document.getElementById('card-loss-link').textContent = 'Open in telemetry →';
+    document.getElementById('card-loss-link').style.display = '';
+  } else {
   const bestLap = _laps.find(l => l.lap_time_s != null && s.best_lap_time_s != null && Math.abs(l.lap_time_s - s.best_lap_time_s) < 0.001);
   if(bestLap && _theo && bestLap.s1_time_s != null){
     const gaps = [
@@ -421,6 +442,7 @@ function renderCards(){
     document.getElementById('card-loss-body').textContent = 'Sector splits appear after the first complete lap is recorded.';
     document.getElementById('card-loss-link').style.display='none';
   }
+  }  // end events-vs-sector-fallback branch
 
   // Card B — Car context
   if(_carCtx && _carCtx.rank_in_car != null){
@@ -625,7 +647,7 @@ async function saveEdit(){
   closeEdit();
   const d = await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());
   if(d.session){
-    _sess = d.session; _laps = d.laps || []; _theo = d.theoretical || null; _carCtx = d.car_context || null;
+    _sess = d.session; _laps = d.laps || []; _theo = d.theoretical || null; _carCtx = d.car_context || null; _events = d.events || [];
     renderCrumbAndNav();
     renderHeader();
     renderHero();

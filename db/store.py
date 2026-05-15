@@ -133,6 +133,19 @@ def _db_init():
                     reason      TEXT,
                     culled_at   TEXT DEFAULT (datetime('now'))
                 );
+                CREATE TABLE IF NOT EXISTS lap_events (
+                    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id     TEXT NOT NULL,
+                    lap_number     INTEGER NOT NULL,
+                    event_type     TEXT NOT NULL,
+                    distance_m     REAL,
+                    distance_norm  REAL,
+                    severity       REAL,
+                    description    TEXT,
+                    detected_at    TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_lap_events_session
+                    ON lap_events(session_id);
                 CREATE INDEX IF NOT EXISTS idx_laps_session  ON laps(session_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_track ON sessions(track);
                 CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(started_at);
@@ -1384,6 +1397,89 @@ def update_track_references(track: str, game: str):
                 conn.commit()
             finally:
                 conn.close()
+
+    # ── Mistakes & Events detection ─────────────────────────────────
+    # Run for every session whose laps we just iterated. Stores results
+    # in lap_events; replaces any prior rows for the same (session, lap)
+    # so re-runs are idempotent. See analysis/events.py.
+    try:
+        from analysis.events import detect_lap_events
+        # Group writes by session so we can wipe-and-replace cleanly.
+        events_by_session: dict = {}
+        # Pull engine_max_rpm per session (needed for the bad-shift detector)
+        session_ids = sorted({row["session_id"] for row in rows})
+        engine_rpms: dict = {}
+        if session_ids:
+            with _db_lock:
+                conn = _db_connect()
+                try:
+                    qs = ",".join("?" * len(session_ids))
+                    for r in conn.execute(
+                        f"SELECT session_id, MAX(rpm) as max_rpm FROM lap_samples "
+                        f"WHERE session_id IN ({qs}) GROUP BY session_id",
+                        session_ids
+                    ):
+                        # Approximation: peak observed RPM is close to
+                        # engine_max_rpm. Real engine_max_rpm isn't stored
+                        # per session today; this lets the detector work
+                        # without a schema change.
+                        engine_rpms[r["session_id"]] = r["max_rpm"]
+                except Exception:
+                    pass
+                finally:
+                    conn.close()
+
+        for row in rows:
+            sid = row["session_id"]
+            ln = row["lap_number"]
+            lap_data = _db_get_lap_samples(sid, ln)
+            if not lap_data or not lap_data.get("samples"):
+                continue
+            try:
+                ev = detect_lap_events(
+                    lap_data["samples"],
+                    lap_data.get("distance_m") or [],
+                    engine_rpms.get(sid),
+                )
+            except Exception as exc:
+                _log.warning(f"event detection failed for {sid} L{ln}: {exc}")
+                continue
+            if ev:
+                events_by_session.setdefault(sid, []).append((ln, ev))
+
+        if events_by_session:
+            with _db_lock:
+                conn = _db_connect()
+                try:
+                    for sid, pairs in events_by_session.items():
+                        # Wipe prior events for these (session, lap) combos
+                        for ln, _ in pairs:
+                            conn.execute(
+                                "DELETE FROM lap_events WHERE session_id=? AND lap_number=?",
+                                (sid, ln)
+                            )
+                        # Insert fresh detections
+                        rows_to_write = [
+                            (sid, ln, e["event_type"], e["distance_m"],
+                             e["distance_norm"], e["severity"], e["description"])
+                            for ln, evs in pairs for e in evs
+                        ]
+                        if rows_to_write:
+                            conn.executemany(
+                                "INSERT INTO lap_events "
+                                "(session_id, lap_number, event_type, distance_m, "
+                                " distance_norm, severity, description) "
+                                "VALUES (?,?,?,?,?,?,?)",
+                                rows_to_write,
+                            )
+                    conn.commit()
+                finally:
+                    conn.close()
+            total = sum(len(evs) for pairs in events_by_session.values() for _, evs in pairs)
+            _log.info(f"lap_events: detected {total} events across "
+                      f"{sum(len(p) for p in events_by_session.values())} laps")
+    except Exception as exc:
+        _log.warning(f"lap_events: detector pass failed: {exc}")
 
     if not all(best_meta):
         return
