@@ -329,6 +329,9 @@ def make_handler(ctx: dict):
                             config["anthropic_api_key"] = str(incoming["anthropic_api_key"]).strip()
                         if "anthropic_model" in incoming:
                             config["anthropic_model"] = str(incoming["anthropic_model"]).strip()
+                        if "time_format" in incoming:
+                            tf = str(incoming["time_format"]).strip()
+                            config["time_format"] = tf if tf in ("12h", "24h") else "24h"
                         save_config(config)
                         msg = "Saved."
                         if incoming.get("ports") and incoming["ports"] != PORTS:
