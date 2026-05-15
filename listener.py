@@ -32,6 +32,7 @@ from net.pages.cars import (
     CAR_INDEX_HTML_PRE,
 )
 from net.pages.home import HOME_HTML_PRE
+from net.pages.events import SESSION_EVENTS_HTML
 from net.pages.telemetry import TELEMETRY_HTML
 from net.pages.debug import DEBUG_RAW_HTML, DEBUG_PERF_HTML
 from net.router import make_handler
@@ -405,6 +406,7 @@ async def main(demo_mode: bool = False):
         "SESSION_DETAIL_HTML": SESSION_DETAIL_HTML,
         "CAR_DETAIL_HTML": CAR_DETAIL_HTML,
         "CAR_INDEX_HTML": CAR_INDEX_HTML,
+        "SESSION_EVENTS_HTML": SESSION_EVENTS_HTML,
         "HOME_HTML": HOME_HTML,
         "TELEMETRY_HTML": TELEMETRY_HTML,
         "DEBUG_RAW_HTML": DEBUG_RAW_HTML,

@@ -40,6 +40,7 @@ def make_handler(ctx: dict):
     SESSION_DETAIL_HTML    = ctx["SESSION_DETAIL_HTML"]
     CAR_DETAIL_HTML        = ctx["CAR_DETAIL_HTML"]
     CAR_INDEX_HTML         = ctx["CAR_INDEX_HTML"]
+    SESSION_EVENTS_HTML    = ctx["SESSION_EVENTS_HTML"]
     HOME_HTML              = ctx["HOME_HTML"]
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
     DEBUG_RAW_HTML         = ctx["DEBUG_RAW_HTML"]
@@ -407,6 +408,9 @@ def make_handler(ctx: dict):
 
             elif path == "/sessions/session":
                 writer.write(_http_response("200 OK", "text/html", SESSION_DETAIL_HTML.encode()))
+
+            elif path == "/sessions/session/events":
+                writer.write(_http_response("200 OK", "text/html", SESSION_EVENTS_HTML.encode()))
 
             elif path == "/sessions/telemetry":
                 writer.write(_http_response("200 OK", "text/html", TELEMETRY_HTML.encode()))
@@ -801,6 +805,84 @@ def make_handler(ctx: dict):
                         "track_list":    track_names,
                         "track_ordinal": cd_dict.get("track_ordinal"),
                     }).encode()))
+
+            elif path == "/sessions/session/events-map":
+                # Everything the all-events page needs in one request:
+                # detected events + session meta + a downsampled track
+                # outline (px,pz from a lap that has position samples) so
+                # the client can draw the loop and place markers by
+                # distance_norm. See net/pages/events.py.
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                sid = qs.get("id", "")
+                if not sid:
+                    writer.write(_http_response("400 Bad Request", "application/json",
+                                                json.dumps({"error": "id required"}).encode()))
+                else:
+                    with db_lock:
+                        conn = db_connect()
+                        try:
+                            srow = conn.execute(
+                                "SELECT session_id,track,car,car_ordinal,started_at,"
+                                "best_lap_time_s,race_type,session_type "
+                                "FROM sessions WHERE session_id=?", (sid,)
+                            ).fetchone()
+                            ev_rows = [dict(r) for r in conn.execute(
+                                "SELECT lap_number,event_type,distance_m,distance_norm,"
+                                "severity,description FROM lap_events "
+                                "WHERE session_id=? ORDER BY severity DESC", (sid,)
+                            ).fetchall()]
+                            # Pick a lap that has stored samples — prefer the
+                            # best lap, else any. lap_samples rows are one per
+                            # (session,lap); grab the lap_numbers present.
+                            lap_nums = [r["lap_number"] for r in conn.execute(
+                                "SELECT lap_number FROM lap_samples WHERE session_id=? "
+                                "ORDER BY lap_number", (sid,)
+                            ).fetchall()]
+                        finally:
+                            conn.close()
+                    if not srow:
+                        writer.write(_http_response("404 Not Found", "application/json",
+                                                    json.dumps({"error": "Session not found"}).encode()))
+                    else:
+                        sess = dict(srow)
+                        # Resolve car name like the other endpoints
+                        ord_ = sess.get("car_ordinal")
+                        if ord_ is not None:
+                            info = FORZA_CARS.get(int(ord_)) or {}
+                            if info.get("name"):
+                                sess["car"] = f"{info.get('year','')} {info['name']}".strip()
+                            nick = db_get_car_nickname(int(ord_))
+                            if nick:
+                                sess["car_nickname"] = nick
+                        # Build a track outline from the first lap that has
+                        # px/pz samples. Downsample to ~140 points.
+                        track_xy = []
+                        for ln in lap_nums:
+                            data = db_get_lap_samples(sid, ln)
+                            if not data or not data.get("samples"):
+                                continue
+                            sm = data["samples"]
+                            if not all(("px" in s and "pz" in s) for s in sm[:1]):
+                                continue
+                            step = max(1, len(sm) // 140)
+                            for i in range(0, len(sm), step):
+                                s = sm[i]
+                                if "px" in s and "pz" in s:
+                                    track_xy.append({
+                                        "x": s["px"], "y": s["pz"],
+                                        "d": s.get("distance_norm", 0.0),
+                                    })
+                            if track_xy:
+                                break
+                        writer.write(_http_response("200 OK", "application/json",
+                                                    json.dumps({
+                                                        "session": sess,
+                                                        "events": ev_rows,
+                                                        "track_xy": track_xy,
+                                                        "time_format": config.get("time_format", "24h"),
+                                                    }).encode()))
 
             elif path == "/sessions/session/hero-delta":
                 # Compute the delta between this session's best and second-best
