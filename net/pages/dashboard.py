@@ -25,7 +25,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <span class="tb-cmp" id="tb-cmp"></span>
   </div>
   <nav class="tb-nav">
-    <a href="/" class="cur">Live</a>
+    <a href="/dashboard" class="cur">Live</a>
+    <a href="/">Home</a>
     <a href="/sessions">Sessions</a>
     <a href="/setup">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
