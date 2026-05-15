@@ -381,9 +381,9 @@ def make_handler(ctx: dict):
                     writer.write(_http_response("400 Bad Request", "text/plain", b"bad json"))
 
             elif path in ("/sessions", "/sessions/"):
-                # Forza is the only active game; serve the per-game overview as the home page.
-                # See docs/specs/park-acc-f1.md.
-                writer.write(_http_response("200 OK", "text/html", GAMES_HTML.encode()))
+                # Career stats now live on the Home page (compact strip).
+                # Keep the URL alive for old bookmarks → redirect to /.
+                writer.write(_http_response("301 Moved Permanently", "text/plain", b"", "Location: /\r\n"))
 
             elif path == "/sessions/game":
                 qs = {k: urllib.parse.unquote_plus(v)

@@ -27,7 +27,6 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     <span class="spacer"></span>
     <span class="top-nav">
       <a href="/dashboard" id="nav-live">Live dashboard</a>
-      <a href="/sessions">Sessions</a>
       <a href="/setup">Setup</a>
     </span>
   </div>
@@ -36,6 +35,22 @@ HOME_HTML_PRE = """<!DOCTYPE html>
   <div class="welcome">
     <div class="welcome-eyebrow" id="welcome-eyebrow">&mdash;</div>
     <h1 class="welcome-title">Welcome back.</h1>
+  </div>
+
+  <!-- Career strip (compact lifetime stats) -->
+  <div class="career-strip" id="career-strip" style="display:none">
+    <div class="cs-stats">
+      <div class="cs-cell"><span class="cs-v muted" id="cs-total">&mdash;</span><span class="cs-l">Sessions</span></div>
+      <div class="cs-cell"><span class="cs-v blue" id="cs-finish">&mdash;</span><span class="cs-l">Avg Finish</span></div>
+      <div class="cs-cell"><span class="cs-v" id="cs-gained">&mdash;</span><span class="cs-l">Pos Gained</span></div>
+      <div class="cs-cell"><span class="cs-v amber" id="cs-win">&mdash;</span><span class="cs-l">Win Rate</span></div>
+      <div class="cs-cell"><span class="cs-v green" id="cs-podium">&mdash;</span><span class="cs-l">Podium</span></div>
+      <div class="cs-cell"><span class="cs-v muted" id="cs-laps">&mdash;</span><span class="cs-l">Laps</span></div>
+    </div>
+    <div class="cs-form">
+      <span class="cs-trend fl" id="cs-trend">&mdash;</span>
+      <span class="cs-spark" id="cs-spark"></span>
+    </div>
   </div>
 
   <!-- Hero: last session -->
