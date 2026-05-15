@@ -258,34 +258,43 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   </nav>
 </div>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
-<div class="breadcrumb">
-  <a href="/sessions">Sessions</a> &rsaquo;
-  <a href="#" id="bc-game" style="display:none"></a>
-  <span id="bc-game-sep" style="display:none"> &rsaquo; </span>
-  <a href="#" id="bc-track">Track</a> &rsaquo;
-  <span id="bc-sess">Session</span>
-</div>
-<div class="sess-hdr">
-  <div class="sess-hdr-top">
-    <div class="sess-hdr-title">
-      <div class="sess-title" id="hdr-track">Loading&hellip;</div>
-      <div class="sess-sub" id="hdr-sub"></div>
+<div class="page">
+
+  <a class="crumb" id="bc-track" href="#">&larr; <span id="bc-track-name">Track</span></a>
+
+  <div class="subnav">
+    <span class="subnav-item active">Overview</span>
+    <a class="subnav-item" id="link-telemetry" href="#">Full telemetry</a>
+  </div>
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-h1" id="hdr-track">Loading&hellip;</h1>
+      <a class="page-h2" id="hdr-car-link" href="#" style="display:none">
+        <span id="hdr-car-name"></span>
+        <span class="class-badge" id="hdr-car-class" style="display:none"></span>
+        <span class="pi" id="hdr-car-pi" style="display:none"></span>
+        <span class="page-h2-arrow">&rarr;</span>
+      </a>
     </div>
-    <div class="hdr-stat"><div class="v" id="hdr-best">&mdash;</div><div class="l">Best Lap</div></div>
-    <div class="hdr-stat"><div class="v" id="hdr-laps">&mdash;</div><div class="l">Laps</div></div>
-    <div class="hdr-stat" id="hdr-grid-stat" style="display:none"><div class="v" id="hdr-grid">&mdash;</div><div class="l">Grid</div></div>
-    <div class="hdr-stat" id="hdr-finish-stat" style="display:none"><div class="v" id="hdr-finish">&mdash;</div><div class="l">Finish</div></div>
-    <div class="hdr-stat" id="hdr-gained-stat" style="display:none"><div class="v" id="hdr-gained">&mdash;</div><div class="l">Gained</div></div>
+    <div class="page-head-result" id="hdr-result" style="display:none">
+      <div class="result-eyebrow">Grid &rarr; Finish</div>
+      <div class="result-positions">
+        <span id="hdr-grid-p">&mdash;</span>
+        <span class="arrow">&rarr;</span>
+        <span class="finish" id="hdr-finish-p">&mdash;</span>
+      </div>
+      <div class="result-delta" id="hdr-gained">&mdash;</div>
+    </div>
   </div>
-  <div class="sess-hdr-pills">
-    <span class="type-chip" id="hdr-car" style="display:none" title=""></span>
-    <span class="type-chip" id="hdr-type" style="display:none"></span>
-    <span class="type-chip" id="hdr-weather" style="display:none"></span>
-    <span class="type-chip" id="hdr-tyre" style="display:none"></span>
-    <button class="btn-re" onclick="openEdit()" style="font-size:var(--text-xs);padding:4px 12px;margin-left:auto"
-            title="Edit session metadata — track, car, race type, weather, tyres, nickname">Edit race</button>
+
+  <div class="strip">
+    <span class="pill" id="hdr-when" style="display:none"><span class="label">When</span><span class="val" id="hdr-when-val"></span></span>
+    <span class="pill" id="hdr-cond" style="display:none"><span class="label">Cond</span><span class="val" id="hdr-cond-val"></span></span>
+    <span class="pill type-chip" id="hdr-type" style="display:none"></span>
+    <span class="strip-spacer"></span>
+    <button class="edit-btn" onclick="openEdit()" title="Edit session metadata">Edit &#x2303;</button>
   </div>
-</div>
 <!-- Edit modal -->
 <div class="edit-ovl" id="edit-ovl">
   <div class="edit-panel">
@@ -352,114 +361,96 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
     </div>
   </div>
 </div>
-<!-- Tab bar -->
-<div class="sess-tab-bar">
-  <button class="sess-tab active" id="st-overview" onclick="switchTab('overview')">Overview</button>
-  <button class="sess-tab" id="st-deepdive" onclick="switchTab('deepdive')">Deep Dive</button>
-  <button class="sess-tab" id="st-telemetry" onclick="switchTab('telemetry')">Telemetry</button>
-</div>
-<!-- Layout -->
-<div class="layout">
-  <nav class="left-rail" id="left-rail">
-    <div class="lr-section-lbl">Circuits</div>
-    <div id="lr-items"></div>
-    <div class="lr-divider"></div>
-    <div class="lr-this" id="lr-this" style="display:none">
-      <div class="lr-this-lbl">This Session</div>
-      <div class="lr-this-car" id="lr-car"></div>
-      <div class="lr-this-badges" id="lr-badges"></div>
+  <!-- Hero: best lap + gap to theoretical + sector deltas -->
+  <div class="hero">
+    <div class="hero-numbers">
+      <div class="hero-time" id="hero-best">&mdash;</div>
+      <div class="hero-time-sub" id="hero-best-sub">Best lap</div>
+      <div class="hero-gap" id="hero-gap" style="display:none">&mdash;</div>
+      <div class="hero-gap-sub" id="hero-gap-sub" style="display:none">left on the table vs theoretical</div>
     </div>
-  </nav>
-  <div class="main-content">
-    <div class="lr-pills" id="lr-pills"></div>
-    <div id="tab-overview">
-      <div class="section">
-        <div class="section-lbl">Lap Times</div>
-        <table>
-          <thead><tr>
-            <th>Lap</th>
-            <th>Time</th>
-            <th>Max Spd</th>
-            <th>Thr%</th>
-            <th>Brk%</th>
-            <th>Avg Slip</th>
-            <th>Peak Slip</th>
-            <th>Slip&gt;0.1%</th>
-          </tr></thead>
-          <tbody id="lap-tbody"></tbody>
-        </table>
-      </div>
-      <div class="ai-section">
-        <div class="ai-lbl">AI Coaching</div>
-        <div>
-          <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
-          <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
-          <span class="ai-meta" id="ai-meta"></span>
-        </div>
-        <div class="ai-body" id="ai-body"></div>
-        <div class="ai-err" id="ai-err"></div>
-      </div>
-    </div>
-    <div id="tab-deepdive" style="display:none">
-      <div class="dd-headline" id="dd-headline"></div>
-      <div class="dd-empty" id="dd-empty" style="display:none"></div>
-      <div class="dd-grid">
-        <section class="dd-card dd-card-map">
-          <div class="dd-card-head">
-            <h3>Track Map</h3>
-            <div class="dd-channel-row" id="dd-channels">
-              <button class="dd-chip active" data-ch="speed">Speed</button>
-              <button class="dd-chip" data-ch="throttle">Throttle</button>
-              <button class="dd-chip" data-ch="brake">Brake</button>
-              <button class="dd-chip" data-ch="slip">Slip</button>
-              <button class="dd-chip" data-ch="gear">Gear</button>
-            </div>
-          </div>
-          <div class="dd-lap-row" id="dd-lap-row"></div>
-          <div class="dd-map-wrap">
-            <svg id="dd-map" preserveAspectRatio="xMidYMid meet"></svg>
-            <div class="dd-tip" id="dd-map-tip" style="display:none"></div>
-          </div>
-        </section>
-
-        <section class="dd-card">
-          <div class="dd-card-head"><h3>G-G Diagram</h3></div>
-          <div class="dd-gg-wrap">
-            <canvas id="dd-gg" width="320" height="320"></canvas>
-            <div class="dd-tip" id="dd-gg-tip" style="display:none"></div>
-          </div>
-        </section>
-
-        <section class="dd-card">
-          <div class="dd-card-head"><h3>Speed Trace</h3></div>
-          <div class="dd-speed-wrap">
-            <svg id="dd-speed" preserveAspectRatio="none"></svg>
-          </div>
-        </section>
-
-        <section class="dd-card dd-card-cmp">
-          <div class="dd-card-head">
-            <h3>Lap Comparison</h3>
-            <div class="dd-cmp-pickers">
-              <label>Reference <select id="dd-cmp-ref"></select></label>
-              <label>Compare <select id="dd-cmp-cmp"></select></label>
-            </div>
-          </div>
-          <div class="dd-cmp-summary" id="dd-cmp-summary"></div>
-        </section>
-
-        <section class="dd-card">
-          <div class="dd-card-head"><h3>Mistakes &amp; Events</h3></div>
-          <div class="dd-events" id="dd-events"></div>
-        </section>
-      </div>
-    </div>
-
-    <div id="tab-telemetry" style="display:none">
-      <iframe id="tele-frame" src="" style="width:100%;height:calc(100vh - 120px);border:none;display:block"></iframe>
+    <div class="sector-row" id="hero-sectors" style="display:none">
+      <div><div class="val" id="hero-s1">&mdash;</div><div class="lbl">S1 &Delta; vs theoretical</div></div>
+      <div><div class="val" id="hero-s2">&mdash;</div><div class="lbl">S2 &Delta; vs theoretical</div></div>
+      <div><div class="val" id="hero-s3">&mdash;</div><div class="lbl">S3 &Delta; vs theoretical</div></div>
     </div>
   </div>
-</div>
+
+  <!-- Session profile strip (5-cell aggregate, immediately under hero) -->
+  <div class="profile" id="profile" style="display:none">
+    <div class="profile-cell">
+      <div class="profile-label">Throttle avg</div>
+      <div class="profile-value" id="prof-thr">&mdash;</div>
+      <div class="profile-bar"><span id="prof-thr-bar" style="width:0"></span></div>
+    </div>
+    <div class="profile-cell">
+      <div class="profile-label">Brake avg</div>
+      <div class="profile-value" id="prof-brk">&mdash;</div>
+      <div class="profile-bar brake"><span id="prof-brk-bar" style="width:0"></span></div>
+    </div>
+    <div class="profile-cell">
+      <div class="profile-label">Slip avg</div>
+      <div class="profile-value" id="prof-slip">&mdash;</div>
+      <div class="profile-bar slip"><span id="prof-slip-bar" style="width:0"></span></div>
+    </div>
+    <div class="profile-cell">
+      <div class="profile-label">Peak slip</div>
+      <div class="profile-value" id="prof-pslip">&mdash;</div>
+      <div class="profile-bar slip"><span id="prof-pslip-bar" style="width:0"></span></div>
+    </div>
+    <div class="profile-cell">
+      <div class="profile-label">Slip &gt; 0.1</div>
+      <div class="profile-value" id="prof-above">&mdash;</div>
+      <div class="profile-bar slip"><span id="prof-above-bar" style="width:0"></span></div>
+    </div>
+  </div>
+
+  <!-- Lap table -->
+  <div class="laps">
+    <div class="laps-head">
+      <h2>Laps</h2>
+      <span class="laps-hint">Click a header to sort &middot; click a row to inspect in telemetry</span>
+    </div>
+    <table class="lap-table">
+      <thead><tr>
+        <th class="sorted" data-sort="lap"  data-dir="asc">Lap <span class="sort-ind">&#x25B2;</span></th>
+        <th data-sort="time">Time <span class="sort-ind">&#x21D5;</span></th>
+        <th data-sort="s1">S1 &Delta; <span class="sort-ind">&#x21D5;</span></th>
+        <th data-sort="s2">S2 &Delta; <span class="sort-ind">&#x21D5;</span></th>
+        <th data-sort="s3">S3 &Delta; <span class="sort-ind">&#x21D5;</span></th>
+        <th></th>
+      </tr></thead>
+      <tbody id="lap-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Three drill-in cards -->
+  <div class="cards">
+    <div class="card" id="card-loss">
+      <div class="card-title">Where you lost time</div>
+      <div class="card-headline" id="card-loss-headline">&mdash;</div>
+      <div class="card-body" id="card-loss-body"></div>
+      <a class="card-link" id="card-loss-link" href="#">Open in telemetry &rarr;</a>
+    </div>
+    <div class="card" id="card-car">
+      <div class="card-title">Car context</div>
+      <div class="card-headline" id="card-car-headline">&mdash;</div>
+      <div class="card-body" id="card-car-body"></div>
+      <a class="card-link" id="card-car-link" href="#" style="display:none">Show car history &rarr;</a>
+    </div>
+    <div class="card" id="card-ai">
+      <div class="card-title">Coaching</div>
+      <div class="card-body" id="card-ai-body" style="display:none"></div>
+      <div class="ai-controls" id="ai-controls">
+        <button class="btn-analyze" id="btn-analyze" onclick="runAnalysis(false)">Analyze with Claude</button>
+        <button class="btn-re" id="btn-re" onclick="runAnalysis(true)" style="display:none">Re-analyze</button>
+        <div class="ai-meta" id="ai-meta"></div>
+      </div>
+      <div class="ai-err" id="ai-err"></div>
+    </div>
+  </div>
+
+</div> <!-- /.page -->
 <script>
 const TRACK_NAMES=
 """
@@ -471,7 +462,6 @@ const CAR_CATALOG=
 
 SESSION_DETAIL_HTML_POST = """;</script>
 <script src="/static/js/widgets/autocomplete.js"></script>
-<script src="/static/js/sessions_deepdive.js"></script>
 <script src="/static/js/sessions_session.js"></script>
 </body>
 </html>
