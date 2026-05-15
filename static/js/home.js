@@ -55,6 +55,7 @@ async function init(){
   renderStatus(d.status, d.stats);
   renderWelcome(d.last_session, d.stats);
   renderHero(d.last_session, d.pb_at_track_s);
+  loadCareer();
   renderTopCircuits(d.top_circuits || []);
   renderTopCars(d.top_cars || []);
   renderRecent(d.recent_sessions || []);
@@ -211,6 +212,52 @@ function renderRecent(recents){
       <span class="recent-arrow">→</span>
     </a>`;
   }).join('');
+}
+
+// ── Career strip ──────────────────────────────────────────────────
+function posToPct(fp){if(fp == null) return null; return Math.max(5, Math.min(100, Math.round(100 - (fp - 1) * 6)));}
+function setCV(id, val, cls){
+  const el = document.getElementById(id);
+  el.textContent = (val == null) ? '—' : val;
+  el.className = 'cs-v' + (cls ? ' ' + cls : '');
+}
+async function loadCareer(){
+  let k = {}, form = [];
+  try{k = await fetch('/sessions/career').then(r => r.json());}catch(e){}
+  try{form = await fetch('/sessions/form?type=all&last=20').then(r => r.json());}catch(e){}
+  const strip = document.getElementById('career-strip');
+  if(!k || (k.total_sessions || 0) === 0){strip.style.display = 'none'; return;}
+  strip.style.display = '';
+  setCV('cs-total', k.total_sessions || '0', 'muted');
+  setCV('cs-finish', k.avg_finish_real != null ? 'P' + (+k.avg_finish_real.toFixed(1)) : null, 'blue');
+  const pg = k.avg_pos_gained;
+  setCV('cs-gained', pg != null ? ((pg >= 0 ? '+' : '') + (+pg.toFixed(1))) : null,
+        pg > 0 ? 'green' : pg < 0 ? 'red' : null);
+  setCV('cs-win', k.win_rate != null ? Math.round(k.win_rate) + '%' : null, 'amber');
+  setCV('cs-podium', k.podium_rate != null ? Math.round(k.podium_rate) + '%' : null, 'green');
+  setCV('cs-laps', k.total_laps || '0', 'muted');
+  renderCareerSpark(form);
+}
+function renderCareerSpark(form){
+  const withPos = (form || []).filter(s => s.finish_pos != null);
+  const trendEl = document.getElementById('cs-trend');
+  const sparkEl = document.getElementById('cs-spark');
+  if(withPos.length < 2){trendEl.textContent = ''; trendEl.className = 'cs-trend fl'; sparkEl.innerHTML = ''; return;}
+  const pcts = withPos.map(s => posToPct(s.finish_pos));
+  const half = Math.floor(pcts.length / 2);
+  const a1 = pcts.slice(0, half).reduce((a, b) => a + b, 0) / (half || 1);
+  const a2 = pcts.slice(half).reduce((a, b) => a + b, 0) / ((pcts.length - half) || 1);
+  const diff = a2 - a1;
+  let col;
+  if(diff > 4){trendEl.textContent = '▲ Improving'; trendEl.className = 'cs-trend up'; col = '#22c55e';}
+  else if(diff < -4){trendEl.textContent = '▼ Declining'; trendEl.className = 'cs-trend dn'; col = '#ef4444';}
+  else{trendEl.textContent = '— Steady'; trendEl.className = 'cs-trend fl'; col = '#888';}
+  const w = 120, h = 32, pad = 3;
+  const mn = Math.min(...pcts), mx = Math.max(...pcts), rng = Math.max(mx - mn, 15);
+  const xs = pcts.map((_, i) => pad + (w - pad * 2) * i / Math.max(pcts.length - 1, 1));
+  const ys = pcts.map(v => h - pad - (h - pad * 2) * (v - mn) / rng);
+  const pts = xs.map((x, i) => x.toFixed(1) + ',' + ys[i].toFixed(1)).join(' ');
+  sparkEl.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/></svg>`;
 }
 
 function renderFooter(stats){
