@@ -27,6 +27,9 @@ from net.pages.sessions import (
     TRACK_DETAIL_HTML_PRE, TRACK_DETAIL_HTML_POST,
     SESSION_DETAIL_HTML_PRE, SESSION_DETAIL_HTML_MID, SESSION_DETAIL_HTML_POST,
 )
+from net.pages.cars import (
+    CAR_DETAIL_HTML_PRE,
+)
 from net.pages.telemetry import TELEMETRY_HTML
 from net.pages.debug import DEBUG_RAW_HTML, DEBUG_PERF_HTML
 from net.router import make_handler
@@ -306,6 +309,9 @@ SESSION_DETAIL_HTML = (
     + json.dumps(_CAR_CATALOG, ensure_ascii=False)
     + SESSION_DETAIL_HTML_POST
 )
+# Car detail page — currently no embedded constants, so PRE alone is
+# the whole page. Kept as a constant for parity with the other pages.
+CAR_DETAIL_HTML = CAR_DETAIL_HTML_PRE
 
 
 # ─── AI Analysis ──────────────────────────────────────────────────────────────
@@ -393,6 +399,7 @@ async def main(demo_mode: bool = False):
         "TRACKS_HTML": TRACKS_HTML,
         "TRACK_DETAIL_HTML": TRACK_DETAIL_HTML,
         "SESSION_DETAIL_HTML": SESSION_DETAIL_HTML,
+        "CAR_DETAIL_HTML": CAR_DETAIL_HTML,
         "TELEMETRY_HTML": TELEMETRY_HTML,
         "DEBUG_RAW_HTML": DEBUG_RAW_HTML,
         "DEBUG_PERF_HTML": DEBUG_PERF_HTML,

@@ -38,6 +38,7 @@ def make_handler(ctx: dict):
     TRACKS_HTML            = ctx["TRACKS_HTML"]
     TRACK_DETAIL_HTML      = ctx["TRACK_DETAIL_HTML"]
     SESSION_DETAIL_HTML    = ctx["SESSION_DETAIL_HTML"]
+    CAR_DETAIL_HTML        = ctx["CAR_DETAIL_HTML"]
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
     DEBUG_RAW_HTML         = ctx["DEBUG_RAW_HTML"]
     DEBUG_PERF_HTML        = ctx["DEBUG_PERF_HTML"]
@@ -319,6 +320,150 @@ def make_handler(ctx: dict):
                     writer.write(_http_response("200 OK", "application/json",
                                                 json.dumps({"ok": True, "ordinal": ordinal,
                                                             "nickname": nick or None}).encode()))
+
+            elif path.startswith("/cars/") and (
+                path.count("/") == 2 or (path.count("/") == 3 and path.endswith("/data"))
+            ):
+                # /cars/<ordinal>          → HTML page
+                # /cars/<ordinal>/data     → JSON aggregate for that car
+                parts = path.split("/")  # ['', 'cars', '<ord>', ...]
+                try:
+                    ordinal = int(parts[2])
+                except (ValueError, IndexError):
+                    writer.write(_http_response("404 Not Found", "text/plain", b"Car not found"))
+                else:
+                    is_data = len(parts) == 4 and parts[3] == "data"
+                    if not is_data:
+                        writer.write(_http_response("200 OK", "text/html", CAR_DETAIL_HTML.encode()))
+                    else:
+                        # ── Build the aggregate payload for /cars/<ordinal>/data ──
+                        car_info = FORZA_CARS.get(ordinal) or {}
+                        nickname = db_get_car_nickname(ordinal)
+
+                        with db_lock:
+                            conn = db_connect()
+                            try:
+                                # All sessions in this car, newest-first for "last
+                                # driven" + recent-list rendering. We sort lap-time
+                                # ascending in Python after fetching since we also
+                                # need recency ordering elsewhere.
+                                sessions = [dict(r) for r in conn.execute(
+                                    "SELECT session_id,track,car,started_at,ended_at,"
+                                    "best_lap_time_s,lap_count,car_class,car_pi,"
+                                    "drivetrain_type,num_cylinders,weather_condition,"
+                                    "tyre_compound,track_temp_c "
+                                    "FROM sessions WHERE car_ordinal=? "
+                                    "ORDER BY started_at DESC",
+                                    (ordinal,)
+                                ).fetchall()]
+                                # Sum total lap time across this car (laps with a
+                                # recorded lap_time_s). Out-laps are NULL and don't
+                                # contribute, which is the right behaviour.
+                                total_sec = conn.execute(
+                                    "SELECT COALESCE(SUM(l.lap_time_s),0) "
+                                    "FROM laps l JOIN sessions s ON l.session_id=s.session_id "
+                                    "WHERE s.car_ordinal=? AND l.lap_time_s IS NOT NULL",
+                                    (ordinal,)
+                                ).fetchone()[0]
+                                # Theoretical-best per track for the gap calc.
+                                track_names = list({s["track"] for s in sessions if s.get("track")})
+                                theo_map = {}
+                                if track_names:
+                                    qs_ = ",".join("?" * len(track_names))
+                                    theo_rows = conn.execute(
+                                        f"SELECT track, theoretical_best_s FROM track_references "
+                                        f"WHERE reference_type='theoretical' AND track IN ({qs_})",
+                                        track_names
+                                    ).fetchall()
+                                    theo_map = {r["track"]: r["theoretical_best_s"] for r in theo_rows}
+                            finally:
+                                conn.close()
+
+                        # If we have no sessions in this car AND no FORZA_CARS entry,
+                        # treat as 404 — nothing to show.
+                        if not sessions and not car_info:
+                            writer.write(_http_response("404 Not Found", "application/json",
+                                                        json.dumps({"error": "Car not found"}).encode()))
+                        else:
+                            # Pull class/PI/drivetrain from the most recent session
+                            # where they're set — these don't drift across sessions
+                            # for a given car_ordinal.
+                            meta_src = next((s for s in sessions
+                                             if s.get("car_class") is not None
+                                                or s.get("car_pi") is not None
+                                                or s.get("drivetrain_type") is not None),
+                                            sessions[0] if sessions else {})
+                            # Best-lap-ever in this car, plus its track
+                            best_ever = None
+                            for s in sessions:
+                                if s.get("best_lap_time_s") is not None:
+                                    if best_ever is None or s["best_lap_time_s"] < best_ever["best_lap_time_s"]:
+                                        best_ever = {
+                                            "session_id": s["session_id"],
+                                            "best_lap_time_s": s["best_lap_time_s"],
+                                            "track": s["track"],
+                                            "started_at": s["started_at"],
+                                        }
+                            # Average lap across all laps in this car
+                            laps_count = sum((s.get("lap_count") or 0) for s in sessions)
+                            avg_lap = (total_sec / laps_count) if laps_count else None
+                            # Per-track aggregates
+                            tracks: dict = {}
+                            for s in sessions:
+                                t = s.get("track") or "unknown"
+                                if t not in tracks:
+                                    tracks[t] = {
+                                        "track": t,
+                                        "sessions_count": 0,
+                                        "laps_count": 0,
+                                        "last_session": None,
+                                        "best_lap_s": None,
+                                    }
+                                tracks[t]["sessions_count"] += 1
+                                tracks[t]["laps_count"] += s.get("lap_count") or 0
+                                if not tracks[t]["last_session"] or (s.get("started_at") or "") > tracks[t]["last_session"]:
+                                    tracks[t]["last_session"] = s.get("started_at")
+                                blt = s.get("best_lap_time_s")
+                                if blt is not None and (tracks[t]["best_lap_s"] is None or blt < tracks[t]["best_lap_s"]):
+                                    tracks[t]["best_lap_s"] = blt
+                            for t, agg in tracks.items():
+                                theo = theo_map.get(t)
+                                agg["theoretical_best_s"] = theo
+                                agg["gap_to_theoretical"] = (
+                                    round(agg["best_lap_s"] - theo, 3)
+                                    if agg["best_lap_s"] is not None and theo else None
+                                )
+                            tracks_list = sorted(
+                                tracks.values(),
+                                key=lambda x: x["sessions_count"], reverse=True
+                            )
+                            # Resolve canonical name + year
+                            payload = {
+                                "car": {
+                                    "ordinal": ordinal,
+                                    "name": car_info.get("name"),
+                                    "manufacturer": car_info.get("manufacturer"),
+                                    "year": car_info.get("year"),
+                                    "nickname": nickname,
+                                    "class": meta_src.get("car_class"),
+                                    "pi": meta_src.get("car_pi"),
+                                    "drivetrain_type": meta_src.get("drivetrain_type"),
+                                    "num_cylinders": meta_src.get("num_cylinders"),
+                                },
+                                "stats": {
+                                    "total_sessions": len(sessions),
+                                    "total_laps": laps_count,
+                                    "total_seconds": round(total_sec, 1),
+                                    "tracks_driven": len(tracks),
+                                    "avg_lap_s": round(avg_lap, 3) if avg_lap else None,
+                                    "last_driven": sessions[0].get("started_at") if sessions else None,
+                                    "best_ever": best_ever,
+                                },
+                                "tracks": tracks_list,
+                                "recent": sessions[:10],
+                            }
+                            writer.write(_http_response("200 OK", "application/json",
+                                                        json.dumps(payload).encode()))
 
             elif path == "/sessions/form":
                 qs = {k: urllib.parse.unquote_plus(v)
