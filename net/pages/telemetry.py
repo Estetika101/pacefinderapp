@@ -7,7 +7,7 @@ TELEMETRY_HTML = """<!DOCTYPE html>
 <link rel="stylesheet" href="/static/base.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(--font-mono);min-height:100vh;overflow-x:hidden}
+body{background:var(--color-bg);color:var(--color-text-primary);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-variant-numeric:tabular-nums;min-height:100vh;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
 .tb{height:50px;display:flex;align-items:center;padding:0 var(--space-4);gap:14px;border-bottom:1px solid var(--color-border);background:var(--color-bg);z-index:20;position:sticky;top:0}
 .tb h1{font-size:var(--text-md);color:var(--color-text-primary);letter-spacing:3px;text-transform:uppercase;flex:1}
@@ -15,10 +15,10 @@ a{color:inherit;text-decoration:none}
 .tb-nav a{font-size:var(--text-xs);color:var(--color-text-secondary);letter-spacing:1px;text-transform:uppercase}
 .tb-nav a:hover{color:var(--color-text-primary)}
 .tb-nav a.cur{color:var(--color-text-primary);border-bottom:1px solid var(--color-text-secondary)}
-.breadcrumb{font-size:var(--text-xs);color:var(--color-text-secondary);padding:8px var(--space-4);border-bottom:1px solid var(--color-border-subtle)}
-.breadcrumb a{color:var(--n-400)}.breadcrumb a:hover{color:var(--n-200)}
-.tele-layout{display:flex;min-height:calc(100vh - 90px)}
-.ctrl-col{width:220px;flex-shrink:0;border-right:1px solid var(--border-sub);padding:var(--sp-3) var(--sp-4);overflow-y:auto;position:sticky;top:50px;max-height:calc(100vh - 50px)}
+.breadcrumb{font-size:var(--text-xs);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--color-border)}
+.breadcrumb a{color:var(--color-text-tertiary)}.breadcrumb a:hover{color:var(--color-text-primary)}
+.tele-layout{display:flex;min-height:calc(100vh - 90px);gap:8px;padding:8px}
+.ctrl-col{width:220px;flex-shrink:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--sp-3) var(--sp-4);overflow-y:auto;position:sticky;top:58px;max-height:calc(100vh - 66px);align-self:flex-start}
 /* In embed mode the iframe's own .tb is hidden, so anchor sticky to 0 and
    give the iframe body min-height:0 so it doesn't double-scroll the parent. */
 html.embed body{min-height:0}
@@ -26,7 +26,7 @@ html.embed .tele-layout{min-height:0}
 html.embed .ctrl-col{top:0;max-height:100vh}
 @media(max-width:768px){.tele-layout{flex-direction:column}.ctrl-col{width:100%;position:static;max-height:none;border-right:none;border-bottom:1px solid var(--border-sub)}}
 .ctrl-section{margin-bottom:var(--sp-4)}
-.ctrl-lbl{font-size:var(--text-xs);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:2px;margin-bottom:var(--space-2)}
+.ctrl-lbl{font-size:10px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-2)}
 .lap-item{display:flex;align-items:center;gap:6px;padding:3px 4px;font-size:.76rem;cursor:pointer;border-radius:3px;user-select:none}
 .lap-item:hover{background:var(--surface)}
 .lap-swatch{width:9px;height:9px;border-radius:50%;flex-shrink:0}
@@ -41,7 +41,17 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 .xmode-btn.active{background:var(--accent-bg);border-color:var(--accent-bd);color:var(--accent-soft)}
 .ctrl-sel{width:100%;background:var(--surface);border:1px solid var(--surface-bd);color:var(--text);font-family:inherit;font-size:.74rem;padding:5px 6px;border-radius:4px}
 .panels-col{flex:1;min-width:0;padding:var(--sp-3) var(--sp-4) var(--sp-6)}
-.sector-hdr{margin-bottom:var(--sp-3);border:1px solid var(--border-sub);border-radius:4px;background:var(--bg-raised);overflow:hidden}
+/* Track map promoted to a sticky panel at the top of the charts column.
+   JS (renderTrackMap) still controls visibility — it only un-hides the
+   wrap when the lap actually has px/pz position samples. */
+.track-map-wrap{
+  position:sticky;top:58px;z-index:6;
+  margin:0 0 var(--sp-3);
+  border:1px solid var(--color-border);border-radius:var(--radius-md);
+  background:var(--color-surface);overflow:hidden;
+}
+html.embed .track-map-wrap{top:0}
+.sector-hdr{margin-bottom:var(--sp-3);border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);overflow:hidden}
 .s-hdr-row{display:flex;align-items:center;padding:4px var(--sp-3);gap:var(--sp-2);border-bottom:1px solid var(--border-faint);font-size:.68rem}
 .s-hdr-row:last-child{border-bottom:none}
 .s-row-lbl{width:24px;color:var(--color-text-secondary);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:1px;flex-shrink:0}
@@ -69,8 +79,7 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 .px-line{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.16);pointer-events:none;display:none}
 .px-line.locked{background:var(--color-accent,#f59e0b);width:2px;opacity:.85;box-shadow:0 0 4px rgba(245,158,11,.4)}
 #tele-tip{position:fixed;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);font-size:var(--text-xs);padding:5px 10px;border-radius:4px;pointer-events:none;display:none;z-index:200;white-space:pre;line-height:1.7;font-family:var(--font-mono);min-width:160px}
-.track-map-wrap{margin-top:var(--sp-4);border:1px solid var(--border-sub);border-radius:2px;background:var(--bg-raised);overflow:hidden}
-.tm-lbl{font-size:.56rem;color:var(--n-500);text-transform:uppercase;letter-spacing:1.5px;padding:4px var(--sp-3)}
+.tm-lbl{font-size:10px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;padding:8px var(--sp-3);border-bottom:1px solid var(--color-border-subtle)}
 #drag-sel{position:absolute;background:rgba(245,158,11,.18);border:2px dashed rgba(245,158,11,.85);box-shadow:inset 0 0 0 1px rgba(0,0,0,.4),0 0 8px rgba(245,158,11,.35);pointer-events:none;display:none;top:0;bottom:0;border-radius:2px;z-index:5}
 .tele-help{display:flex;flex-wrap:wrap;gap:10px;padding:6px 10px;margin-bottom:var(--sp-3);background:var(--bg-raised);border:1px solid var(--border-sub);border-radius:4px;font-size:.66rem;color:var(--n-400)}
 .tele-help kbd{background:var(--surface);border:1px solid var(--surface-bd);border-bottom-width:2px;border-radius:3px;padding:1px 5px;font-family:var(--font-mono);font-size:.6rem;color:var(--n-200)}
@@ -105,7 +114,7 @@ input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;flex-shri
 <div class="tb">
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
-    <a href="/dashboard">Live</a><a href="/sessions" class="cur">Sessions</a><a href="/setup">Setup</a>
+    <a href="/dashboard">Live</a><a href="/">Home</a><a href="/sessions" class="cur">Career</a><a href="/setup">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
   </nav>
 </div>
@@ -171,6 +180,10 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
 <div class="panels-col">
   <div id="tele-loading">Loading telemetry data&hellip;</div>
   <div id="panels-inner" style="display:none">
+    <div class="track-map-wrap" id="track-map-wrap" style="display:none">
+      <div class="tm-lbl">Track map &mdash; colour = speed (blue slow &rarr; red fast)</div>
+      <div id="track-map-inner"></div>
+    </div>
     <div id="sector-hdr" class="sector-hdr"></div>
     <div id="lap-summaries" class="lap-summaries"></div>
     <div class="tele-help" id="tele-help">
@@ -202,10 +215,6 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
       <div id="panel-tyre" class="panel-wrap"></div>
     </div>
     <div class="x-lbl-row"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
-    <div class="track-map-wrap" id="track-map-wrap" style="display:none">
-      <div class="tm-lbl">Track Map &mdash; colour = speed (blue slow &rarr; red fast)</div>
-      <div id="track-map-inner"></div>
-    </div>
   </div>
 </div>
 </div>
