@@ -12,7 +12,7 @@ GAMES_HTML = """<!DOCTYPE html>
 <div class="tb">
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
-    <a href="/">Live</a>
+    <a href="/dashboard">Live</a>
     <a href="/sessions" class="cur">Sessions</a>
     <a href="/setup">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
@@ -111,7 +111,7 @@ TRACKS_HTML = """<!DOCTYPE html>
 <div class="tb">
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
-    <a href="/">Live</a>
+    <a href="/dashboard">Live</a>
     <a href="/sessions" class="cur">Sessions</a>
     <a href="/setup">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
@@ -181,7 +181,7 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <div class="tb">
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
-    <a href="/">Live</a>
+    <a href="/dashboard">Live</a>
     <a href="/sessions" class="cur">Sessions</a>
     <a href="/setup">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
@@ -251,7 +251,7 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <div class="tb">
   <h1>Pacefinder</h1>
   <nav class="tb-nav">
-    <a href="/">Live</a>
+    <a href="/dashboard">Live</a>
     <a href="/sessions" class="cur">Sessions</a>
     <a href="/setup">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>

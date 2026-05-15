@@ -95,7 +95,7 @@ SETUP_HTML = """<!DOCTYPE html>
 <div class="topbar">
   <h1>Pacefinder</h1>
   <nav>
-    <a href="/">Live</a>
+    <a href="/dashboard">Live</a>
     <a href="/sessions">Sessions</a>
     <a href="/setup" class="active">Setup</a>
     <a href="/admin" id="nav-admin" style="display:none">Admin</a>
