@@ -272,6 +272,7 @@ def make_handler(ctx: dict):
                     "top_circuits": circuits,
                     "top_cars": top_cars,
                     "recent_sessions": recents,
+                    "time_format": config.get("time_format", "24h"),
                     "stats": {
                         "total_sessions": total_sessions,
                         "udp_received_total": udp_total,
@@ -663,6 +664,7 @@ def make_handler(ctx: dict):
                                 },
                                 "tracks": tracks_list,
                                 "recent": sessions[:10],
+                                "time_format": config.get("time_format", "24h"),
                             }
                             writer.write(_http_response("200 OK", "application/json",
                                                         json.dumps(payload).encode()))
@@ -736,6 +738,7 @@ def make_handler(ctx: dict):
                     "personal_best": pb,
                     "progress": progress,
                     "theoretical": dict(theo_row) if theo_row else None,
+                    "time_format": config.get("time_format", "24h"),
                 }).encode()))
 
             elif path == "/sessions/track/tip":
@@ -990,6 +993,7 @@ def make_handler(ctx: dict):
                                                     "theoretical": theo,
                                                     "car_context": car_ctx,
                                                     "events": event_rows,
+                                                    "time_format": config.get("time_format", "24h"),
                                                 }).encode()))
 
             elif path == "/sessions/laps":

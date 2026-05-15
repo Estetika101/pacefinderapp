@@ -16,18 +16,20 @@ const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
 
 function fmtLap(s){if(s==null)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDelta(d){if(d==null)return '—';const sign=d>0?'+':'';return sign+d.toFixed(3);}
+let _tf='24h';  // user time-format pref, set from /sessions/session/data
+function _h12(){return _tf==='12h';}
 function fmtDateShort(iso){
   if(!iso)return '—';
   const d=new Date(iso);
-  return d.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:_h12()});
 }
 function fmtTimeRange(startIso, endIso){
   if(!startIso)return '—';
   const s=new Date(startIso);
-  const start=s.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  const start=s.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:_h12()});
   if(!endIso)return start;
   const e=new Date(endIso);
-  const end=e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const end=e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:_h12()});
   return start+' – '+end;
 }
 
@@ -44,7 +46,7 @@ async function init(){
   let d;
   try{d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());}
   catch(e){document.getElementById('hdr-track').textContent='Session not found';return;}
-  _sess=d.session;_laps=d.laps||[];_theo=d.theoretical||null;_carCtx=d.car_context||null;_events=d.events||[];
+  _sess=d.session;_laps=d.laps||[];_theo=d.theoretical||null;_carCtx=d.car_context||null;_events=d.events||[];_tf=d.time_format||'24h';
   renderCrumbAndNav();
   renderHeader();
   renderHero();
@@ -533,7 +535,7 @@ function renderAI(){
     document.getElementById('btn-analyze').style.display = 'none';
     document.getElementById('btn-re').style.display = 'inline-block';
     if(s.ai_analyzed_at){
-      const dt = new Date(s.ai_analyzed_at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      const dt = new Date(s.ai_analyzed_at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:_h12()});
       document.getElementById('ai-meta').textContent = 'Cached · '+dt+(s.ai_model?' · '+s.ai_model:'');
     }
   }
@@ -556,7 +558,7 @@ async function runAnalysis(force){
     btn.style.display = 'none';
     rbtn.style.display = 'inline-block'; rbtn.textContent = 'Re-analyze'; rbtn.disabled = false;
     if(d.analyzed_at){
-      const dt = new Date(d.analyzed_at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      const dt = new Date(d.analyzed_at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:_h12()});
       meta.textContent = 'Analyzed '+dt+(d.model?' · '+d.model:'');
     }
   } catch(e){
@@ -694,7 +696,7 @@ async function saveEdit(){
   closeEdit();
   const d = await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());
   if(d.session){
-    _sess = d.session; _laps = d.laps || []; _theo = d.theoretical || null; _carCtx = d.car_context || null; _events = d.events || [];
+    _sess = d.session; _laps = d.laps || []; _theo = d.theoretical || null; _carCtx = d.car_context || null; _events = d.events || []; _tf = d.time_format || '24h';
     renderCrumbAndNav();
     renderHeader();
     renderHero();

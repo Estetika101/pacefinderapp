@@ -8,7 +8,8 @@ const CLASS_NAMES = {0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
 function fmtLap(s){if(s == null) return '—'; const m = Math.floor(s/60); return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDate(iso){if(!iso) return '—'; return new Date(iso).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'});}
 function fmtShortDate(iso){if(!iso) return '—'; return new Date(iso).toLocaleDateString([], {month:'short', day:'numeric'});}
-function fmtTime(iso){if(!iso) return ''; return new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});}
+let _tf='24h';  // user time-format pref, set from /cars/<ord>/data
+function fmtTime(iso){if(!iso) return ''; return new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12:_tf==='12h'});}
 function fmtRelative(iso){
   if(!iso) return '—';
   const dt = new Date(iso);
@@ -38,6 +39,7 @@ async function init(){
   try{d = await fetch('/cars/' + encodeURIComponent(_ordinal) + '/data').then(r => r.json());}
   catch(e){document.getElementById('nickname').textContent = 'Car not found'; return;}
   if(d.error){document.getElementById('nickname').textContent = 'Car not found'; return;}
+  _tf = d.time_format || '24h';
 
   renderTitle(d.car);
   renderHero(d.car, d.stats);
