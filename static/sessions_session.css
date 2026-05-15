@@ -170,6 +170,12 @@ a{color:inherit;text-decoration:none}
   font-size:11px;color:var(--color-text-quaternary);
   font-variant-numeric:tabular-nums;
 }
+.delta-caption{
+  font-size:11px;color:var(--color-text-tertiary);
+  margin:0 0 6px;line-height:1.4;
+}
+.delta-caption .dc-slow{color:var(--color-red);font-weight:500}
+.delta-caption .dc-fast{color:var(--color-green);font-weight:500}
 .delta-svg{display:block;width:100%;height:180px}
 .delta-empty{
   font-size:11px;color:var(--color-text-quaternary);

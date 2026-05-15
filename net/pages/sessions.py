@@ -385,28 +385,31 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
     </div>
     <div class="hero-chart">
       <div class="delta-header" id="delta-header" style="display:none">
-        <span class="delta-title">&Delta; — best vs 2nd-best</span>
+        <span class="delta-title" id="delta-title">&Delta; — 2nd-best vs your best lap</span>
         <span class="delta-meta" id="delta-meta"></span>
       </div>
+      <div class="delta-caption" id="delta-caption" style="display:none">
+        Where your 2nd-best lap <span class="dc-slow">lost time</span> or
+        <span class="dc-fast">gained time</span> against your best, around the lap.
+      </div>
       <svg class="delta-svg" id="hero-delta-svg" viewBox="0 0 1000 180" preserveAspectRatio="none" style="display:none">
+        <defs>
+          <clipPath id="clipSlow"><rect x="0" y="0" width="1000" height="90"/></clipPath>
+          <clipPath id="clipFast"><rect x="0" y="90" width="1000" height="90"/></clipPath>
+        </defs>
         <line x1="333" y1="0" x2="333" y2="180" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="3,4"/>
         <line x1="666" y1="0" x2="666" y2="180" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="3,4"/>
-        <line x1="0" y1="90" x2="1000" y2="90" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="2,3"/>
+        <line x1="0" y1="90" x2="1000" y2="90" stroke="#3a3a3a" stroke-width="1"/>
         <text x="166" y="14" fill="#888" font-size="10" font-family="monospace" text-anchor="middle" letter-spacing="0.1em">S1</text>
         <text x="500" y="14" fill="#888" font-size="10" font-family="monospace" text-anchor="middle" letter-spacing="0.1em">S2</text>
         <text x="833" y="14" fill="#888" font-size="10" font-family="monospace" text-anchor="middle" letter-spacing="0.1em">S3</text>
-        <defs>
-          <linearGradient id="slowerGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#f87171" stop-opacity="0.4"/>
-            <stop offset="100%" stop-color="#f87171" stop-opacity="0.02"/>
-          </linearGradient>
-          <linearGradient id="fasterGrad" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%" stop-color="#4ade80" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="#4ade80" stop-opacity="0.02"/>
-          </linearGradient>
-        </defs>
-        <path id="hero-delta-fill" d="" fill="url(#slowerGrad)" opacity="0.75"/>
-        <path id="hero-delta-line" d="" fill="none" stroke="var(--color-amber)" stroke-width="1.5"/>
+        <!-- y-axis cues: above the line = 2nd-best losing time, below = gaining -->
+        <text x="6" y="20" fill="#f87171" font-size="10" font-family="monospace">slower ↑</text>
+        <text x="6" y="86" fill="#8a8a8a" font-size="10" font-family="monospace">your best lap (0)</text>
+        <text x="6" y="174" fill="#4ade80" font-size="10" font-family="monospace">faster ↓</text>
+        <path id="hero-delta-fill-slow" d="" fill="#f87171" opacity="0.28" clip-path="url(#clipSlow)"/>
+        <path id="hero-delta-fill-fast" d="" fill="#4ade80" opacity="0.26" clip-path="url(#clipFast)"/>
+        <path id="hero-delta-line" d="" fill="none" stroke="#cfcfcf" stroke-width="1.5"/>
       </svg>
       <div class="delta-empty" id="delta-empty" style="display:none"></div>
       <div class="sector-row" id="hero-sectors" style="display:none">
