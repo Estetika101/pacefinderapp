@@ -22,6 +22,11 @@
   --color-text-secondary: lightgrey;
   --color-text-muted: lightgrey;
   --color-text-dim: lightgrey;
+  /* Tertiary / quaternary sit *below* the muted/dim rung — for small
+     uppercase labels, eyebrows, and timestamp meta on dark surfaces.
+     Tested at ~6.5:1 and ~4.8:1 contrast on --color-bg. */
+  --color-text-tertiary:   #b0b0b0;
+  --color-text-quaternary: #8a8a8a;
   --color-accent: #e8b84b;
   --color-green: #4ade80;
   --color-red: #f87171;
