@@ -171,9 +171,22 @@ def build_analysis_prompt(session: dict, laps: list, historical: list,
         f"Track: {track} | Game: {game} | Session: {date}\n\n"
         f"THIS SESSION — LAP TABLE:\n{hdr}{rows}\n"
         f"{hist_block}\n"
-        "Analyze this session. Focus on slip management, throttle discipline, "
-        "brake consistency, and lap time trend. Reference specific laps. "
-        "Compare against historical baseline where relevant. Be direct, no padding."
+        "Analyze this sim-racing session. Focus on slip management, throttle "
+        "discipline, brake consistency, and lap-time trend. Reference specific "
+        "laps. Compare against the historical baseline where relevant.\n\n"
+        "Respond with ONLY a JSON object (no markdown fences, no prose before "
+        "or after) in exactly this shape:\n"
+        "{\n"
+        '  "summary": "one or two sentences — the headline read of this session",\n'
+        '  "findings": [\n'
+        '    {"area": "short label e.g. \'T-sequence braking\' or \'Lap 4-6 slip\'",\n'
+        '     "issue": "what went wrong, specific and concrete",\n'
+        '     "fix": "the actionable change, one sentence"}\n'
+        "  ],\n"
+        '  "strengths": ["short phrase", "short phrase"]\n'
+        "}\n"
+        "2-4 findings, ordered most-costly first. 1-3 strengths. Be direct, "
+        "no padding. Plain text inside the JSON string values — no markdown."
     )
 
 
