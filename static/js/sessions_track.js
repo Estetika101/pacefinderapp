@@ -9,7 +9,8 @@ const GAME_LABELS = {'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
 function fmtLap(s){if(s==null)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDate(iso){if(!iso)return '—';return new Date(iso).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});}
 function fmtShort(iso){if(!iso)return '—';return new Date(iso).toLocaleDateString([],{month:'short',day:'numeric'});}
-function fmtTime(iso){if(!iso)return '';return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+let _tf='24h';  // user time-format pref, set from /sessions/track/data
+function fmtTime(iso){if(!iso)return '';return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:_tf==='12h'});}
 function escapeHtml(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 const _track = new URLSearchParams(location.search).get('name') || '';
@@ -31,6 +32,7 @@ async function init(){
   _pb       = d.personal_best || null;
   _progress = d.progress || [];
   _theo     = d.theoretical || null;
+  _tf       = d.time_format || '24h';
 
   renderSubtitle();
   renderHero();
