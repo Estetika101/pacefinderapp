@@ -1,10 +1,6 @@
-// race_type values land here from db.store._classify_race_type — primarily
-// `real` (humans present), `ai` (AI grid), `time_trial` (no position changes,
-// <=3 laps). Older code also wrote `race`, `race_ai`, etc. — keep those for
-// backward compat with sessions classified before the rename.
-const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'Race vs AI',race_online:'Online Race',hot_lap:'Hot Lap',real:'Race',ai:'AI Race'};
-// Maps race_type to a color-modifier class on .type-chip. Folds older synonyms
-// (race_ai → t-ai, race_online → t-race, etc.) onto the canonical buckets.
+// race_type values: `real` (humans), `ai`, `time_trial`. Older code wrote
+// `race`, `race_ai`, etc. — keep both forms for backward compatibility.
+const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'AI Race',race_online:'Online Race',hot_lap:'Hot Lap',real:'Race',ai:'AI Race'};
 function typeChipClass(t){
   if(t==='real'||t==='race'||t==='race_online')return 't-race';
   if(t==='ai'||t==='race_ai')return 't-ai';
@@ -13,370 +9,496 @@ function typeChipClass(t){
   if(t==='hot_lap')return 't-hot_lap';
   return '';
 }
-// Forza drivetrain_type spec: 0=FWD, 1=RWD, 2=AWD.
+// Forza drivetrain_type spec: 0=FWD, 1=RWD, 2=AWD
 const DRIVETRAIN_LABELS={0:'FWD',1:'RWD',2:'AWD'};
-// Car-class indices — same FH5 nine-class scheme used by the other sessions
-// pages. Duplicated here because each sessions_*.js is loaded standalone
-// (no shared module). #103 tracks the FM2023 vs FH5 split.
+// FH5 nine-class scheme. #103 tracks the FM2023 vs FH5 split.
 const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
-function fmtLap(s){if(!s)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
-function fmtDt(iso){if(!iso)return '—';return new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}
-function scls(v){return v>0.25?'crit':v>0.12?'warn':'';}
+
+function fmtLap(s){if(s==null)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
+function fmtDelta(d){if(d==null)return '—';const sign=d>0?'+':'';return sign+d.toFixed(3);}
+function fmtDateShort(iso){
+  if(!iso)return '—';
+  const d=new Date(iso);
+  return d.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function fmtTimeRange(startIso, endIso){
+  if(!startIso)return '—';
+  const s=new Date(startIso);
+  const start=s.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  if(!endIso)return start;
+  const e=new Date(endIso);
+  const end=e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  return start+' – '+end;
+}
+
 const _qs=new URLSearchParams(location.search);
 const _id=_qs.get('id')||'';
 const _sgame=_qs.get('game')||'';
 const _strack=_qs.get('track')||'';
-const _initTab=_qs.get('tab')||'overview';
-const SGAME_LABELS={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
-let _sess=null,_laps=[],_allTracks=[];
 
-// ── Tab switching ─────────────────────────────────────────────
-let _teleInited=false,_ddInited=false;
-function switchTab(tab){
-  document.getElementById('tab-overview').style.display=tab==='overview'?'':'none';
-  document.getElementById('tab-deepdive').style.display=tab==='deepdive'?'':'none';
-  document.getElementById('tab-telemetry').style.display=tab==='telemetry'?'':'none';
-  document.getElementById('st-overview').classList.toggle('active',tab==='overview');
-  document.getElementById('st-deepdive').classList.toggle('active',tab==='deepdive');
-  document.getElementById('st-telemetry').classList.toggle('active',tab==='telemetry');
-  const url=new URL(location.href);url.searchParams.set('tab',tab);history.replaceState({},'',url);
-  if(tab==='deepdive'&&!_ddInited&&typeof DeepDive!=='undefined'){
-    _ddInited=true;
-    DeepDive.init(_id);
-  }
-  if(tab==='telemetry'&&!_teleInited){
-    _teleInited=true;
-    const game=_sgame||(_sess&&_sess.game)||'';
-    const track=_strack||(_sess&&_sess.track)||'';
-    let src='/sessions/telemetry?embed=1&id='+encodeURIComponent(_id);
-    if(game)src+='&game='+encodeURIComponent(game);
-    if(track)src+='&track='+encodeURIComponent(track);
-    document.getElementById('tele-frame').src=src;
-  }
-}
+let _sess=null,_laps=[],_theo=null,_carCtx=null;
+let _sortKey='lap', _sortDir='asc';
 
 async function init(){
   if(!_id){location.href='/sessions';return;}
   let d;
   try{d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());}
   catch(e){document.getElementById('hdr-track').textContent='Session not found';return;}
-  _sess=d.session;_laps=d.laps||[];
-  // Load left rail circuit list
-  const game=_sgame||_sess.game||'';
-  try{_allTracks=await fetch('/sessions/tracks'+(game?'?game='+encodeURIComponent(game):'')).then(r=>r.json());}catch(e){_allTracks=[];}
+  _sess=d.session;_laps=d.laps||[];_theo=d.theoretical||null;_carCtx=d.car_context||null;
+  renderCrumbAndNav();
   renderHeader();
-  renderLeftRail();
+  renderHero();
+  renderProfile();
   renderLaps();
+  renderCards();
   renderAI();
-  switchTab(_initTab);
+  attachSortHandlers();
 }
 
-function renderLeftRail(){
+function renderCrumbAndNav(){
   const s=_sess;
+  const track=s.track&&s.track!=='unknown'?s.track:(_strack||'Unknown Track');
   const game=_sgame||s.game||'';
-  const trackName=s.track&&s.track!=='unknown'?s.track:(_strack||'');
-  const items=document.getElementById('lr-items');
-  const pills=document.getElementById('lr-pills');
-  items.innerHTML=_allTracks.map(t=>{
-    const active=t.track===trackName;
-    const href='/sessions/track?name='+encodeURIComponent(t.track)+(game?'&game='+encodeURIComponent(game):'');
-    return`<a class="lr-item${active?' active':''}" href="${href}">
-      <div class="lr-name">${t.track==='unknown'?'Unknown':t.track}</div>
-      <div class="lr-sub">${t.session_count} session${t.session_count===1?'':'s'}</div>
-    </a>`;
-  }).join('');
-  pills.innerHTML=_allTracks.map(t=>{
-    const active=t.track===trackName;
-    const href='/sessions/track?name='+encodeURIComponent(t.track)+(game?'&game='+encodeURIComponent(game):'');
-    return`<a class="lr-pill${active?' active':''}" href="${href}">${t.track==='unknown'?'Unknown':t.track}</a>`;
-  }).join('');
-  // THIS SESSION block
-  // Only render the THIS SESSION pill when we have a real car name —
-  // otherwise it reads as noise ("Unknown Car / PI 900 / real").
-  // Render priority: user nickname > resolved name > "Unknown Car (#ord)".
-  // When a nickname is set AND we have a resolved name, show the resolved
-  // name as a small subtitle so the user can still identify the actual car.
-  let resolvedName=null;
-  if(s.car&&s.car!=='unknown'&&!/^Unknown Car/i.test(s.car)){
-    resolvedName=s.car;
-  }else if(s.car_ordinal!=null){
-    resolvedName=`Unknown Car (#${s.car_ordinal})`;
-  }
-  const nick=s.car_nickname||null;
-  const carName=nick||resolvedName;
-  const subtitle=(nick&&resolvedName&&nick!==resolvedName)?resolvedName:null;
-  const cls=s.car_class!=null?CLASS_NAMES[s.car_class]:null;
-  const pi=s.car_pi;
-  const dt=s.drivetrain_type!=null?DRIVETRAIN_LABELS[s.drivetrain_type]:null;
-  const cyl=s.num_cylinders;
-  const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
-  const thisBlock=document.getElementById('lr-this');
-  const carEl=document.getElementById('lr-car');
-  const badgesEl=document.getElementById('lr-badges');
-  if(carName){
-    thisBlock.style.display='';
-    carEl.innerHTML=carName + (subtitle?`<div style="font-size:.65rem;color:var(--color-text-muted);font-weight:normal;margin-top:2px">${subtitle}</div>`:'');
-    let badges='';
-    if(cls)badges+=`<span class="cc cc-${cls}">${cls}</span>`;
-    if(pi)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">PI ${pi}</span>`;
-    if(dt)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">${dt}</span>`;
-    if(cyl)badges+=`<span style="font-size:.6rem;color:var(--color-text-muted)">${cyl}cyl</span>`;
-    if(effType)badges+=`<span class="type-chip ${typeChipClass(effType)}" style="font-size:.55rem">${TYPE_LABELS[effType]||effType}</span>`;
-    badgesEl.innerHTML=badges;
-  }
+  document.title='Pacefinder · '+track;
+  // Breadcrumb → /sessions/track?name=...
+  let trackHref='/sessions/track?name='+encodeURIComponent(track);
+  if(game)trackHref+='&game='+encodeURIComponent(game);
+  const bc=document.getElementById('bc-track');
+  bc.href=trackHref;
+  document.getElementById('bc-track-name').textContent=track;
+  // Telemetry subnav link
+  let teleHref='/sessions/telemetry?id='+encodeURIComponent(_id);
+  if(game)teleHref+='&game='+encodeURIComponent(game);
+  if(track)teleHref+='&track='+encodeURIComponent(track);
+  document.getElementById('link-telemetry').href=teleHref;
 }
 
 function renderHeader(){
   const s=_sess;
   const track=s.track&&s.track!=='unknown'?s.track:(_strack||'Unknown Track');
-  const game=_sgame||s.game||'';
-  document.title='Pacefinder · '+track;
-  if(game){
-    const bg=document.getElementById('bc-game');
-    bg.textContent=SGAME_LABELS[game]||game;
-    bg.href='/sessions/game?name='+encodeURIComponent(game);
-    bg.style.display='';
-    document.getElementById('bc-game-sep').style.display='';
-  }
-  let trackHref='/sessions/track?name='+encodeURIComponent(track);
-  if(game)trackHref+='&game='+encodeURIComponent(game);
-  document.getElementById('bc-track').textContent=track;
-  document.getElementById('bc-track').href=trackHref;
-  document.getElementById('bc-sess').textContent=fmtDt(s.started_at);
   document.getElementById('hdr-track').textContent=track;
-  document.getElementById('hdr-sub').textContent=(s.game||'').replace(/_/g,' ')+' · '+fmtDt(s.started_at);
-  document.getElementById('hdr-best').textContent=fmtLap(s.best_lap_time_s);
-  document.getElementById('hdr-laps').textContent=_laps.length;
-  // Car chip — nickname takes priority, fall back to resolved name, then to
-  // the raw ordinal so unmapped cars are still identifiable. Mirrors the
-  // priority logic used by the THIS SESSION pill in the left rail.
-  const carEl=document.getElementById('hdr-car');
-  if(carEl){
-    let txt=null,sub=null;
-    if(s.car_nickname){txt=s.car_nickname;sub=s.car&&!/^Unknown Car/i.test(s.car)?s.car:null;}
-    else if(s.car && s.car!=='unknown' && !/^Unknown Car/i.test(s.car)){txt=s.car;}
-    else if(s.car_ordinal!=null){txt=`Car #${s.car_ordinal}`;}
-    if(txt){
-      carEl.textContent=txt;
-      carEl.title=sub||'';  // hover reveals the resolved name when nickname shown
-      carEl.style.display='';
-    }else{
-      carEl.style.display='none';
+
+  // H2 car link — nickname > resolved > Unknown Car (#N)
+  let carText=null;
+  if(s.car_nickname)carText=s.car_nickname;
+  else if(s.car && s.car!=='unknown' && !/^Unknown Car/i.test(s.car))carText=s.car;
+  else if(s.car_ordinal!=null)carText='Unknown Car (#'+s.car_ordinal+')';
+  if(carText){
+    document.getElementById('hdr-car-name').textContent=carText;
+    document.getElementById('hdr-car-link').style.display='';
+    if(s.car_ordinal!=null){
+      document.getElementById('hdr-car-link').href='/cars/'+s.car_ordinal;
+    }
+    if(s.car_class!=null){
+      const el=document.getElementById('hdr-car-class');
+      el.textContent=CLASS_NAMES[s.car_class]||'';
+      el.style.display='';
+    }
+    if(s.car_pi){
+      const el=document.getElementById('hdr-car-pi');
+      el.textContent=s.car_pi;
+      el.style.display='';
     }
   }
+
+  // Grid → Finish result block (race types only, both values present)
+  const gp=s.grid_pos, fp=s.finish_pos;
+  if(gp!=null && gp>0 && fp!=null){
+    document.getElementById('hdr-grid-p').textContent='P'+gp;
+    const fEl=document.getElementById('hdr-finish-p');
+    fEl.textContent='P'+fp;
+    const g=gp-fp;
+    if(g>0){fEl.classList.add('finish');fEl.classList.remove('lost','same');}
+    else if(g<0){fEl.classList.add('lost');fEl.classList.remove('finish','same');}
+    else{fEl.classList.add('same');fEl.classList.remove('finish','lost');}
+    const gEl=document.getElementById('hdr-gained');
+    if(g>0){gEl.textContent='↗ '+g+' place'+(g===1?'':'s')+' gained';gEl.classList.remove('lost','same');}
+    else if(g<0){gEl.textContent='↘ '+(-g)+' place'+(-g===1?'':'s')+' lost';gEl.classList.add('lost');}
+    else{gEl.textContent='no change';gEl.classList.add('same');}
+    document.getElementById('hdr-result').style.display='';
+  }
+
+  // Metadata strip pills
+  const whenVal=fmtTimeRange(s.started_at, s.ended_at);
+  if(whenVal && whenVal!=='—'){
+    document.getElementById('hdr-when-val').textContent=whenVal;
+    document.getElementById('hdr-when').style.display='';
+  }
+  // Conditions: weather + tyre + track_temp_c
+  const condParts=[];
+  if(s.weather_condition)condParts.push(s.weather_condition);
+  if(s.tyre_compound)condParts.push(s.tyre_compound);
+  if(s.track_temp_c!=null)condParts.push(Math.round(s.track_temp_c)+'°C');
+  if(condParts.length){
+    document.getElementById('hdr-cond-val').textContent=condParts.join(' · ');
+    document.getElementById('hdr-cond').style.display='';
+  }
+  // Type
   const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
   if(effType){
     const el=document.getElementById('hdr-type');
     el.textContent=TYPE_LABELS[effType]||effType;
-    // Reset prior color class then apply current — keeps the chip from
-    // accumulating modifiers across navigations (defensive, not strictly
-    // necessary on a hard reload).
-    el.className='type-chip '+typeChipClass(effType);
+    el.className='pill type-chip '+typeChipClass(effType);
     el.style.display='';
   }
-  // Race position: Grid / Finish / Gained header stats — shown only when present.
-  const fp=s.finish_pos, gp=s.grid_pos;
-  const gridStat=document.getElementById('hdr-grid-stat');
-  const finishStat=document.getElementById('hdr-finish-stat');
-  const gainedStat=document.getElementById('hdr-gained-stat');
-  if(gp!=null && gp>0){
-    document.getElementById('hdr-grid').textContent='P'+gp;
-    gridStat.style.display='';
-  }
-  if(fp!=null){
-    document.getElementById('hdr-finish').textContent='P'+fp;
-    finishStat.style.display='';
-  }
-  if(gp!=null && gp>0 && fp!=null){
-    const g=gp-fp;
-    const el=document.getElementById('hdr-gained');
-    el.textContent = g>0?'+'+g : g<0?String(g) : '0';
-    el.style.color = g>0?'var(--color-green)' : g<0?'var(--color-red)' : '';
-    gainedStat.style.display='';
-  }
-  // Weather + tyre compound chips (set via the edit modal). Always render
-  // them — when the user hasn't set them yet, show a dim placeholder
-  // ("Tyres?" / "Weather?") so the slot is discoverable instead of hidden.
-  // Click the placeholder to open the edit modal and set it.
-  const wxEl=document.getElementById('hdr-weather');
-  if(wxEl){
-    if(s.weather_condition){
-      wxEl.textContent=s.weather_condition;
-      wxEl.className='type-chip';
-      wxEl.onclick=null;
-    }else{
-      wxEl.textContent='Weather?';
-      wxEl.className='type-chip placeholder';
-      wxEl.onclick=openEdit;
+}
+
+function renderHero(){
+  const s=_sess;
+  const best=s.best_lap_time_s;
+  document.getElementById('hero-best').textContent=fmtLap(best);
+  // Find which lap is the best one for the subtitle
+  let bestLap=null;
+  _laps.forEach(l=>{
+    if(l.lap_time_s && best && Math.abs(l.lap_time_s-best)<0.001)bestLap=l;
+  });
+  const subBits=[];
+  if(bestLap && bestLap.lap_number!=null)subBits.push('Best lap · L'+(bestLap.lap_number+1));
+  if(_laps.length)subBits.push((_laps.length-(bestLap?1:0))+(_laps.length-1===1?' other lap':' other laps'));
+  document.getElementById('hero-best-sub').textContent = bestLap
+    ? 'Best lap · L'+(bestLap.lap_number+1)+' of '+_laps.length
+    : 'Best lap';
+
+  // Gap to theoretical (if we have track-level theoretical and a best lap)
+  if(_theo && _theo.theoretical_best_s && best){
+    const gap = best - _theo.theoretical_best_s;
+    if(gap > 0.001){
+      const gapEl=document.getElementById('hero-gap');
+      gapEl.textContent = '+'+gap.toFixed(3)+'s';
+      gapEl.style.display='';
+      document.getElementById('hero-gap-sub').style.display='';
     }
-    wxEl.style.display='';
   }
-  const tyEl=document.getElementById('hdr-tyre');
-  if(tyEl){
-    if(s.tyre_compound){
-      tyEl.textContent=s.tyre_compound;
-      tyEl.className='type-chip';
-      tyEl.onclick=null;
-    }else{
-      tyEl.textContent='Tyres?';
-      tyEl.className='type-chip placeholder';
-      tyEl.onclick=openEdit;
-    }
-    tyEl.style.display='';
+
+  // Sector deltas vs theoretical (use the BEST lap's sectors)
+  if(bestLap && _theo && bestLap.s1_time_s!=null && _theo.theoretical_s1_s!=null){
+    const renderS=(elId, lapS, theoS)=>{
+      const d = lapS - theoS;
+      const el = document.getElementById(elId);
+      el.textContent = fmtDelta(d);
+      el.classList.remove('faster','slower');
+      if(d < -0.005) el.classList.add('faster');
+      else if(d > 0.005) el.classList.add('slower');
+    };
+    renderS('hero-s1', bestLap.s1_time_s, _theo.theoretical_s1_s);
+    renderS('hero-s2', bestLap.s2_time_s, _theo.theoretical_s2_s);
+    renderS('hero-s3', bestLap.s3_time_s, _theo.theoretical_s3_s);
+    document.getElementById('hero-sectors').style.display='';
   }
 }
+
+function renderProfile(){
+  // Session-level aggregates: mean of per-lap means/maxes. Excludes laps
+  // with no data. If no valid lap aggregates exist, hide the strip.
+  const valid = _laps.filter(l => l.avg_throttle != null);
+  if(!valid.length) return;
+  const mean = (key) => {
+    const xs = valid.map(l=>l[key]).filter(v=>v!=null);
+    if(!xs.length) return null;
+    return xs.reduce((a,b)=>a+b,0)/xs.length;
+  };
+  const max = (key) => {
+    const xs = valid.map(l=>l[key]).filter(v=>v!=null);
+    if(!xs.length) return null;
+    return Math.max(...xs);
+  };
+  const thr = mean('avg_throttle');
+  const brk = mean('avg_brake');
+  const slip = mean('avg_slip');
+  const pslip = max('peak_slip');
+  const above = mean('slip_above_pct');
+
+  const set = (vid, bid, val, fmt, barPct) => {
+    if(val == null) return;
+    document.getElementById(vid).textContent = fmt(val);
+    document.getElementById(bid).style.width = Math.max(0, Math.min(100, barPct)) + '%';
+  };
+  set('prof-thr',   'prof-thr-bar',   thr,   v=>v.toFixed(0)+'%',         thr);
+  set('prof-brk',   'prof-brk-bar',   brk,   v=>v.toFixed(0)+'%',         brk);
+  // Slip is unitless 0–1ish; scale to a 0.5 max for the bar visualization
+  set('prof-slip',  'prof-slip-bar',  slip,  v=>v.toFixed(2),             slip != null ? slip*200 : 0);
+  set('prof-pslip', 'prof-pslip-bar', pslip, v=>v.toFixed(2),             pslip != null ? pslip*200 : 0);
+  set('prof-above', 'prof-above-bar', above, v=>v.toFixed(0)+'% of lap',  above);
+
+  document.getElementById('profile').style.display='';
+}
+
+function attachSortHandlers(){
+  document.querySelectorAll('.lap-table th[data-sort]').forEach(th=>{
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if(_sortKey === key){
+        _sortDir = (_sortDir === 'asc') ? 'desc' : 'asc';
+      } else {
+        _sortKey = key;
+        _sortDir = (key === 'lap') ? 'asc' : 'asc';  // ascending default
+      }
+      renderLaps();
+    });
+  });
+}
+
 function renderLaps(){
-  const best=_sess.best_lap_time_s;
-  // Forza UDP lap_number is 0-indexed; lap 0 IS race lap 1, not an out-lap.
-  // Drop the lap_number > 0 / OUT LAP carve-outs (those were ACC-style and
-  // ACC support is parked).
-  const validTimes=_laps.filter(l=>l.lap_time_s).map(l=>l.lap_time_s);
-  validTimes.sort((a,b)=>a-b);
-  const median=validTimes.length?validTimes[Math.floor(validTimes.length/2)]:null;
-  document.getElementById('lap-tbody').innerHTML=_laps.map(l=>{
-    const isSlow=median&&l.lap_time_s&&l.lap_time_s>median*1.4;
-    const isB=best&&l.lap_time_s&&Math.abs(l.lap_time_s-best)<0.001;
-    const rowCls=[isB?'best-row':'',isSlow?'outlier-row':''].filter(Boolean).join(' ');
-    const timeHtml=isSlow?`<span class="outlier-time">${fmtLap(l.lap_time_s)}</span>`:fmtLap(l.lap_time_s);
-    return `<tr class="${rowCls}">
-      <td>${l.lap_number != null ? l.lap_number + 1 : '—'}</td>
-      <td>${timeHtml}</td>
-      <td>${l.max_speed_mph!=null?l.max_speed_mph.toFixed(1)+' mph':'—'}</td>
-      <td>${l.avg_throttle!=null?l.avg_throttle.toFixed(1)+'%':'—'}</td>
-      <td>${l.avg_brake!=null?l.avg_brake.toFixed(1)+'%':'—'}</td>
-      <td class="${scls(l.avg_slip||0)}">${l.avg_slip!=null?l.avg_slip.toFixed(4):'—'}</td>
-      <td class="${scls(l.peak_slip||0)}">${l.peak_slip!=null?l.peak_slip.toFixed(4):'—'}</td>
-      <td>${l.slip_above_pct!=null?l.slip_above_pct.toFixed(1)+'%':'—'}</td>
+  const best = _sess.best_lap_time_s;
+  // Sort
+  const keyFn = (l) => {
+    switch(_sortKey){
+      case 'lap':  return l.lap_number != null ? l.lap_number : Infinity;
+      case 'time': return l.lap_time_s != null ? l.lap_time_s : Infinity;
+      case 's1':   return l.s1_time_s != null ? l.s1_time_s : Infinity;
+      case 's2':   return l.s2_time_s != null ? l.s2_time_s : Infinity;
+      case 's3':   return l.s3_time_s != null ? l.s3_time_s : Infinity;
+      default:     return 0;
+    }
+  };
+  const sorted = [..._laps].sort((a,b)=>{
+    const ka = keyFn(a), kb = keyFn(b);
+    if(ka === kb) return 0;
+    return _sortDir === 'asc' ? (ka < kb ? -1 : 1) : (ka > kb ? -1 : 1);
+  });
+
+  // Sector deltas are vs THIS SESSION's best sectors (not vs theoretical)
+  const bestLap = _laps.find(l => l.lap_time_s != null && best != null && Math.abs(l.lap_time_s - best) < 0.001);
+  const bs1 = bestLap ? bestLap.s1_time_s : null;
+  const bs2 = bestLap ? bestLap.s2_time_s : null;
+  const bs3 = bestLap ? bestLap.s3_time_s : null;
+
+  // Tag heuristics: lap 0 (Forza first lap) = out-lap if its time is wildly slower
+  const validTimes = _laps.filter(l => l.lap_time_s).map(l => l.lap_time_s).sort((a,b)=>a-b);
+  const median = validTimes.length ? validTimes[Math.floor(validTimes.length/2)] : null;
+  const isOutOrInLap = (l) => {
+    if(!median || !l.lap_time_s) return null;
+    if(l.lap_time_s > median * 1.4){
+      // Heuristic: first lap of the list = out, last lap = in
+      const idx = _laps.indexOf(l);
+      if(idx === 0) return 'Out';
+      if(idx === _laps.length - 1) return 'In';
+    }
+    return null;
+  };
+
+  const tbody = document.getElementById('lap-tbody');
+  tbody.innerHTML = sorted.map(l => {
+    const isBest = best && l.lap_time_s && Math.abs(l.lap_time_s - best) < 0.001;
+    const rowCls = isBest ? 'best' : '';
+    const lapNum = l.lap_number != null ? 'L'+(l.lap_number+1) : '—';
+    const tag = isOutOrInLap(l);
+    const tagHtml = tag ? `<span class="tag tag-${tag.toLowerCase()}">${tag}</span>` : '';
+
+    const sCell = (lapVal, bestVal) => {
+      if(isBest) return '<span class="delta-zero">—</span>';
+      if(lapVal == null || bestVal == null) return '<span class="delta-zero">—</span>';
+      const d = lapVal - bestVal;
+      const sign = d > 0 ? '+' : '';
+      const cls = d > 0 ? 'delta-pos' : (d < 0 ? 'delta-neg' : 'delta-zero');
+      return `<span class="${cls}">${sign}${d.toFixed(2)}</span>`;
+    };
+
+    const lapHref = '/sessions/telemetry?id='+encodeURIComponent(_id)+'&lap='+(l.lap_number != null ? l.lap_number : '');
+    const sgame = _sgame || (_sess && _sess.game) || '';
+    const fullHref = sgame ? lapHref + '&game=' + encodeURIComponent(sgame) : lapHref;
+
+    return `<tr class="${rowCls}" onclick="location.href='${fullHref}'">
+      <td>${lapNum}</td>
+      <td>${fmtLap(l.lap_time_s)}</td>
+      <td>${sCell(l.s1_time_s, bs1)}</td>
+      <td>${sCell(l.s2_time_s, bs2)}</td>
+      <td>${sCell(l.s3_time_s, bs3)}</td>
+      <td>${tagHtml}</td>
     </tr>`;
   }).join('');
+
+  // Sort indicators
+  document.querySelectorAll('.lap-table th[data-sort]').forEach(th => {
+    th.classList.remove('sorted');
+    const ind = th.querySelector('.sort-ind');
+    if(!ind) return;
+    if(th.dataset.sort === _sortKey){
+      th.classList.add('sorted');
+      ind.textContent = _sortDir === 'asc' ? '▲' : '▼';
+    } else {
+      ind.textContent = '⇕';
+    }
+  });
 }
+
+function renderCards(){
+  const s = _sess;
+
+  // Card A — Where you lost time (simplified: slowest sector vs theoretical)
+  // The full top-3 corner-window detector is a separate spec (Mistakes &
+  // Events). Until that ships, surface the cheapest meaningful insight:
+  // which sector left the most time on the table, with its gap value.
+  const bestLap = _laps.find(l => l.lap_time_s != null && s.best_lap_time_s != null && Math.abs(l.lap_time_s - s.best_lap_time_s) < 0.001);
+  if(bestLap && _theo && bestLap.s1_time_s != null){
+    const gaps = [
+      {name:'S1', d: bestLap.s1_time_s - (_theo.theoretical_s1_s||bestLap.s1_time_s)},
+      {name:'S2', d: bestLap.s2_time_s - (_theo.theoretical_s2_s||bestLap.s2_time_s)},
+      {name:'S3', d: bestLap.s3_time_s - (_theo.theoretical_s3_s||bestLap.s3_time_s)},
+    ].filter(g => g.d > 0);
+    if(gaps.length){
+      gaps.sort((a,b)=>b.d-a.d);
+      const worst = gaps[0];
+      const totalGap = gaps.reduce((a,b)=>a+b.d,0);
+      document.getElementById('card-loss-headline').innerHTML =
+        `<em>${worst.name}</em> cost you ${worst.d.toFixed(2)}s`;
+      document.getElementById('card-loss-body').innerHTML =
+        gaps.map(g => `<span class="card-corner">${g.name} +${g.d.toFixed(2)}</span>`).join('');
+      const teleHref = '/sessions/telemetry?id='+encodeURIComponent(_id);
+      document.getElementById('card-loss-link').href = teleHref;
+    } else {
+      document.getElementById('card-loss-headline').textContent = 'On theoretical pace across all sectors';
+      document.getElementById('card-loss-body').textContent = 'Your best lap matched or beat every personal-best sector.';
+      document.getElementById('card-loss-link').style.display='none';
+    }
+  } else {
+    document.getElementById('card-loss-headline').textContent = 'Not enough sector data yet';
+    document.getElementById('card-loss-body').textContent = 'Sector splits appear after the first complete lap is recorded.';
+    document.getElementById('card-loss-link').style.display='none';
+  }
+
+  // Card B — Car context
+  if(_carCtx && _carCtx.rank_in_car != null){
+    const rank = _carCtx.rank_in_car;
+    const total = _carCtx.total_in_car;
+    const ord = (n) => {
+      if(n === 1) return '1st';
+      if(n === 2) return '2nd';
+      if(n === 3) return '3rd';
+      return n + 'th';
+    };
+    const carText = s.car_nickname || s.car || 'this car';
+    document.getElementById('card-car-headline').innerHTML =
+      `Your <em>${ord(rank)}-best</em> of ${total} session${total===1?'':'s'} in this car`;
+    const bh = _carCtx.best_in_car_at_track;
+    if(bh && bh.best_lap_time_s){
+      const dt = bh.started_at ? new Date(bh.started_at).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '';
+      document.getElementById('card-car-body').innerHTML =
+        `Best ever in ${carText} at ${s.track}:<br>` +
+        `<strong style="color:var(--color-text-primary)">${fmtLap(bh.best_lap_time_s)}</strong>${dt?' — '+dt:''}`;
+    } else {
+      document.getElementById('card-car-body').textContent = `First session in this car at ${s.track}.`;
+    }
+    if(s.car_ordinal != null){
+      const link = document.getElementById('card-car-link');
+      link.href = '/cars/' + s.car_ordinal;
+      link.style.display = '';
+    }
+  } else {
+    document.getElementById('card-car-headline').textContent = 'No car context yet';
+    document.getElementById('card-car-body').textContent = 'Car identification is unavailable for this session.';
+  }
+}
+
 function renderAI(){
-  if(_sess.ai_analysis){
-    document.getElementById('ai-body').textContent=_sess.ai_analysis;
-    document.getElementById('ai-body').style.display='block';
-    document.getElementById('btn-analyze').style.display='none';
-    document.getElementById('btn-re').style.display='inline-block';
-    if(_sess.ai_analyzed_at){
-      const dt=new Date(_sess.ai_analyzed_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-      document.getElementById('ai-meta').textContent='Cached · '+dt+(_sess.ai_model?' · '+_sess.ai_model:'');
+  const s = _sess;
+  if(s.ai_analysis){
+    const body = document.getElementById('card-ai-body');
+    body.textContent = s.ai_analysis;
+    body.style.display = 'block';
+    document.getElementById('btn-analyze').style.display = 'none';
+    document.getElementById('btn-re').style.display = 'inline-block';
+    if(s.ai_analyzed_at){
+      const dt = new Date(s.ai_analyzed_at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      document.getElementById('ai-meta').textContent = 'Cached · '+dt+(s.ai_model?' · '+s.ai_model:'');
     }
   }
 }
+
 async function runAnalysis(force){
-  const btn=document.getElementById('btn-analyze');
-  const rbtn=document.getElementById('btn-re');
-  const body=document.getElementById('ai-body');
-  const meta=document.getElementById('ai-meta');
-  const err=document.getElementById('ai-err');
-  err.style.display='none';
-  btn.disabled=true;rbtn.disabled=true;
-  if(force){rbtn.textContent='Analyzing…';}else{btn.textContent='Analyzing…';}
+  const btn = document.getElementById('btn-analyze');
+  const rbtn = document.getElementById('btn-re');
+  const body = document.getElementById('card-ai-body');
+  const meta = document.getElementById('ai-meta');
+  const err = document.getElementById('ai-err');
+  err.style.display = 'none';
+  btn.disabled = true; rbtn.disabled = true;
+  if(force){rbtn.textContent = 'Analyzing…';} else {btn.textContent = 'Analyzing…';}
   try{
-    const r=await fetch('/analyze?id='+encodeURIComponent(_id)+(force?'&force=true':''));
-    const d=await r.json();
-    if(!r.ok)throw new Error(d.error||'Unknown error');
-    body.textContent=d.analysis;body.style.display='block';
-    btn.style.display='none';rbtn.style.display='inline-block';rbtn.textContent='Re-analyze';rbtn.disabled=false;
+    const r = await fetch('/analyze?id='+encodeURIComponent(_id)+(force?'&force=true':''));
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || 'Unknown error');
+    body.textContent = d.analysis; body.style.display = 'block';
+    btn.style.display = 'none';
+    rbtn.style.display = 'inline-block'; rbtn.textContent = 'Re-analyze'; rbtn.disabled = false;
     if(d.analyzed_at){
-      const dt=new Date(d.analyzed_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-      meta.textContent='Analyzed '+dt+(d.model?' · '+d.model:'');
+      const dt = new Date(d.analyzed_at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      meta.textContent = 'Analyzed '+dt+(d.model?' · '+d.model:'');
     }
-  }catch(e){
-    err.textContent='✗ '+e.message;err.style.display='block';
-    btn.disabled=false;btn.textContent='Analyze with Claude';
-    rbtn.disabled=false;if(!_sess.ai_analysis)rbtn.style.display='none';
+  } catch(e){
+    err.textContent = '✗ '+e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Analyze with Claude';
+    rbtn.disabled = false; if(!_sess.ai_analysis) rbtn.style.display = 'none';
   }
 }
-// ── Edit modal ────────────────────────────────────────────────
+
+// ── Edit modal (unchanged from prior implementation) ─────────────────
 let _editTrack='',_editRaceType=null,_editWeather='Dry',_editTyre=null;
-// Autocomplete widget instances reused across modal opens (avoid leaking listeners).
-let _trackAc=null;
-let _carAc=null;
+let _trackAc=null, _carAc=null;
+
 async function openEdit(){
   if(!_sess)return;
-  const cur=_sess.track&&_sess.track!=='unknown'?_sess.track:'';
-  // Fetch the merged track list at open time so newly-learned ordinals
-  // (and any extended-CSV reload) are reflected without a page refresh.
-  // Falls back to the page-embedded TRACK_NAMES if the endpoint fails.
+  const cur = _sess.track && _sess.track !== 'unknown' ? _sess.track : '';
   let tracks;
   try{
-    tracks=await fetch('/sessions/track-options').then(r=>r.json());
-    if(!Array.isArray(tracks)||!tracks.length)tracks=TRACK_NAMES;
-  }catch(e){tracks=TRACK_NAMES;}
-  if(cur && !tracks.includes(cur))tracks=[...tracks,cur].sort();
-  // Autocomplete widget (replaces the old <datalist>). Attached once and
-  // reused; setOptions on subsequent opens so newly-learned tracks show up.
-  const trackInput=document.getElementById('edit-track');
+    tracks = await fetch('/sessions/track-options').then(r=>r.json());
+    if(!Array.isArray(tracks) || !tracks.length) tracks = TRACK_NAMES;
+  } catch(e){tracks = TRACK_NAMES;}
+  if(cur && !tracks.includes(cur)) tracks = [...tracks, cur].sort();
+  const trackInput = document.getElementById('edit-track');
   if(!_trackAc){
-    _trackAc=Autocomplete.attach(trackInput,{
-      options:tracks,
-      allowFreeText:true,
-      initialValue:cur,
-    });
-  }else{
+    _trackAc = Autocomplete.attach(trackInput, {options: tracks, allowFreeText: true, initialValue: cur});
+  } else {
     _trackAc.setOptions(tracks);
-    trackInput.value=cur;
+    trackInput.value = cur;
   }
-  // Car field: searchable autocomplete drawn from CAR_CATALOG (inlined on the
-  // page from FORZA_CARS). Free-text fallback preserved for unmapped ordinals
-  // — the user can hunt down the actual name later. "Unknown Car (#NNN)"
-  // pre-fills as the initial value so they have a starting point.
-  const carInput=document.getElementById('edit-car');
-  const carInitial=(_sess.car && _sess.car!=='unknown')?_sess.car:'';
+  const carInput = document.getElementById('edit-car');
+  const carInitial = (_sess.car && _sess.car !== 'unknown') ? _sess.car : '';
   if(!_carAc){
-    _carAc=Autocomplete.attach(carInput,{
-      options:(typeof CAR_CATALOG!=='undefined')?CAR_CATALOG:[],
-      allowFreeText:true,
-      initialValue:carInitial,
-    });
-  }else{
-    carInput.value=carInitial;
+    _carAc = Autocomplete.attach(carInput, {options: (typeof CAR_CATALOG!=='undefined') ? CAR_CATALOG : [], allowFreeText: true, initialValue: carInitial});
+  } else {
+    carInput.value = carInitial;
   }
-  // Nickname row: only meaningful when we have a car_ordinal — otherwise
-  // there's nothing to key the nickname to.
-  const nickRow=document.getElementById('edit-nickname-row');
-  const nickInput=document.getElementById('edit-nickname');
-  if(_sess.car_ordinal!=null){
-    nickRow.style.display='';
-    nickInput.value=_sess.car_nickname||'';
-  }else{
-    nickRow.style.display='none';
-    nickInput.value='';
+  const nickRow = document.getElementById('edit-nickname-row');
+  const nickInput = document.getElementById('edit-nickname');
+  if(_sess.car_ordinal != null){
+    nickRow.style.display = '';
+    nickInput.value = _sess.car_nickname || '';
+  } else {
+    nickRow.style.display = 'none';
+    nickInput.value = '';
   }
-  // Pre-fill grid + finish — empty input = no value, server treats as null.
   document.getElementById('edit-grid').value   = _sess.grid_pos   != null ? _sess.grid_pos   : '';
   document.getElementById('edit-finish').value = _sess.finish_pos != null ? _sess.finish_pos : '';
-  _editTrack=cur;
-  _editRaceType=_sess.race_type||_sess.session_type||null;
-  // Default weather to Dry per spec; tyre has no default.
-  _editWeather=_sess.weather_condition||'Dry';
-  _editTyre=_sess.tyre_compound||null;
-  // Activate the right pill in each chip group (scoped per-row to avoid cross-row collisions).
+  _editTrack = cur;
+  _editRaceType = _sess.race_type || _sess.session_type || null;
+  _editWeather = _sess.weather_condition || 'Dry';
+  _editTyre = _sess.tyre_compound || null;
   document.querySelectorAll('#edit-ovl .edit-chips').forEach(g=>g.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel')));
   document.querySelectorAll('#edit-ovl .edit-row .edit-chips .etype').forEach(c=>{
-    if(c.dataset.val===_editRaceType && c.parentElement.id!=='edit-weather-chips' && c.parentElement.id!=='edit-tyre-chips')c.classList.add('sel');
+    if(c.dataset.val === _editRaceType && c.parentElement.id !== 'edit-weather-chips' && c.parentElement.id !== 'edit-tyre-chips') c.classList.add('sel');
   });
-  document.querySelectorAll('#edit-weather-chips .etype').forEach(c=>c.classList.toggle('sel',c.dataset.val===_editWeather));
-  document.querySelectorAll('#edit-tyre-chips .etype').forEach(c=>c.classList.toggle('sel',c.dataset.val===_editTyre));
-  // Read-only conditions context: show track and air temps if telemetry captured them.
-  const tt=_sess.track_temp_c, at=_sess.air_temp_c;
-  const condEl=document.getElementById('edit-conditions');
-  const condRow=document.getElementById('edit-conditions-row');
-  if(tt!=null||at!=null){
-    const parts=[];
-    if(tt!=null)parts.push(`Track: ${tt.toFixed(0)}°C`);
-    if(at!=null)parts.push(`Air: ${at.toFixed(0)}°C`);
-    condEl.textContent=parts.join(' · ');
-    condRow.style.display='';
-  }else{
-    condRow.style.display='none';
+  document.querySelectorAll('#edit-weather-chips .etype').forEach(c=>c.classList.toggle('sel', c.dataset.val === _editWeather));
+  document.querySelectorAll('#edit-tyre-chips .etype').forEach(c=>c.classList.toggle('sel', c.dataset.val === _editTyre));
+  const tt = _sess.track_temp_c, at = _sess.air_temp_c;
+  const condEl = document.getElementById('edit-conditions');
+  const condRow = document.getElementById('edit-conditions-row');
+  if(tt != null || at != null){
+    const parts = [];
+    if(tt != null) parts.push(`Track: ${tt.toFixed(0)}°C`);
+    if(at != null) parts.push(`Air: ${at.toFixed(0)}°C`);
+    condEl.textContent = parts.join(' · ');
+    condRow.style.display = '';
+  } else {
+    condRow.style.display = 'none';
   }
   document.getElementById('edit-ovl').classList.add('open');
 }
+
 function closeEdit(){document.getElementById('edit-ovl').classList.remove('open');}
+
 async function deleteSession(){
-  if(!_id)return;
-  // Two-step confirm — single click on a destructive button feels too easy.
+  if(!_id) return;
   const trackHint = (_sess && _sess.track && _sess.track !== 'unknown') ? _sess.track : 'this session';
   const ok = window.confirm(
     'Permanently delete '+trackHint+'?\n\n'+
@@ -384,78 +506,68 @@ async function deleteSession(){
   );
   if(!ok) return;
   try{
-    const res = await fetch('/sessions/delete', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({id: _id})
-    });
+    const res = await fetch('/sessions/delete', {method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({id: _id})});
     if(!res.ok) throw new Error('HTTP '+res.status);
-    // Redirect back to the sessions list — the current detail page no
-    // longer has anything to show.
     location.href = '/sessions';
-  }catch(e){
+  } catch(e){
     alert('Could not delete session: '+(e && e.message || e));
   }
 }
+
 function editSelType(el){
   el.parentElement.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
-  _editRaceType=el.dataset.val;
+  _editRaceType = el.dataset.val;
 }
 function editSelWeather(el){
   el.parentElement.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
-  _editWeather=el.dataset.val;
+  _editWeather = el.dataset.val;
 }
 function editSelTyre(el){
-  // Tyre is optional — clicking the active pill toggles it off.
-  if(el.classList.contains('sel')){el.classList.remove('sel');_editTyre=null;return;}
+  if(el.classList.contains('sel')){el.classList.remove('sel'); _editTyre = null; return;}
   el.parentElement.querySelectorAll('.etype').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
-  _editTyre=el.dataset.val;
+  _editTyre = el.dataset.val;
 }
+
 async function saveEdit(){
-  if(!_id)return;
-  const body={id:_id};
-  const track=document.getElementById('edit-track').value.trim();
-  if(track)body.track=track;
-  if(_editRaceType)body.race_type=_editRaceType;
-  // If the user picked a track AND the session has a detected ordinal,
-  // remember the ordinal→name mapping so future sessions auto-resolve it.
-  // The /sessions/update endpoint upserts into learned_track_ordinals.
+  if(!_id) return;
+  const body = {id: _id};
+  const track = document.getElementById('edit-track').value.trim();
+  if(track) body.track = track;
+  if(_editRaceType) body.race_type = _editRaceType;
   if(track && _sess.track_ordinal && track !== _sess.track){
-    body.learned_ordinal={
-      ordinal: _sess.track_ordinal,
-      game: _sess.game||'forza_motorsport',
-      track_name: track,
-    };
+    body.learned_ordinal = {ordinal: _sess.track_ordinal, game: _sess.game || 'forza_motorsport', track_name: track};
   }
-  body.weather_condition=_editWeather||'';
-  body.tyre_compound=_editTyre||'';
-  // Free-text car override (covers Unknown Car / unmapped ordinals — see #6).
-  const car=document.getElementById('edit-car').value.trim();
-  body.car=car;  // empty string clears the override; "Unknown Car" passes through
-  // Grid / finish overrides — empty input means "clear" (null), so we always
-  // send the field rather than skip it. Coerce non-numeric input to null.
-  const gp=document.getElementById('edit-grid').value.trim();
-  const fp=document.getElementById('edit-finish').value.trim();
+  body.weather_condition = _editWeather || '';
+  body.tyre_compound = _editTyre || '';
+  const car = document.getElementById('edit-car').value.trim();
+  body.car = car;
+  const gp = document.getElementById('edit-grid').value.trim();
+  const fp = document.getElementById('edit-finish').value.trim();
   body.grid_pos   = gp ? parseInt(gp, 10) : null;
   body.finish_pos = fp ? parseInt(fp, 10) : null;
   if(Number.isNaN(body.grid_pos))   body.grid_pos = null;
   if(Number.isNaN(body.finish_pos)) body.finish_pos = null;
   await fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  // Nickname is keyed to car_ordinal, not the session — separate POST.
-  // Empty string deletes the nickname (matches server-side semantics).
-  if(_sess.car_ordinal!=null){
-    const nick=document.getElementById('edit-nickname').value.trim();
-    if(nick !== (_sess.car_nickname||'')){
-      await fetch('/cars/nickname',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ordinal:_sess.car_ordinal, nickname:nick})});
+  if(_sess.car_ordinal != null){
+    const nick = document.getElementById('edit-nickname').value.trim();
+    if(nick !== (_sess.car_nickname || '')){
+      await fetch('/cars/nickname',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ordinal: _sess.car_ordinal, nickname: nick})});
     }
   }
   closeEdit();
-  const d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());
-  if(d.session){_sess=d.session;_laps=d.laps||[];renderHeader();}
+  const d = await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());
+  if(d.session){
+    _sess = d.session; _laps = d.laps || []; _theo = d.theoretical || null; _carCtx = d.car_context || null;
+    renderCrumbAndNav();
+    renderHeader();
+    renderHero();
+    renderProfile();
+    renderLaps();
+    renderCards();
+  }
 }
 
 init();

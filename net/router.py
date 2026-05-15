@@ -437,10 +437,54 @@ def make_handler(ctx: dict):
                         ).fetchone()
                         lap_rows = conn.execute(
                             "SELECT lap_number,lap_time_s,max_speed_mph,"
-                            "avg_throttle,avg_brake,avg_slip,peak_slip,slip_above_pct "
+                            "avg_throttle,avg_brake,avg_slip,peak_slip,slip_above_pct,"
+                            "s1_time_s,s2_time_s,s3_time_s "
                             "FROM laps WHERE session_id=? ORDER BY lap_number",
                             (sid,)
                         ).fetchall() if sess_row else []
+                        # Theoretical-best sectors for this track — used by the
+                        # hero strip to compute "left on the table" against
+                        # the lifetime ideal.
+                        theo_row = conn.execute(
+                            "SELECT theoretical_s1_s,theoretical_s2_s,theoretical_s3_s,"
+                            "theoretical_best_s "
+                            "FROM track_references WHERE track=? AND reference_type='theoretical'",
+                            (sess_row["track"],)
+                        ).fetchone() if sess_row else None
+                        # Car-context aggregates (Card B): rank of this session
+                        # against other sessions in the same car, plus the
+                        # best ever in this car at this track.
+                        car_ctx = None
+                        if sess_row and sess_row["car_ordinal"] is not None:
+                            ord_ = int(sess_row["car_ordinal"])
+                            # Best-lap rank among all sessions in this car
+                            same_car = conn.execute(
+                                "SELECT session_id,track,best_lap_time_s,started_at "
+                                "FROM sessions WHERE car_ordinal=? AND best_lap_time_s IS NOT NULL "
+                                "ORDER BY best_lap_time_s ASC",
+                                (ord_,)
+                            ).fetchall()
+                            total_in_car = len(same_car)
+                            rank_in_car = None
+                            for i, r in enumerate(same_car):
+                                if r["session_id"] == sid:
+                                    rank_in_car = i + 1
+                                    break
+                            # Best ever in this car at this track (across all sessions)
+                            best_here = None
+                            for r in same_car:
+                                if r["track"] == sess_row["track"]:
+                                    best_here = {
+                                        "session_id": r["session_id"],
+                                        "best_lap_time_s": r["best_lap_time_s"],
+                                        "started_at": r["started_at"],
+                                    }
+                                    break  # rows are sorted, first hit is fastest
+                            car_ctx = {
+                                "rank_in_car": rank_in_car,
+                                "total_in_car": total_in_car,
+                                "best_in_car_at_track": best_here,
+                            }
                     finally:
                         conn.close()
                 if not sess_row:
@@ -470,8 +514,14 @@ def make_handler(ctx: dict):
                         # resolved/fallback name (see Bundle 3 PR).
                         sess_dict["car_nickname"] = db_get_car_nickname(int(car_ord))
                     laps = [dict(r) for r in lap_rows]
+                    theo = dict(theo_row) if theo_row else None
                     writer.write(_http_response("200 OK", "application/json",
-                                                json.dumps({"session": sess_dict, "laps": laps}).encode()))
+                                                json.dumps({
+                                                    "session": sess_dict,
+                                                    "laps": laps,
+                                                    "theoretical": theo,
+                                                    "car_context": car_ctx,
+                                                }).encode()))
 
             elif path == "/sessions/laps":
                 qs = {k: urllib.parse.unquote_plus(v)
