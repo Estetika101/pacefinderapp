@@ -168,6 +168,13 @@ def _db_init():
                 ("avg_slip",       "REAL"),
                 ("peak_slip",      "REAL"),
                 ("slip_above_pct", "REAL"),
+                # Per-lap sector times. Boundaries are fixed at 1/3 and 2/3 of
+                # lap distance, matching the theoretical-best computation in
+                # update_track_references(). Written at session close by the
+                # same loop; backfilled by scripts/backfill_lap_sectors.py.
+                ("s1_time_s",      "REAL"),
+                ("s2_time_s",      "REAL"),
+                ("s3_time_s",      "REAL"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE laps ADD COLUMN {col} {defn}")
@@ -1320,6 +1327,10 @@ def update_track_references(track: str, game: str):
     best_s = [None, None, None]
     best_meta = [None, None, None]
     sector_bounds = [(0.0, 0.333), (0.333, 0.667), (0.667, 1.0)]
+    # Per-lap sector writes collected during the loop and flushed in a
+    # single transaction at the end. Same validation as theoretical-best
+    # (sector sum within 5% of lap_time_s); failing laps stay NULL.
+    per_lap_writes: list[tuple] = []
 
     for row in rows:
         lap_data = _db_get_lap_samples(row["session_id"], row["lap_number"])
@@ -1348,6 +1359,10 @@ def update_track_references(track: str, game: str):
                 f"(probably partial / glitched samples)"
             )
             continue
+        per_lap_writes.append(
+            (round(sec_times[0], 3), round(sec_times[1], 3), round(sec_times[2], 3),
+             row["session_id"], row["lap_number"])
+        )
         for i, st in enumerate(sec_times):
             if best_s[i] is None or st < best_s[i]:
                 best_s[i] = st
@@ -1356,6 +1371,19 @@ def update_track_references(track: str, game: str):
                     "lap": row["lap_number"],
                     "samples": samples,
                 }
+
+    if per_lap_writes:
+        with _db_lock:
+            conn = _db_connect()
+            try:
+                conn.executemany(
+                    "UPDATE laps SET s1_time_s=?, s2_time_s=?, s3_time_s=? "
+                    "WHERE session_id=? AND lap_number=?",
+                    per_lap_writes,
+                )
+                conn.commit()
+            finally:
+                conn.close()
 
     if not all(best_meta):
         return
