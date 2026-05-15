@@ -361,7 +361,7 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
     </div>
   </div>
 </div>
-  <!-- Hero: best lap + gap to theoretical + sector deltas -->
+  <!-- Hero: best lap + gap to theoretical + delta line + sector deltas -->
   <div class="hero">
     <div class="hero-numbers">
       <div class="hero-time" id="hero-best">&mdash;</div>
@@ -369,10 +369,37 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
       <div class="hero-gap" id="hero-gap" style="display:none">&mdash;</div>
       <div class="hero-gap-sub" id="hero-gap-sub" style="display:none">left on the table vs theoretical</div>
     </div>
-    <div class="sector-row" id="hero-sectors" style="display:none">
-      <div><div class="val" id="hero-s1">&mdash;</div><div class="lbl">S1 &Delta; vs theoretical</div></div>
-      <div><div class="val" id="hero-s2">&mdash;</div><div class="lbl">S2 &Delta; vs theoretical</div></div>
-      <div><div class="val" id="hero-s3">&mdash;</div><div class="lbl">S3 &Delta; vs theoretical</div></div>
+    <div class="hero-chart">
+      <div class="delta-header" id="delta-header" style="display:none">
+        <span class="delta-title">&Delta; — best vs 2nd-best</span>
+        <span class="delta-meta" id="delta-meta"></span>
+      </div>
+      <svg class="delta-svg" id="hero-delta-svg" viewBox="0 0 1000 180" preserveAspectRatio="none" style="display:none">
+        <line x1="333" y1="0" x2="333" y2="180" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="666" y1="0" x2="666" y2="180" stroke="#1e1e1e" stroke-width="1" stroke-dasharray="3,4"/>
+        <line x1="0" y1="90" x2="1000" y2="90" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="2,3"/>
+        <text x="166" y="14" fill="#888" font-size="10" font-family="monospace" text-anchor="middle" letter-spacing="0.1em">S1</text>
+        <text x="500" y="14" fill="#888" font-size="10" font-family="monospace" text-anchor="middle" letter-spacing="0.1em">S2</text>
+        <text x="833" y="14" fill="#888" font-size="10" font-family="monospace" text-anchor="middle" letter-spacing="0.1em">S3</text>
+        <defs>
+          <linearGradient id="slowerGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f87171" stop-opacity="0.4"/>
+            <stop offset="100%" stop-color="#f87171" stop-opacity="0.02"/>
+          </linearGradient>
+          <linearGradient id="fasterGrad" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#4ade80" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#4ade80" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        <path id="hero-delta-fill" d="" fill="url(#slowerGrad)" opacity="0.75"/>
+        <path id="hero-delta-line" d="" fill="none" stroke="var(--color-amber)" stroke-width="1.5"/>
+      </svg>
+      <div class="delta-empty" id="delta-empty" style="display:none"></div>
+      <div class="sector-row" id="hero-sectors" style="display:none">
+        <div><div class="val" id="hero-s1">&mdash;</div><div class="lbl">S1 &Delta; vs theoretical</div></div>
+        <div><div class="val" id="hero-s2">&mdash;</div><div class="lbl">S2 &Delta; vs theoretical</div></div>
+        <div><div class="val" id="hero-s3">&mdash;</div><div class="lbl">S3 &Delta; vs theoretical</div></div>
+      </div>
     </div>
   </div>
 

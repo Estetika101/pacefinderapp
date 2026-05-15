@@ -759,6 +759,77 @@ def make_handler(ctx: dict):
                         "track_ordinal": cd_dict.get("track_ordinal"),
                     }).encode()))
 
+            elif path == "/sessions/session/hero-delta":
+                # Compute the delta between this session's best and second-best
+                # laps as a function of distance along the lap. Returns ~100
+                # (d, dt) pairs for the hero SVG to draw.
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                sid = qs.get("id", "")
+                if not sid:
+                    writer.write(_http_response("400 Bad Request", "application/json",
+                                                json.dumps({"error": "id required"}).encode()))
+                else:
+                    with db_lock:
+                        conn = db_connect()
+                        try:
+                            laps_rows = conn.execute(
+                                "SELECT lap_number, lap_time_s FROM laps "
+                                "WHERE session_id=? AND lap_time_s IS NOT NULL "
+                                "ORDER BY lap_time_s ASC LIMIT 2",
+                                (sid,)
+                            ).fetchall()
+                        finally:
+                            conn.close()
+                    if len(laps_rows) < 2:
+                        writer.write(_http_response("200 OK", "application/json",
+                                                    json.dumps({"available": False,
+                                                                "reason": "Need at least 2 completed laps"}).encode()))
+                    else:
+                        best = dict(laps_rows[0])
+                        comp = dict(laps_rows[1])
+                        best_data = db_get_lap_samples(sid, best["lap_number"])
+                        comp_data = db_get_lap_samples(sid, comp["lap_number"])
+                        if not best_data or not comp_data:
+                            writer.write(_http_response("200 OK", "application/json",
+                                                        json.dumps({"available": False,
+                                                                    "reason": "Per-lap samples not available"}).encode()))
+                        else:
+                            def _t_at(samples, d):
+                                # Linear interp on distance_norm-sorted samples
+                                lo, hi = 0, len(samples) - 1
+                                while lo < hi:
+                                    mid = (lo + hi) // 2
+                                    if samples[mid].get("distance_norm", 0.0) < d:
+                                        lo = mid + 1
+                                    else:
+                                        hi = mid
+                                if lo == 0:
+                                    return samples[0].get("t", 0.0)
+                                a, b = samples[lo - 1], samples[lo]
+                                da, db_ = a.get("distance_norm", 0.0), b.get("distance_norm", 0.0)
+                                if db_ <= da:
+                                    return a.get("t", 0.0)
+                                f = (d - da) / (db_ - da)
+                                return a.get("t", 0.0) + f * (b.get("t", 0.0) - a.get("t", 0.0))
+
+                            bs = best_data["samples"]
+                            cs = comp_data["samples"]
+                            pts = []
+                            for i in range(101):
+                                d = i / 100.0
+                                tb = _t_at(bs, d)
+                                tc = _t_at(cs, d)
+                                pts.append({"d": d, "dt": round(tc - tb, 3)})
+                            writer.write(_http_response("200 OK", "application/json",
+                                                        json.dumps({
+                                                            "available": True,
+                                                            "best": best,
+                                                            "compare": comp,
+                                                            "points": pts,
+                                                        }).encode()))
+
             elif path == "/sessions/session/data":
                 # Pure-SQL handler — per-lap aggregates are precomputed at session
                 # close (see compute_lap_aggregates in db/store.py). Was reading
