@@ -39,6 +39,7 @@ def make_handler(ctx: dict):
     TRACK_DETAIL_HTML      = ctx["TRACK_DETAIL_HTML"]
     SESSION_DETAIL_HTML    = ctx["SESSION_DETAIL_HTML"]
     CAR_DETAIL_HTML        = ctx["CAR_DETAIL_HTML"]
+    CAR_INDEX_HTML         = ctx["CAR_INDEX_HTML"]
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
     DEBUG_RAW_HTML         = ctx["DEBUG_RAW_HTML"]
     DEBUG_PERF_HTML        = ctx["DEBUG_PERF_HTML"]
@@ -300,6 +301,69 @@ def make_handler(ctx: dict):
                 result = sorted(names)
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps(result).encode()))
+
+            elif path == "/cars":
+                writer.write(_http_response("200 OK", "text/html", CAR_INDEX_HTML.encode()))
+
+            elif path == "/cars/data":
+                # One row per distinct car_ordinal: counts, totals, best lap,
+                # and the track where that best lap was set. Bounded by the
+                # number of cars the user has actually driven (small), so a
+                # single GROUP BY + a follow-up per-car lookup is fine.
+                with db_lock:
+                    conn = db_connect()
+                    try:
+                        rows = [dict(r) for r in conn.execute(
+                            "SELECT car_ordinal, "
+                            "MIN(best_lap_time_s) as best_lap_s, "
+                            "MAX(started_at)     as last_driven, "
+                            "COUNT(*)            as sessions_count, "
+                            "COALESCE(SUM(lap_count), 0) as laps_count, "
+                            "MAX(car_class)      as car_class, "
+                            "MAX(car_pi)         as car_pi, "
+                            "MAX(drivetrain_type) as drivetrain_type "
+                            "FROM sessions "
+                            "WHERE car_ordinal IS NOT NULL "
+                            "GROUP BY car_ordinal "
+                            "ORDER BY sessions_count DESC"
+                        ).fetchall()]
+                        # Find the track where each car's best lap was set
+                        for row in rows:
+                            ord_ = row["car_ordinal"]
+                            best = row["best_lap_s"]
+                            if best is not None:
+                                t = conn.execute(
+                                    "SELECT track FROM sessions "
+                                    "WHERE car_ordinal=? AND best_lap_time_s=? "
+                                    "LIMIT 1", (ord_, best)
+                                ).fetchone()
+                                row["best_at_track"] = t["track"] if t else None
+                            else:
+                                row["best_at_track"] = None
+                    finally:
+                        conn.close()
+                # Resolve canonical name + nickname for each ordinal
+                cars = []
+                for row in rows:
+                    ord_ = int(row["car_ordinal"])
+                    info = FORZA_CARS.get(ord_) or {}
+                    cars.append({
+                        "ordinal": ord_,
+                        "name": info.get("name"),
+                        "manufacturer": info.get("manufacturer"),
+                        "year": info.get("year"),
+                        "nickname": db_get_car_nickname(ord_),
+                        "class": row["car_class"],
+                        "pi": row["car_pi"],
+                        "drivetrain_type": row["drivetrain_type"],
+                        "sessions_count": row["sessions_count"],
+                        "laps_count": row["laps_count"],
+                        "best_lap_s": row["best_lap_s"],
+                        "best_at_track": row["best_at_track"],
+                        "last_driven": row["last_driven"],
+                    })
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps({"cars": cars}).encode()))
 
             elif path == "/cars/nicknames" and method == "GET":
                 # Full {ordinal: nickname} map. Cheap lookup; no pagination.
