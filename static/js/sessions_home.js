@@ -252,4 +252,8 @@ function renderRecent(){
 }
 
 // ── Boot ─────────────────────────────────────────────────────
-Promise.all([loadKPIs(),loadTabCounts(),loadFormData(),loadTracks(),loadRecent()]);
+// Career page: KPIs + tab counts + form trend only. Tracks / recent /
+// game-cards were trimmed (Home + circuit/car pages cover those) so
+// their loaders are no longer called — the functions remain for any
+// future reuse but target DOM that no longer exists on this page.
+Promise.all([loadKPIs(),loadTabCounts(),loadFormData()]);
