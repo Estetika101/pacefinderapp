@@ -477,12 +477,59 @@ function renderCards(){
   }
 }
 
+// Parse a structured-analysis payload. Returns the object on success,
+// null when it's a legacy plain-text essay. Defensively strips ```json
+// fences in case the model wraps the JSON despite instructions.
+function parseStructuredAI(text){
+  if(!text || typeof text !== 'string') return null;
+  let t = text.trim();
+  if(t.startsWith('```')){
+    t = t.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  }
+  if(t[0] !== '{') return null;
+  try{
+    const o = JSON.parse(t);
+    if(o && (Array.isArray(o.findings) || typeof o.summary === 'string')) return o;
+  }catch(e){}
+  return null;
+}
+
+function renderAIContent(text){
+  const body = document.getElementById('card-ai-body');
+  const structured = parseStructuredAI(text);
+  if(structured){
+    let html = '';
+    if(structured.summary){
+      html += `<div class="ai-summary">${escapeHtml(structured.summary)}</div>`;
+    }
+    (structured.findings || []).forEach(f => {
+      html += `<div class="ai-finding">
+        <div class="ai-finding-area">${escapeHtml(f.area || '')}</div>
+        <div class="ai-finding-issue">${escapeHtml(f.issue || '')}</div>
+        ${f.fix ? `<div class="ai-finding-fix">→ ${escapeHtml(f.fix)}</div>` : ''}
+      </div>`;
+    });
+    if(structured.strengths && structured.strengths.length){
+      html += `<div class="ai-strengths"><span class="ai-strengths-lbl">Strengths</span> ` +
+              structured.strengths.map(x => escapeHtml(x)).join(' · ') + `</div>`;
+    }
+    body.innerHTML = html;
+  } else {
+    // Legacy plain-text essay (old cached analyses)
+    body.textContent = text;
+  }
+  body.style.display = 'block';
+}
+
+function escapeHtml(s){
+  if(s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 function renderAI(){
   const s = _sess;
   if(s.ai_analysis){
-    const body = document.getElementById('card-ai-body');
-    body.textContent = s.ai_analysis;
-    body.style.display = 'block';
+    renderAIContent(s.ai_analysis);
     document.getElementById('btn-analyze').style.display = 'none';
     document.getElementById('btn-re').style.display = 'inline-block';
     if(s.ai_analyzed_at){
@@ -505,7 +552,7 @@ async function runAnalysis(force){
     const r = await fetch('/analyze?id='+encodeURIComponent(_id)+(force?'&force=true':''));
     const d = await r.json();
     if(!r.ok) throw new Error(d.error || 'Unknown error');
-    body.textContent = d.analysis; body.style.display = 'block';
+    renderAIContent(d.analysis);
     btn.style.display = 'none';
     rbtn.style.display = 'inline-block'; rbtn.textContent = 'Re-analyze'; rbtn.disabled = false;
     if(d.analyzed_at){
