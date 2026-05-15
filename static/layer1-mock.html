@@ -211,10 +211,47 @@
     letter-spacing: 0.05em;
     font-size: 10px;
     border-bottom-color: var(--color-border);
+    cursor: pointer;
+    user-select: none;
+    transition: color 120ms;
+  }
+  .lap-table th:hover { color: var(--color-text-primary); }
+  .lap-table th .sort-ind {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 9px;
+    opacity: 0.4;
+    transition: opacity 120ms, color 120ms;
+  }
+  .lap-table th:hover .sort-ind { opacity: 0.85; }
+  .lap-table th.sorted { color: var(--color-text-primary); }
+  .lap-table th.sorted .sort-ind {
+    opacity: 1;
+    color: var(--color-accent);
   }
   .lap-table th:first-child, .lap-table td:first-child { text-align: left; }
+  .lap-table tbody tr {
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .lap-table tbody tr:hover { background: var(--color-surface); }
   .lap-table tr.best td { color: var(--color-text-primary); font-weight: 500; }
   .lap-table tr.best td:first-child::after { content: '·'; margin-left: 8px; color: var(--color-accent); }
+  .laps-hint {
+    font-size: 11px;
+    color: var(--color-text-quaternary);
+    font-style: normal;
+  }
+  .laps-hint kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-tertiary);
+  }
   .lap-table .delta-pos { color: var(--color-red); }
   .lap-table .delta-neg { color: var(--color-green); }
   .lap-table .delta-zero { color: #555; }
@@ -280,7 +317,78 @@
   /* ─── Page head: H1 (track) + H2 (car link) ─────────────────────── */
   .page-head {
     padding: var(--space-4) 0 var(--space-3);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-4);
+    align-items: end;
   }
+  .page-head-result { text-align: right; }
+  .result-eyebrow {
+    font-size: 10px; color: var(--color-text-quaternary);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .result-positions {
+    font-size: clamp(20px, 2.6vw, 28px);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-top: 4px;
+  }
+  .result-positions .arrow { color: var(--color-text-tertiary); margin: 0 6px; font-weight: 400; }
+  .result-positions .finish { color: var(--color-green); }
+  .result-positions .finish.lost { color: var(--color-red); }
+  .result-positions .finish.same { color: var(--color-text-primary); }
+  .result-delta {
+    font-size: var(--text-sm); color: var(--color-green);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .result-delta.lost { color: var(--color-red); }
+  .result-delta.same { color: var(--color-text-tertiary); }
+
+  /* ─── Session profile strip (session summary, sits under hero) ──── */
+  .profile {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: var(--color-border-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-top: 0;
+    margin-bottom: var(--space-6);
+  }
+  .profile-cell {
+    background: var(--color-surface);
+    padding: 10px var(--space-3);
+    display: flex; flex-direction: column;
+    gap: 4px;
+  }
+  .profile-label {
+    font-size: 9px;
+    color: var(--color-text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .profile-value {
+    font-size: var(--text-md);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .profile-bar {
+    height: 3px;
+    background: var(--color-border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 2px;
+  }
+  .profile-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--color-accent);
+    border-radius: 2px;
+  }
+  .profile-bar.brake > span { background: var(--color-red); }
+  .profile-bar.slip > span  { background: var(--color-amber); }
   .page-h1 {
     margin: 0;
     font-size: clamp(28px, 5vw, 48px);
@@ -420,20 +528,29 @@
 
   <!-- ─── PAGE HEAD ─── -->
   <div class="page-head">
-    <h1 class="page-h1">Le Mans Full Circuit</h1>
-    <a class="page-h2" href="/static/car-mock.html">
-      Pink Pig
-      <span class="class-badge">R</span>
-      <span class="pi">850</span>
-      <span class="page-h2-arrow">→</span>
-    </a>
+    <div>
+      <h1 class="page-h1">Le Mans Full Circuit</h1>
+      <a class="page-h2" href="/static/car-mock.html">
+        Pink Pig
+        <span class="class-badge">R</span>
+        <span class="pi">850</span>
+        <span class="page-h2-arrow">→</span>
+      </a>
+    </div>
+    <div class="page-head-result">
+      <div class="result-eyebrow">Grid → Finish</div>
+      <div class="result-positions">
+        P4 <span class="arrow">→</span> <span class="finish">P2</span>
+      </div>
+      <div class="result-delta">↗ 2 places gained</div>
+    </div>
   </div>
 
   <!-- ─── METADATA STRIP ─── -->
   <div class="strip">
     <span class="pill"><span class="label">When</span><span class="val">Sat May 11 · 14:02 – 14:34</span></span>
     <span class="pill"><span class="label">Cond</span><span class="val">Dry · Hard · 28°C</span></span>
-    <span class="pill type-practice"><span class="val">Practice</span></span>
+    <span class="pill type-practice"><span class="val">AI Race · 9 vs 11</span></span>
     <span class="spacer"></span>
     <button class="edit-btn">Edit ⌃</button>
   </div>
@@ -533,86 +650,53 @@
 
   <!-- ─── LAP TIMES ─── -->
   <div class="laps">
+    <!-- ─── SESSION PROFILE ─── -->
+    <div class="profile">
+      <div class="profile-cell">
+        <div class="profile-label">Throttle avg</div>
+        <div class="profile-value">64%</div>
+        <div class="profile-bar"><span style="width:64%"></span></div>
+      </div>
+      <div class="profile-cell">
+        <div class="profile-label">Brake avg</div>
+        <div class="profile-value">32%</div>
+        <div class="profile-bar brake"><span style="width:32%"></span></div>
+      </div>
+      <div class="profile-cell">
+        <div class="profile-label">Slip avg</div>
+        <div class="profile-value">0.18</div>
+        <div class="profile-bar slip"><span style="width:36%"></span></div>
+      </div>
+      <div class="profile-cell">
+        <div class="profile-label">Peak slip</div>
+        <div class="profile-value">0.41</div>
+        <div class="profile-bar slip"><span style="width:82%"></span></div>
+      </div>
+      <div class="profile-cell">
+        <div class="profile-label">Slip &gt; 0.1</div>
+        <div class="profile-value">23% of lap</div>
+        <div class="profile-bar slip"><span style="width:23%"></span></div>
+      </div>
+    </div>
+
     <div class="laps-head">
       <h2>Laps</h2>
+      <span class="laps-hint">Click a header to sort · click a row to inspect in telemetry</span>
     </div>
+
     <table class="lap-table">
       <thead>
         <tr>
-          <th>Lap</th>
-          <th>Time</th>
-          <th>S1 Δ</th>
-          <th>S2 Δ</th>
-          <th>S3 Δ</th>
+          <th class="sorted">Lap <span class="sort-ind">▲</span></th>
+          <th>Time <span class="sort-ind">↕</span></th>
+          <th>S1 Δ <span class="sort-ind">↕</span></th>
+          <th>S2 Δ <span class="sort-ind">↕</span></th>
+          <th>S3 Δ <span class="sort-ind">↕</span></th>
           <th></th>
         </tr>
       </thead>
       <tbody id="lap-tbody">
-        <tr class="best">
-          <td>L4</td>
-          <td>1:42.731</td>
-          <td class="delta-zero">—</td>
-          <td class="delta-zero">—</td>
-          <td class="delta-zero">—</td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>L7</td>
-          <td>1:43.204</td>
-          <td class="delta-pos">+0.05</td>
-          <td class="delta-pos">+0.41</td>
-          <td class="delta-pos">+0.21</td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>L3</td>
-          <td>1:43.412</td>
-          <td class="delta-pos">+0.12</td>
-          <td class="delta-pos">+0.32</td>
-          <td class="delta-pos">+0.27</td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>L9</td>
-          <td>1:43.501</td>
-          <td class="delta-pos">+0.08</td>
-          <td class="delta-pos">+0.45</td>
-          <td class="delta-pos">+0.24</td>
-          <td><span class="tag">In</span></td>
-        </tr>
-        <tr>
-          <td>L6</td>
-          <td>1:43.687</td>
-          <td class="delta-pos">+0.18</td>
-          <td class="delta-pos">+0.38</td>
-          <td class="delta-pos">+0.39</td>
-          <td></td>
-        </tr>
-        <tr class="more-row hidden">
-          <td>L5</td>
-          <td>1:43.812</td>
-          <td class="delta-pos">+0.21</td>
-          <td class="delta-pos">+0.44</td>
-          <td class="delta-pos">+0.42</td>
-          <td></td>
-        </tr>
-        <tr class="more-row hidden">
-          <td>L8</td>
-          <td>1:44.018</td>
-          <td class="delta-pos">+0.32</td>
-          <td class="delta-pos">+0.51</td>
-          <td class="delta-pos">+0.44</td>
-          <td></td>
-        </tr>
-        <tr class="more-row hidden">
-          <td>L2</td>
-          <td>1:44.601</td>
-          <td class="delta-pos">+0.43</td>
-          <td class="delta-pos">+0.68</td>
-          <td class="delta-pos">+0.76</td>
-          <td></td>
-        </tr>
-        <tr class="more-row hidden">
+        <tr onclick="location.href='/static/telemetry-mock.html?lap=1'">
           <td>L1</td>
           <td>1:48.142</td>
           <td class="delta-pos">+1.21</td>
@@ -620,9 +704,72 @@
           <td class="delta-pos">+2.16</td>
           <td><span class="tag">Out</span></td>
         </tr>
+        <tr onclick="location.href='/static/telemetry-mock.html?lap=2'">
+          <td>L2</td>
+          <td>1:44.601</td>
+          <td class="delta-pos">+0.43</td>
+          <td class="delta-pos">+0.68</td>
+          <td class="delta-pos">+0.76</td>
+          <td></td>
+        </tr>
+        <tr onclick="location.href='/static/telemetry-mock.html?lap=3'">
+          <td>L3</td>
+          <td>1:43.412</td>
+          <td class="delta-pos">+0.12</td>
+          <td class="delta-pos">+0.32</td>
+          <td class="delta-pos">+0.27</td>
+          <td></td>
+        </tr>
+        <tr class="best" onclick="location.href='/static/telemetry-mock.html?lap=4'">
+          <td>L4</td>
+          <td>1:42.731</td>
+          <td class="delta-zero">—</td>
+          <td class="delta-zero">—</td>
+          <td class="delta-zero">—</td>
+          <td></td>
+        </tr>
+        <tr onclick="location.href='/static/telemetry-mock.html?lap=5'">
+          <td>L5</td>
+          <td>1:43.812</td>
+          <td class="delta-pos">+0.21</td>
+          <td class="delta-pos">+0.44</td>
+          <td class="delta-pos">+0.42</td>
+          <td></td>
+        </tr>
+        <tr onclick="location.href='/static/telemetry-mock.html?lap=6'">
+          <td>L6</td>
+          <td>1:43.687</td>
+          <td class="delta-pos">+0.18</td>
+          <td class="delta-pos">+0.38</td>
+          <td class="delta-pos">+0.39</td>
+          <td></td>
+        </tr>
+        <tr onclick="location.href='/static/telemetry-mock.html?lap=7'">
+          <td>L7</td>
+          <td>1:43.204</td>
+          <td class="delta-pos">+0.05</td>
+          <td class="delta-pos">+0.41</td>
+          <td class="delta-pos">+0.21</td>
+          <td></td>
+        </tr>
+        <tr onclick="location.href='/static/telemetry-mock.html?lap=8'">
+          <td>L8</td>
+          <td>1:44.018</td>
+          <td class="delta-pos">+0.32</td>
+          <td class="delta-pos">+0.51</td>
+          <td class="delta-pos">+0.44</td>
+          <td></td>
+        </tr>
+        <tr onclick="location.href='/static/telemetry-mock.html?lap=9'">
+          <td>L9</td>
+          <td>1:43.501</td>
+          <td class="delta-pos">+0.08</td>
+          <td class="delta-pos">+0.45</td>
+          <td class="delta-pos">+0.24</td>
+          <td><span class="tag">In</span></td>
+        </tr>
       </tbody>
     </table>
-    <button id="lap-toggle" class="laps-toggle" type="button">Show all 9 ▾</button>
   </div>
 
 
@@ -667,19 +814,6 @@
 
 
 </div>
-
-<script>
-  (function () {
-    var btn = document.getElementById('lap-toggle');
-    var rows = document.querySelectorAll('#lap-tbody tr.more-row');
-    var expanded = false;
-    btn.addEventListener('click', function () {
-      expanded = !expanded;
-      rows.forEach(function (r) { r.classList.toggle('hidden', !expanded); });
-      btn.textContent = expanded ? 'Show fewer ▴' : 'Show all 9 ▾';
-    });
-  })();
-</script>
 
 </body>
 </html>
