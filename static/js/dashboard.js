@@ -102,6 +102,19 @@ es.onmessage=e=>{
   // state.status='race_ended' lingers for 30s so without the guard every
   // dashboard tick would re-fire openFinish.
   if(!ended) _foShown=false;  // reset for the next race_ended phase
+
+  // Debug mode: speak once when race-end is detected, so you can hear
+  // whether detection timing matches what happened on track. Guarded so
+  // it fires once per race_ended phase (state lingers ~30s). Web Speech
+  // API — no audio assets; silently no-ops if the browser lacks it.
+  if(!ended) _spokeOver=false;
+  if(ended && d.debug_mode && !_spokeOver){
+    _spokeOver=true;
+    try{
+      const u=new SpeechSynthesisUtterance('I think the race is over');
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
   if(ended && !$('fo').classList.contains('open') && !_foShown){
     if(!_foAutoTimer) _foAutoTimer=setTimeout(()=>{_foAutoTimer=null;_foShown=true;openFinish();},500);
   } else if(!ended&&_foAutoTimer){
@@ -251,6 +264,7 @@ let _foWeather=null, _foTyre=null;
 // race or after the 30s _clear_race_ended timeout). Prevents the modal from
 // re-popping every dashboard tick after the user has saved or skipped.
 let _foShown=false;
+let _spokeOver=false;  // debug-mode "race is over" announced this phase
 
 // Each chip-group selector clears chips inside its own .fo-section so a Type
 // pick doesn't accidentally clear Weather/Tyres (they all share .type-chip).
