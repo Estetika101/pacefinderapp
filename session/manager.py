@@ -636,12 +636,26 @@ class Session:
             # into a Mugello lap got their incomplete drive stored as a
             # 35s lap, which would beat their real 1:30 lap times and
             # become the session "best". See issue with the recovery path.
+            #
+            # "Did this final lap cross the line?" is answered by timing,
+            # not by value: _last_lap_completed_at is stamped whenever
+            # Forza posts a *fresh* last_lap_time (exact != change-detect
+            # at the top of ingest). If that fresh value arrived AFTER the
+            # final lap started, the lap finished at the line. If the last
+            # change predates this lap, llt is stale (the prior lap's time)
+            # and the driver stopped mid-lap → don't recover.
+            #
+            # The earlier guard compared llt to the *previous* completed
+            # lap's time and skipped recovery when they were within 0.01s.
+            # A consistent driver running the last two laps within 10 ms
+            # silently lost the entire final lap (8-lap race stored as 7).
             inferred_time: Optional[float] = None
-            last_completed_time = (self.completed_laps[-1].lap_time_s
-                                   if self.completed_laps else None)
             llt = self._last_seen_lap_time
-            if (llt and 0 < llt < 600 and
-                    (last_completed_time is None or abs(llt - last_completed_time) > 0.01)):
+            crossed_line = (
+                self._last_lap_completed_at is not None
+                and self._last_lap_completed_at >= self.current_lap.started_at
+            )
+            if llt and 0 < llt < 600 and crossed_line:
                 inferred_time = llt
             self.current_lap.close(inferred_time)
             if inferred_time:
