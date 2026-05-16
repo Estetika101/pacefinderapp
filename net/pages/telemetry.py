@@ -17,6 +17,10 @@ a{color:inherit;text-decoration:none}
 .tb-nav a.cur{color:var(--color-text-primary);border-bottom:1px solid var(--color-text-secondary)}
 .breadcrumb{font-size:var(--text-xs);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--color-border)}
 .breadcrumb a{color:var(--color-text-tertiary)}.breadcrumb a:hover{color:var(--color-text-primary)}
+.subnav{display:flex;align-items:center;gap:2px;padding:6px var(--space-4);border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.subnav-item{font-size:var(--text-sm);color:var(--color-text-tertiary);text-decoration:none;padding:8px 14px;border-radius:6px;transition:color 120ms,background 120ms}
+.subnav-item:hover{color:var(--color-text-primary);background:var(--color-surface)}
+.subnav-item.active{color:var(--color-text-primary);background:var(--color-surface);box-shadow:inset 0 -2px 0 var(--color-accent)}
 .tele-layout{display:flex;min-height:calc(100vh - 90px);gap:8px;padding:8px}
 .ctrl-col{width:220px;flex-shrink:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--sp-3) var(--sp-4);overflow-y:auto;position:sticky;top:58px;max-height:calc(100vh - 66px);align-self:flex-start}
 /* In embed mode the iframe's own .tb is hidden, so anchor sticky to 0 and
@@ -140,6 +144,8 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
   document.documentElement.classList.add('embed');
   const bc=document.getElementById('tele-breadcrumb');
   if(bc) bc.style.display='none';
+  const sn=document.getElementById('tele-subnav');
+  if(sn) sn.style.display='none';
 }
 </script>
 <div class="breadcrumb" id="tele-breadcrumb">
@@ -148,6 +154,10 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
   <a href="#" id="bc-track"></a> &rsaquo;
   <a href="#" id="bc-sess"></a> &rsaquo;
   <span>Telemetry</span>
+</div>
+<div class="subnav" id="tele-subnav">
+  <a class="subnav-item" id="link-overview" href="#">Overview</a>
+  <span class="subnav-item active">Full telemetry</span>
 </div>
 <div class="tele-layout">
 <div class="ctrl-col" id="ctrl-col">

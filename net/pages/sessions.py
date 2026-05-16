@@ -274,7 +274,12 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
 <div class="page">
 
-  <a class="crumb" id="bc-track" href="#">&larr; <span id="bc-track-name">Track</span></a>
+  <div class="breadcrumb" id="sess-breadcrumb">
+    <a href="/sessions">Sessions</a> &rsaquo;
+    <a href="#" id="bc-game" style="display:none"></a><span id="bc-gsep" style="display:none"> &rsaquo; </span>
+    <a href="#" id="bc-track">Track</a> &rsaquo;
+    <span id="bc-sess-cur">Session</span>
+  </div>
 
   <div class="subnav">
     <span class="subnav-item active">Overview</span>

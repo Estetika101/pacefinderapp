@@ -132,12 +132,21 @@ function renderCrumbAndNav(){
   const track=s.track&&s.track!=='unknown'?s.track:(_strack||'Unknown Track');
   const game=_sgame||s.game||'';
   document.title='Pacefinder · '+track;
-  // Breadcrumb → /sessions/track?name=...
+  // Full breadcrumb: Sessions › [Game] › Track › <this session>
+  const GL={'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
+  if(game){
+    const g=document.getElementById('bc-game');
+    g.textContent=GL[game]||game;
+    g.href='/sessions/game?name='+encodeURIComponent(game);
+    g.style.display='';
+    document.getElementById('bc-gsep').style.display='';
+  }
   let trackHref='/sessions/track?name='+encodeURIComponent(track);
   if(game)trackHref+='&game='+encodeURIComponent(game);
   const bc=document.getElementById('bc-track');
   bc.href=trackHref;
-  document.getElementById('bc-track-name').textContent=track;
+  bc.textContent=track;
+  document.getElementById('bc-sess-cur').textContent=fmtDateShort(s.started_at);
   // Telemetry subnav link
   let teleHref='/sessions/telemetry?id='+encodeURIComponent(_id);
   if(game)teleHref+='&game='+encodeURIComponent(game);
