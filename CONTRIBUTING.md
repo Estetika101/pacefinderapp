@@ -8,6 +8,7 @@ Pacefinder records UDP telemetry from Forza Motorsport, archives every session, 
 2. **Issue per spec.** Each spec gets a matching GitHub issue with a 3-line body pointing back to the spec file. Use the templates in [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/).
 3. **Branch + PR.** Implementation goes on a `feature/`, `fix/`, `cleanup/`, or `docs/` branch. PR closes the matching issue (`Closes #N`).
 4. **One PR per concern.** If you find an unrelated bug while working, open a separate PR or issue rather than bundling.
+5. **Green before merge.** The full pipeline suite passes locally before you merge — see [Testing](#testing). Squash-merging over a red suite is not allowed, including for self-merged PRs.
 
 For tiny changes (typo fixes, one-line tweaks) the spec step can be skipped — just open the PR directly.
 
@@ -24,6 +25,73 @@ python3 listener.py
 Open <http://localhost:8000>. Point your game's UDP Data Out at this machine on port 5300 (Forza Motorsport / Horizon — same port, packet format auto-detected).
 
 To use the AI Spotter (post-race analysis), set your Anthropic API key in the Setup page or in `simtelemetry.config.json`. Optional — listener runs fine without it.
+
+## Testing
+
+The full pipeline suite runs in ~0.2s, needs no server, and is the merge gate:
+
+```bash
+python3 test_listener.py        # ~80 checks — parse → ingest → session lifecycle
+```
+
+It drives the real ingest path directly, including multi-lap (40/50/100) race
+lap-counting and the Forza `is_race_on=0` race-end packet. A red check blocks the
+merge. Fix the cause — never skip, comment out, or merge around a failing check.
+
+Optional network smoke (needs a running listener):
+
+```bash
+python3 test_listener.py --smoke            # local UDP + /status poll
+python3 test_listener.py --live --host <ip> # against a remote Pi
+```
+
+Syntax-gate touched files the way [CI](./.github/workflows/ci.yml) does:
+
+```bash
+python3 -m py_compile <changed .py files>
+node --check static/js/<changed file>.js
+```
+
+New behavior ships with a test. A bug fix ships with a **regression test that
+fails before the fix and passes after** — prove it by stashing the fix and
+re-running the suite. Synthetic packets must model real game behavior (e.g.
+Forza ends a race with `is_race_on=0`); a test that can't fail is false
+confidence.
+
+> **CI gap:** `.github/workflows/ci.yml` currently runs only an import smoke and
+> JS syntax check — it does **not** run `test_listener.py`. Until that lands,
+> the local suite is the only thing guarding the lap-counting regressions.
+> Running it before every merge is mandatory, not optional.
+
+## Before you merge
+
+- [ ] `python3 test_listener.py` — every check green
+- [ ] `py_compile` / `node --check` clean for every touched file
+- [ ] Regression test added for any bug fix (proven to fail without the fix)
+- [ ] CHANGELOG entry for user-facing changes
+- [ ] One concern per PR
+
+## Deploying to the Pi
+
+Merging to `main` triggers CI (import + JS syntax smoke) but does **not** deploy.
+The Pi pulls manually:
+
+```bash
+cd ~/simtelemetry
+git checkout main && git pull        # must be on main, not a stale branch
+sudo systemctl restart pacefinder
+```
+
+Verify the deploy before calling it done:
+
+```bash
+curl -s localhost:8000/status | head        # responds, status sane
+journalctl -u pacefinder -n 30 --no-pager   # clean startup, no tracebacks
+```
+
+Then drive a validation session and confirm the expected behavior in the
+post-race modal. **Code merged ≠ bug fixed** — a fix only counts once it's
+confirmed on the Pi against real telemetry.
 
 ## Adding a track or car ordinal
 
