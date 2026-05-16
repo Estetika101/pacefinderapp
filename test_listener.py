@@ -29,7 +29,8 @@ _FM_FORMAT = "<iI" + "f"*51 + "i"*5 + "f"*17 + "H" + "B"*6 + "b"*3
 
 def build_forza_packet(speed_mph: float = 100.0, throttle_pct: float = 80.0,
                        lap: int = 1, last_lap: float = 0.0, steer: int = 0,
-                       is_race_on: int = 1) -> bytes:
+                       is_race_on: int = 1, distance_traveled: float = 1500.0,
+                       current_lap_time: float = 15.5) -> bytes:
     speed_ms = speed_mph / 2.237
     accel = int(throttle_pct / 100 * 255)
     vals = [
@@ -52,8 +53,8 @@ def build_forza_packet(speed_mph: float = 100.0, throttle_pct: float = 80.0,
         100.0, 0.5, 200.0,
         speed_ms, 250000.0, 400.0,   # speed field (m/s) mirrors velocity
         85.0, 85.0, 85.0, 85.0,
-        0.5, 0.6, 1500.0,
-        last_lap if last_lap > 0 else 0.0, last_lap, 15.5, 305.0,
+        0.5, 0.6, distance_traveled,
+        last_lap if last_lap > 0 else 0.0, last_lap, current_lap_time, 305.0,
         lap,
         5, accel, 0, 0, 0, 4,
         steer, 0, 0,
@@ -469,33 +470,48 @@ def _stored_lap_count(session_id: str) -> int:
     return row["lap_count"] if row else -1
 
 
-def _simulate_forza_race(L, laps: int):
-    """Drive a synthetic `laps`-lap Forza race through the real pipeline and
-    return the closed session. Laps 1..N-1 complete via lap_number
-    transitions; the final lap has no transition (the race just ends) and
-    must be rescued by close(). The last two lap times are within 0.01s on
-    purpose — that's the case that used to silently drop the final lap."""
+_LAP_LEN_M = 5000.0   # synthetic track length
+_LAP_T_S   = 90.0     # synthetic lap time
+_STEPS     = 6        # sample packets per lap
+
+
+def _drive_forza_race(L, laps: int, final_frac: float = 1.0):
+    """Drive a synthetic `laps`-lap Forza race through the real pipeline,
+    modelling Forza Motorsport's *actual* behaviour:
+
+      - laps 1..N-1 complete via lap_number transitions, each reporting the
+        completed lap's last_lap_time (FM does send it mid-race);
+      - distance_traveled accumulates and current_lap_time ticks per lap;
+      - at race end FM flips is_race_on=0 AND zeroes last_lap_time (the
+        confirmed root cause) — the final lap's official time is never
+        transmitted.
+
+    `final_frac` < 1.0 simulates abandoning the final lap partway (less
+    distance covered) — that lap must NOT be recovered.
+    """
     _ensure_temp_store()
     _reset_state()
     proto = L.TelemetryProtocol("forza_motorsport", L.parse_forza)
 
-    # lap_number=1 starts lap 1 (no LapRecord closed yet).
-    _inject(proto, build_forza_packet(speed_mph=100, lap=1, last_lap=0.0))
+    prev_lap_time = 0.0  # FM reports the last *completed* lap throughout
+    for k in range(laps):                       # FM lap_number is 0-indexed
+        is_final = (k == laps - 1)
+        frac_cap = final_frac if is_final else 1.0
+        dist0 = k * _LAP_LEN_M
+        for i in range(1, _STEPS + 1):
+            f = (i / _STEPS) * frac_cap
+            _inject(proto, build_forza_packet(
+                speed_mph=100, lap=k,
+                distance_traveled=dist0 + _LAP_LEN_M * f,
+                current_lap_time=_LAP_T_S * f,
+                last_lap=prev_lap_time))
+        prev_lap_time = _LAP_T_S + 0.001 * k     # this lap's time
 
-    # Crossing into lap k closes lap k-1 with its last_lap time.
-    for k in range(2, laps + 1):
-        prev_lap_time = 90.0 + 0.001 * (k - 1)
-        _inject(proto, build_forza_packet(speed_mph=100, lap=k,
-                                          last_lap=prev_lap_time))
-
-    # Final lap: no further lap_number bump. The driver crosses the line
-    # and Forza ends the race — the packet carrying the FINAL lap's
-    # last_lap_time arrives with is_race_on=0 (results screen). This is
-    # the real-world race-end the old parser dropped on the floor, losing
-    # the final lap. Time is within 0.01s of the previous lap too.
-    final_time = 90.0 + 0.001 * (laps - 1) + 0.005
-    _inject(proto, build_forza_packet(speed_mph=0, lap=laps,
-                                      last_lap=final_time, is_race_on=0))
+    # Race ends — FM zeroes last_lap_time in the is_race_on=0 packet.
+    _inject(proto, build_forza_packet(
+        speed_mph=0, lap=0, is_race_on=0,
+        distance_traveled=(laps - 1) * _LAP_LEN_M + _LAP_LEN_M * final_frac,
+        current_lap_time=0.0, last_lap=0.0))
 
     session = L.active_sessions.get("forza_motorsport")
     session.close()
@@ -504,18 +520,34 @@ def _simulate_forza_race(L, laps: int):
 
 def test_long_race_lap_count():
     """A 40 / 50 / 100-lap race must store every lap — including the final
-    one, whose time nearly matches the previous lap. Runs in milliseconds;
-    no server, no real-time waiting."""
+    one, whose official time Forza never transmits (last_lap_time=0.0 at
+    race end). The final lap is recovered from its own telemetry because
+    its distance proves it completed. Runs in ms; no server."""
     import listener as L
     print("\n[long race lap count]")
     for n in (40, 50, 100):
-        session = _simulate_forza_race(L, n)
+        session = _drive_forza_race(L, n)
         got = len(session.completed_laps)
         check(f"{n}-lap race keeps {n} laps in memory", got == n,
               f"got {got}")
         stored = _stored_lap_count(session.session_id)
         check(f"{n}-lap race persists lap_count={n}", stored == n,
               f"db lap_count={stored}")
+
+
+def test_final_lap_abandoned_not_recovered():
+    """The flip side of the fix: if the driver abandons the final lap
+    partway (only ~35% distance), it must NOT be stored as a lap — that's
+    the partial-lap regression #146 removed and this fix must preserve."""
+    import listener as L
+    print("\n[final lap abandoned]")
+    session = _drive_forza_race(L, 10, final_frac=0.35)
+    got = len(session.completed_laps)
+    check("abandoned final lap dropped (9 of 10 kept)", got == 9,
+          f"got {got}")
+    stored = _stored_lap_count(session.session_id)
+    check("abandoned final lap not persisted", stored == 9,
+          f"db lap_count={stored}")
 
 
 def test_game_switching():
@@ -806,6 +838,7 @@ def main():
     test_f1_lap_timing()
     test_forza_lap_timing()
     test_long_race_lap_count()
+    test_final_lap_abandoned_not_recovered()
     test_game_switching()
     test_tyre_temps_per_game()
 

@@ -151,6 +151,26 @@ class LapRecord:
         }
 
 
+def _lap_distance(lap: "LapRecord") -> Optional[float]:
+    """Metres travelled within this lap = furthest sample distance minus the
+    lap-start distance. None if the lap has no usable distance telemetry."""
+    if lap is None or lap.start_distance_m is None or not lap.samples:
+        return None
+    dists = [s["distance_traveled_m"] for s in lap.samples
+             if s.get("distance_traveled_m") is not None]
+    if not dists:
+        return None
+    span = max(dists) - lap.start_distance_m
+    return span if span > 0 else None
+
+
+# A final lap that covered at least this fraction of a normal lap's distance
+# is treated as completed (the driver crossed the line; the race just ended).
+# Below it, the drive was abandoned mid-lap — drop it rather than store a
+# bogus partial as a lap (the regression #146 removed).
+_FINAL_LAP_COMPLETE_FRAC = 0.90
+
+
 class Session:
     def __init__(self, game: str, started_at: datetime):
         self.game         = game
@@ -655,6 +675,19 @@ class Session:
             f"{llt:.3f}s captured for recovery"
         )
 
+    def _reference_lap_distance(self) -> Optional[float]:
+        """Median travelled distance across completed laps — the yardstick
+        for deciding whether the in-flight final lap actually finished.
+        Median (not mean) so one short/long lap doesn't skew it."""
+        dists = sorted(
+            d for d in (_lap_distance(l) for l in self.completed_laps)
+            if d is not None
+        )
+        if not dists:
+            return None
+        n = len(dists)
+        return dists[n // 2] if n % 2 else (dists[n // 2 - 1] + dists[n // 2]) / 2
+
     def close(self) -> dict:
         if self.closed_reason is None:
             self.closed_reason = "timeout"
@@ -692,6 +725,7 @@ class Session:
             # A consistent driver running the last two laps within 10 ms
             # silently lost the entire final lap (8-lap race stored as 7).
             inferred_time: Optional[float] = None
+            recovery_source = "last_lap_time"
             llt = self._last_seen_lap_time
             crossed_line = (
                 self._last_lap_completed_at is not None
@@ -699,13 +733,39 @@ class Session:
             )
             if llt and 0 < llt < 600 and crossed_line:
                 inferred_time = llt
+
+            # Forza Motorsport zeroes last_lap_time the instant the race
+            # ends — the final lap's official time is never transmitted
+            # (race_over packets carry last_lap_time=0.0). When that's all
+            # we have, fall back to the lap's own clock, but ONLY if the
+            # distance travelled proves the lap actually completed. A
+            # mid-lap abandon covers far less than a normal lap and is
+            # still dropped (the partial-lap regression #146 removed).
+            if inferred_time is None:
+                ref_dist = self._reference_lap_distance()
+                final_dist = _lap_distance(self.current_lap)
+                if (ref_dist and final_dist
+                        and final_dist >= _FINAL_LAP_COMPLETE_FRAC * ref_dist):
+                    cand = max((s.get("t", 0) for s in self.current_lap.samples),
+                               default=0)
+                    if MIN_VALID_LAP_S <= cand < 600:
+                        inferred_time = cand
+                        recovery_source = "telemetry+distance"
+                    else:
+                        _log.info(
+                            f"[{self.game}] Final lap {self.current_lap.lap_number} "
+                            f"looks complete by distance ({final_dist:.0f}m vs "
+                            f"ref {ref_dist:.0f}m) but lap clock implausible "
+                            f"({cand:.1f}s) — not recovering"
+                        )
+
             self.current_lap.close(inferred_time)
             if inferred_time:
                 if self.best_lap_time_s is None or inferred_time < self.best_lap_time_s:
                     self.best_lap_time_s = inferred_time
                 _log.info(
                     f"[{self.game}] Final lap {self.current_lap.lap_number} recovered "
-                    f"| time={inferred_time:.3f}s (source=last_lap_time)"
+                    f"| time={inferred_time:.3f}s (source={recovery_source})"
                 )
             else:
                 # Lap didn't complete — keep the LapRecord (its samples are
