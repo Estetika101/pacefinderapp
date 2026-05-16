@@ -176,8 +176,11 @@ def build_f1_motionex_packet(slip_rl: float = 0.08, slip_rr: float = 0.09,
 def _reset_state():
     """Reset all global listener state between tests."""
     import listener as L
+    from parsers import f1 as _f1
     L.active_sessions.clear()
-    L._f1_session_meta.clear()
+    # F1 session metadata moved into the parsers.f1 module during the
+    # session/ package refactor; it's no longer a listener attribute.
+    _f1._f1_session_meta.clear()
     L.state.update({
         "status": "idle", "game": None, "session_id": None,
         "track": "unknown", "car": "unknown", "session_type": "unknown",
@@ -330,7 +333,8 @@ def test_f1_pipeline():
 
     # Session packet primes track metadata
     _inject(proto, build_f1_session_packet(track_id=10, session_type=10, uid=uid))
-    check("f1 session meta stored", uid in L._f1_session_meta)
+    from parsers import f1 as _f1
+    check("f1 session meta stored", uid in _f1._f1_session_meta)
 
     # Telemetry creates session and updates state
     _inject(proto, build_f1_telemetry_packet(speed_mph=200.0, uid=uid))
@@ -423,6 +427,92 @@ def test_forza_lap_timing():
     check("forza lap time recorded",
           session and session.best_lap_time_s == 90.5,
           str(session and session.best_lap_time_s))
+
+
+_TMP_STORE = None
+
+
+def _ensure_temp_store():
+    """Point the store + storage_path at a throwaway temp dir so a real
+    session.close() can persist without touching the configured USB path
+    or a live DB. Idempotent — set up once per process."""
+    global _TMP_STORE
+    if _TMP_STORE is not None:
+        return
+    import atexit
+    import logging
+    import shutil
+    import tempfile
+    from pathlib import Path
+    import config
+    from db import store
+
+    _TMP_STORE = tempfile.mkdtemp(prefix="simtel_test_")
+    atexit.register(shutil.rmtree, _TMP_STORE, ignore_errors=True)
+    config.config["storage_path"] = _TMP_STORE
+    (Path(_TMP_STORE) / "sessions").mkdir(parents=True, exist_ok=True)
+    store.initialize([str(Path(_TMP_STORE) / "test.db")], config.storage_path,
+                     {}, {}, logging.getLogger("pacefinder"))
+    store._db_init()
+
+
+def _stored_lap_count(session_id: str) -> int:
+    from db import store
+    conn = store._db_connect()
+    try:
+        row = conn.execute(
+            "SELECT lap_count FROM sessions WHERE session_id=?",
+            (session_id,)).fetchone()
+    finally:
+        conn.close()
+    return row["lap_count"] if row else -1
+
+
+def _simulate_forza_race(L, laps: int):
+    """Drive a synthetic `laps`-lap Forza race through the real pipeline and
+    return the closed session. Laps 1..N-1 complete via lap_number
+    transitions; the final lap has no transition (the race just ends) and
+    must be rescued by close(). The last two lap times are within 0.01s on
+    purpose — that's the case that used to silently drop the final lap."""
+    _ensure_temp_store()
+    _reset_state()
+    proto = L.TelemetryProtocol("forza_motorsport", L.parse_forza)
+
+    # lap_number=1 starts lap 1 (no LapRecord closed yet).
+    _inject(proto, build_forza_packet(speed_mph=100, lap=1, last_lap=0.0))
+
+    # Crossing into lap k closes lap k-1 with its last_lap time.
+    for k in range(2, laps + 1):
+        prev_lap_time = 90.0 + 0.001 * (k - 1)
+        _inject(proto, build_forza_packet(speed_mph=100, lap=k,
+                                          last_lap=prev_lap_time))
+
+    # Final lap: no further lap_number bump. Forza posts the final lap's
+    # time as a fresh last_lap_time at the line — within 0.01s of the
+    # previous lap, the exact scenario of the dropped-final-lap bug.
+    final_time = 90.0 + 0.001 * (laps - 1) + 0.005
+    _inject(proto, build_forza_packet(speed_mph=100, lap=laps,
+                                      last_lap=final_time))
+
+    session = L.active_sessions.get("forza_motorsport")
+    session.close()
+    return session
+
+
+def test_long_race_lap_count():
+    """A 40 / 50 / 100-lap race must store every lap — including the final
+    one, whose time nearly matches the previous lap. Runs in milliseconds;
+    no server, no real-time waiting."""
+    import listener as L
+    print("\n[long race lap count]")
+    for n in (40, 50, 100):
+        session = _simulate_forza_race(L, n)
+        got = len(session.completed_laps)
+        check(f"{n}-lap race keeps {n} laps in memory", got == n,
+              f"got {got}")
+        stored = _stored_lap_count(session.session_id)
+        check(f"{n}-lap race persists lap_count={n}", stored == n,
+              f"db lap_count={stored}")
 
 
 def test_game_switching():
@@ -712,6 +802,7 @@ def main():
     test_f1_slip_via_motionex()
     test_f1_lap_timing()
     test_forza_lap_timing()
+    test_long_race_lap_count()
     test_game_switching()
     test_tyre_temps_per_game()
 
