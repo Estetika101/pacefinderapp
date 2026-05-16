@@ -613,6 +613,32 @@ class Session:
             return False
         return time.time() - self._last_lap_completed_at <= 10.0
 
+    def note_race_over(self, parsed: dict):
+        """Forza emits the FINAL lap's last_lap_time in the is_race_on=0
+        packet sent the instant you cross the line — the packet the parser
+        used to drop entirely. Feed that time into the same machinery the
+        in-race path uses (fresh-value detection + the missing-time
+        backfill) so close()'s final-lap recovery has a real time to work
+        with. Deliberately does NOT bump self.last_packet: race-end timing
+        stays owned by the UDP-stop watchdog exactly as before."""
+        llt = parsed.get("last_lap_time")
+        if not (llt and 0 < llt < 600):
+            return
+        if self._last_seen_lap_time == llt:
+            return
+        self._last_seen_lap_time = llt
+        self._last_lap_completed_at = time.time()
+        # If the final lap already transitioned but Forza was late with its
+        # time (stored None), fill it in — same as the in-race backfill.
+        if self.completed_laps and self.completed_laps[-1].lap_time_s is None:
+            self.completed_laps[-1].lap_time_s = llt
+            if self.best_lap_time_s is None or llt < self.best_lap_time_s:
+                self.best_lap_time_s = llt
+        _log.info(
+            f"[{self.game}] Race-over packet — final lap last_lap_time="
+            f"{llt:.3f}s captured for recovery"
+        )
+
     def close(self) -> dict:
         if self.closed_reason is None:
             self.closed_reason = "timeout"
