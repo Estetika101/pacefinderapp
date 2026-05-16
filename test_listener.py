@@ -28,11 +28,12 @@ _FM_FORMAT = "<iI" + "f"*51 + "i"*5 + "f"*17 + "H" + "B"*6 + "b"*3
 
 
 def build_forza_packet(speed_mph: float = 100.0, throttle_pct: float = 80.0,
-                       lap: int = 1, last_lap: float = 0.0, steer: int = 0) -> bytes:
+                       lap: int = 1, last_lap: float = 0.0, steer: int = 0,
+                       is_race_on: int = 1) -> bytes:
     speed_ms = speed_mph / 2.237
     accel = int(throttle_pct / 100 * 255)
     vals = [
-        1, 12345,
+        is_race_on, 12345,
         8000.0, 800.0, 5500.0,
         0.1, 9.5, 0.0,
         speed_ms, 0.0, 0.0,
@@ -487,12 +488,14 @@ def _simulate_forza_race(L, laps: int):
         _inject(proto, build_forza_packet(speed_mph=100, lap=k,
                                           last_lap=prev_lap_time))
 
-    # Final lap: no further lap_number bump. Forza posts the final lap's
-    # time as a fresh last_lap_time at the line — within 0.01s of the
-    # previous lap, the exact scenario of the dropped-final-lap bug.
+    # Final lap: no further lap_number bump. The driver crosses the line
+    # and Forza ends the race — the packet carrying the FINAL lap's
+    # last_lap_time arrives with is_race_on=0 (results screen). This is
+    # the real-world race-end the old parser dropped on the floor, losing
+    # the final lap. Time is within 0.01s of the previous lap too.
     final_time = 90.0 + 0.001 * (laps - 1) + 0.005
-    _inject(proto, build_forza_packet(speed_mph=100, lap=laps,
-                                      last_lap=final_time))
+    _inject(proto, build_forza_packet(speed_mph=0, lap=laps,
+                                      last_lap=final_time, is_race_on=0))
 
     session = L.active_sessions.get("forza_motorsport")
     session.close()

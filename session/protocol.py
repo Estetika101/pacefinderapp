@@ -50,6 +50,17 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
                 )
             return
 
+        if parsed.get("_packet_type") == "race_over":
+            # Forza's cross-the-final-line packet (is_race_on=0) carries the
+            # final lap's time. Hand it to the active session for final-lap
+            # recovery; never create a session or treat this as telemetry.
+            # Race-end timing itself is unchanged — the watchdog still closes
+            # on UDP-stop — but close() now has the real final lap time.
+            sess = active_sessions.get(self.game)
+            if sess is not None:
+                sess.note_race_over(parsed)
+            return
+
         ts    = datetime.now().strftime("%H:%M:%S")
         speed = parsed.get("speed_mph", 0)
         gear  = parsed.get("gear", parsed.get("current_engine_rpm", "?"))

@@ -64,7 +64,20 @@ def parse_forza(data: bytes, get_tracks, unknown_ordinals_seen: set, log_fn) -> 
         values = struct.unpack(fmt, data)
         parsed = dict(zip(FM_FIELDS, values))
         if not parsed.get("is_race_on"):
-            return None  # race not active — values are stale/garbage
+            # Race not active (menu / pause / replay / results screen).
+            # Most fields are stale here, BUT Forza flips is_race_on→0 the
+            # instant you cross the final line, and that same packet still
+            # carries the FINAL lap's last_lap_time. Returning None dropped
+            # it outright → the last lap of every race went unrecorded.
+            # Emit a minimal race-over marker (never treated as telemetry)
+            # so the session can recover the final lap from last_lap_time.
+            return {
+                "_packet_type":      "race_over",
+                "is_race_on":        0,
+                "last_lap_time":     parsed.get("last_lap_time"),
+                "lap_number":        parsed.get("lap_number"),
+                "current_race_time": parsed.get("current_race_time"),
+            }
         if len(data) == FM_PACKET_SIZE_FH:
             parsed["tire_wear_fl"]  = values[len(FM_FIELDS)]
             parsed["tire_wear_fr"]  = values[len(FM_FIELDS) + 1]
