@@ -334,6 +334,8 @@ def make_handler(ctx: dict):
                         if "time_format" in incoming:
                             tf = str(incoming["time_format"]).strip()
                             config["time_format"] = tf if tf in ("12h", "24h") else "24h"
+                        if "debug_mode" in incoming:
+                            config["debug_mode"] = bool(incoming["debug_mode"])
                         save_config(config)
                         msg = "Saved."
                         if incoming.get("ports") and incoming["ports"] != PORTS:
@@ -342,7 +344,8 @@ def make_handler(ctx: dict):
                         writer.write(_http_response("200 OK", "application/json", result))
 
             elif path == "/status":
-                writer.write(_http_response("200 OK", "application/json", json.dumps(state, indent=2).encode()))
+                status_payload = {**state, "debug_mode": config.get("debug_mode", False)}
+                writer.write(_http_response("200 OK", "application/json", json.dumps(status_payload, indent=2).encode()))
 
             elif path == "/debug/raw":
                 writer.write(_http_response("200 OK", "text/html", DEBUG_RAW_HTML.encode()))
@@ -1609,7 +1612,7 @@ def make_handler(ctx: dict):
                             break
                     else:
                         idle_since = None
-                    data = f"data: {json.dumps(state)}\n\n"
+                    data = f"data: {json.dumps({**state, 'debug_mode': config.get('debug_mode', False)})}\n\n"
                     writer.write(data.encode())
                     await writer.drain()
                     await asyncio.sleep(2.0 if is_idle else 0.1)

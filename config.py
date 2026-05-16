@@ -18,6 +18,10 @@ DEFAULTS: dict = {
     # UI-only display preference. "24h" (default) or "12h".
     # See docs/specs/time-format-preference.md.
     "time_format":       "24h",
+    # When true, the live dashboard speaks an audible "I think the race
+    # is over" the moment race-end is detected — a diagnostic aid for
+    # validating race-end timing against what actually happened on track.
+    "debug_mode":        False,
 }
 
 

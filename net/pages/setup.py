@@ -262,6 +262,13 @@ sudo systemctl start pacefinder</div>
     </select>
     <div class="hint">Applies to session times across the app. Pi log timestamps stay 24-hour ISO.</div>
   </div>
+  <div class="field">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <input type="checkbox" id="debug_mode" style="width:auto;margin:0">
+      Debug mode
+    </label>
+    <div class="hint">When on, the live dashboard speaks &ldquo;I think the race is over&rdquo; the moment race-end is detected — handy for sanity-checking detection timing against what happened on track.</div>
+  </div>
 </div>
 
 <button class="btn" id="save-btn" onclick="save()">Save</button>
@@ -460,6 +467,7 @@ async function load() {
   const modelSel = document.getElementById('anthropic_model');
   if (d.anthropic_model) modelSel.value = d.anthropic_model;
   document.getElementById('time_format').value = (d.time_format === '12h') ? '12h' : '24h';
+  document.getElementById('debug_mode').checked = !!d.debug_mode;
   renderDisk(d.disk);
   if (d.storage_path) validatePath(d.storage_path);
 }
@@ -486,6 +494,7 @@ async function save() {
     anthropic_api_key: document.getElementById('anthropic_api_key').value.trim(),
     anthropic_model:   document.getElementById('anthropic_model').value,
     time_format:       document.getElementById('time_format').value,
+    debug_mode:        document.getElementById('debug_mode').checked,
   };
   try {
     const r = await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
