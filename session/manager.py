@@ -172,6 +172,10 @@ class Session:
         # the final line" — distinguishes from a mid-race pause where the
         # last lap-line crossing was much earlier.
         self._last_lap_completed_at: Optional[float] = None
+        # Diagnostic: last last_lap_time logged from a race_over packet, so
+        # the journal shows what Forza actually transmits at race end
+        # without spamming (these packets stream at ~60Hz post-race).
+        self._race_over_diag_last: Optional[float] = -1.0
 
         self._motion_cache: dict = {}
         self._lap_cache: dict = {}
@@ -622,6 +626,18 @@ class Session:
         with. Deliberately does NOT bump self.last_packet: race-end timing
         stays owned by the UDP-stop watchdog exactly as before."""
         llt = parsed.get("last_lap_time")
+        # Diagnostic — log the first race_over packet and any time its
+        # last_lap_time changes. This pins down, from the journal alone,
+        # whether Forza even transmits the final lap's time post-line
+        # (vs. always the prior lap's stale value or 0/None).
+        if self._race_over_diag_last != llt:
+            self._race_over_diag_last = llt
+            _log.info(
+                f"[{self.game}] race_over pkt — last_lap_time={llt} "
+                f"_last_seen={self._last_seen_lap_time} "
+                f"lap_number={parsed.get('lap_number')} "
+                f"completed_laps={len(self.completed_laps)}"
+            )
         if not (llt and 0 < llt < 600):
             return
         if self._last_seen_lap_time == llt:
