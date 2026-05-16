@@ -842,7 +842,7 @@ function updateMaxT(){
 const _isEmbed=new URLSearchParams(location.search).get('embed')==='1';
 async function init(){
   if(!_id){location.href='/sessions';return;}
-  if(_isEmbed){const bc=$('tele-breadcrumb');if(bc)bc.style.display='none';}
+  if(_isEmbed){const bc=$('tele-breadcrumb');if(bc)bc.style.display='none';const sn=$('tele-subnav');if(sn)sn.style.display='none';}
   if(window.Perf)Perf.mark('init:start');
   let d;
   try{d=await fetch('/sessions/session/data?id='+encodeURIComponent(_id)).then(r=>r.json());}
@@ -862,6 +862,7 @@ async function init(){
   if(game)sessHref+='&game='+encodeURIComponent(game);
   if(track)sessHref+='&track='+encodeURIComponent(track);
   $('bc-sess').href=sessHref;
+  $('link-overview').href=sessHref;
   // Best lap default — skip partial laps
   const best=_sess.best_lap_time_s;
   const validLaps=_laps.filter(l=>l.lap_time_s);
