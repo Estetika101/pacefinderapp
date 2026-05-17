@@ -12,16 +12,11 @@ CIRCUIT_INDEX_HTML_PRE = """<!DOCTYPE html>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/sessions_car.css">
+<link rel="stylesheet" href="/static/nav.css">
 </head>
 <body>
-<div class="tb">
-  <h1>Pacefinder</h1>
-  <nav class="tb-nav">
-    <a href="/dashboard">Live</a>
-    <a href="/" class="cur">Home</a>
-    <a href="/setup">Setup</a>
-  </nav>
-</div>
+<div id="pf-nav"></div>
+<script src="/static/js/nav.js"></script>
 <div class="page">
 
   <a href="/" class="crumb">&larr; Home</a>

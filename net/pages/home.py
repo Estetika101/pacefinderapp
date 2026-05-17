@@ -13,23 +13,12 @@ HOME_HTML_PRE = """<!DOCTYPE html>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/home.css">
+<link rel="stylesheet" href="/static/nav.css">
 </head>
 <body>
+<div id="pf-nav"></div>
+<script src="/static/js/nav.js"></script>
 <div class="page">
-
-  <!-- Topbar (full-width brand + status + nav) -->
-  <div class="topbar">
-    <a href="/" class="brand">pacefinder<span class="dot">.</span></a>
-    <span class="status" id="status">
-      <span class="status-dot" id="status-dot"></span>
-      <span id="status-text">Loading&hellip;</span>
-    </span>
-    <span class="spacer"></span>
-    <span class="top-nav">
-      <a href="/dashboard" id="nav-live">Live dashboard</a>
-      <a href="/setup">Setup</a>
-    </span>
-  </div>
 
   <!-- Welcome strip -->
   <div class="welcome">

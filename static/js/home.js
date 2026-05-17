@@ -47,12 +47,8 @@ function carDisplay(s){
 async function init(){
   let d;
   try{d = await fetch('/home/data').then(r => r.json());}
-  catch(e){
-    document.getElementById('status-text').textContent = 'Failed to load';
-    return;
-  }
+  catch(e){ return; }  // nav.js owns the live status pill
   _tf = d.time_format || '24h';
-  renderStatus(d.status, d.stats);
   renderWelcome(d.last_session, d.stats);
   renderHero(d.last_session, d.pb_at_track_s);
   loadCareer();
@@ -60,44 +56,6 @@ async function init(){
   renderTopCars(d.top_cars || []);
   renderRecent(d.recent_sessions || []);
   renderFooter(d.stats);
-
-  // Cheap polling for status flip — only the pill updates; no full re-render
-  setInterval(async () => {
-    try{
-      const s = await fetch('/status').then(r => r.json());
-      renderStatusFromState(s);
-    }catch(e){}
-  }, 10000);
-}
-
-function renderStatus(status, stats){
-  const text = document.getElementById('status-text');
-  const dot = document.getElementById('status-dot');
-  const pill = document.getElementById('status');
-  if(status === 'racing' || status === 'paused' || (stats && stats.last_packet_at && isRecentMs(stats.last_packet_at, 30000))){
-    pill.classList.add('live');
-    text.textContent = 'Recording · click Live to view';
-  } else {
-    pill.classList.remove('live');
-    text.textContent = 'Idle · waiting for telemetry';
-  }
-}
-
-function renderStatusFromState(s){
-  const text = document.getElementById('status-text');
-  const pill = document.getElementById('status');
-  if(s.status === 'racing' || s.status === 'paused'){
-    pill.classList.add('live');
-    text.textContent = 'Recording · click Live to view';
-  } else {
-    pill.classList.remove('live');
-    text.textContent = 'Idle · waiting for telemetry';
-  }
-}
-
-function isRecentMs(iso, ms){
-  if(!iso) return false;
-  try{return (Date.now() - new Date(iso).getTime()) < ms;}catch(e){return false;}
 }
 
 function renderWelcome(last, stats){

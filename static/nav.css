@@ -1,0 +1,41 @@
+/* Shared top bar — one component, every page (docs/specs/ia.md).
+   Rendered by /static/js/nav.js into <div id="pf-nav"></div>.
+   The status pill IS the Live affordance: quiet when idle, alive and
+   clickable → the dashboard when a session is recording. */
+
+.pf-nav{
+  display:flex;align-items:center;gap:var(--space-3);
+  height:50px;padding:0 var(--space-4);
+  border-bottom:1px solid var(--color-border);
+  position:sticky;top:0;background:var(--color-bg);z-index:30;
+}
+.pf-brand{
+  font-size:var(--text-lg);font-weight:700;letter-spacing:-0.01em;
+  color:var(--color-text-primary);text-decoration:none;
+}
+.pf-brand .pf-dot{color:var(--color-accent)}
+.pf-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:4px 12px;background:var(--color-surface);
+  border:1px solid var(--color-border);border-radius:999px;
+  font-size:11px;color:var(--color-text-secondary);
+  text-transform:uppercase;letter-spacing:0.08em;
+  text-decoration:none;
+}
+.pf-pill-dot{width:8px;height:8px;border-radius:50%;background:#555}
+.pf-pill.live{border-color:var(--color-red);color:var(--color-red);cursor:pointer}
+.pf-pill.live .pf-pill-dot{
+  background:var(--color-red);box-shadow:0 0 8px var(--color-red);
+  animation:pf-pulse 1.4s ease-in-out infinite;
+}
+.pf-pill.ended{border-color:var(--color-accent);color:var(--color-accent);cursor:pointer}
+.pf-pill.ended .pf-pill-dot{background:var(--color-accent)}
+@keyframes pf-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.pf-spacer{flex:1}
+.pf-util{display:inline-flex;gap:var(--space-3)}
+.pf-util a{
+  font-size:var(--text-sm);color:var(--color-text-secondary);
+  padding:6px 10px;border-radius:6px;text-decoration:none;
+}
+.pf-util a:hover{color:var(--color-text-primary);background:var(--color-surface)}
+.pf-util a.cur{color:var(--color-text-primary)}
