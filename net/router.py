@@ -40,6 +40,7 @@ def make_handler(ctx: dict):
     SESSION_DETAIL_HTML    = ctx["SESSION_DETAIL_HTML"]
     CAR_DETAIL_HTML        = ctx["CAR_DETAIL_HTML"]
     CAR_INDEX_HTML         = ctx["CAR_INDEX_HTML"]
+    CIRCUIT_INDEX_HTML     = ctx["CIRCUIT_INDEX_HTML"]
     SESSION_EVENTS_HTML    = ctx["SESSION_EVENTS_HTML"]
     HOME_HTML              = ctx["HOME_HTML"]
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
@@ -450,6 +451,9 @@ def make_handler(ctx: dict):
 
             elif path == "/cars":
                 writer.write(_http_response("200 OK", "text/html", CAR_INDEX_HTML.encode()))
+
+            elif path == "/circuits":
+                writer.write(_http_response("200 OK", "text/html", CIRCUIT_INDEX_HTML.encode()))
 
             elif path == "/cars/data":
                 # One row per distinct car_ordinal: counts, totals, best lap,
