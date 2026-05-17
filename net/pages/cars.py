@@ -14,16 +14,11 @@ CAR_INDEX_HTML_PRE = """<!DOCTYPE html>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/sessions_car.css">
+<link rel="stylesheet" href="/static/nav.css">
 </head>
 <body>
-<div class="tb">
-  <h1>Pacefinder</h1>
-  <nav class="tb-nav">
-    <a href="/dashboard">Live</a>
-    <a href="/sessions" class="cur">Sessions</a>
-    <a href="/setup">Setup</a>
-  </nav>
-</div>
+<div id="pf-nav"></div>
+<script src="/static/js/nav.js"></script>
 <div class="page">
 
   <a href="/sessions" class="crumb">&larr; All sessions</a>
@@ -57,16 +52,11 @@ CAR_DETAIL_HTML_PRE = """<!DOCTYPE html>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/sessions_car.css">
+<link rel="stylesheet" href="/static/nav.css">
 </head>
 <body>
-<div class="tb">
-  <h1>Pacefinder</h1>
-  <nav class="tb-nav">
-    <a href="/dashboard">Live</a>
-    <a href="/sessions" class="cur">Sessions</a>
-    <a href="/setup">Setup</a>
-  </nav>
-</div>
+<div id="pf-nav"></div>
+<script src="/static/js/nav.js"></script>
 <div class="page">
 
   <a href="/sessions" class="crumb" id="crumb">&larr; All sessions</a>

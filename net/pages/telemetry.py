@@ -5,6 +5,7 @@ TELEMETRY_HTML = """<!DOCTYPE html>
 <title>Pacefinder &middot; Telemetry</title>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/nav.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--color-bg);color:var(--color-text-primary);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-variant-numeric:tabular-nums;min-height:100vh;overflow-x:hidden}
@@ -128,19 +129,13 @@ html.embed .track-map-wrap{top:0}
 </style>
 </head>
 <body>
-<div class="tb">
-  <h1>Pacefinder</h1>
-  <nav class="tb-nav">
-    <a href="/dashboard">Live</a><a href="/">Home</a><a href="/sessions" class="cur">Career</a><a href="/setup">Setup</a>
-    <a href="/admin" id="nav-admin" style="display:none">Admin</a>
-  </nav>
-</div>
+<div id="pf-nav"></div>
+<script src="/static/js/nav.js"></script>
 <script>
-if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';
+// Embedded in the session-detail iframe: nav.js hides #pf-nav itself;
+// here we also drop the in-iframe breadcrumb/subnav (the parent page
+// already shows them) and pin .ctrl-col to the top.
 if(new URLSearchParams(location.search).get('embed')==='1'){
-  document.querySelector('.tb').style.display='none';
-  // Hide the in-iframe breadcrumb — the parent session detail page already
-  // shows one. Pin .ctrl-col to top:0 since the iframe topbar is gone.
   document.documentElement.classList.add('embed');
   const bc=document.getElementById('tele-breadcrumb');
   if(bc) bc.style.display='none';
