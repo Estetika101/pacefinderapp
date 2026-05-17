@@ -20,8 +20,9 @@
   border:1px solid var(--color-border);border-radius:999px;
   font-size:11px;color:var(--color-text-secondary);
   text-transform:uppercase;letter-spacing:0.08em;
-  text-decoration:none;
+  text-decoration:none;cursor:pointer;
 }
+.pf-pill:hover{border-color:var(--color-text-secondary);color:var(--color-text-primary)}
 .pf-pill-dot{width:8px;height:8px;border-radius:50%;background:#555}
 .pf-pill.live{border-color:var(--color-red);color:var(--color-red);cursor:pointer}
 .pf-pill.live .pf-pill-dot{
