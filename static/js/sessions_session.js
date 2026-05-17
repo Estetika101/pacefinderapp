@@ -638,22 +638,37 @@ async function openEdit(){
   document.getElementById('edit-ovl').classList.add('open');
 }
 
-function closeEdit(){document.getElementById('edit-ovl').classList.remove('open');}
+function _resetDelConfirm(){
+  const link = document.getElementById('edit-del-link');
+  const conf = document.getElementById('edit-del-confirm');
+  if(link) link.style.display = '';
+  if(conf) conf.style.display = 'none';
+}
+function cancelDelete(){ _resetDelConfirm(); }
 
-async function deleteSession(){
+function closeEdit(){
+  document.getElementById('edit-ovl').classList.remove('open');
+  _resetDelConfirm();
+}
+
+// Two-step: first call swaps the link for an inline confirm (no nested
+// modal, no typing); deleteSession(true) actually destroys. Everything
+// else in the modal dismisses freely ("save regardless"), but delete is
+// destructive and not re-editable later, so it gets the one extra step.
+async function deleteSession(confirmed){
   if(!_id) return;
-  const trackHint = (_sess && _sess.track && _sess.track !== 'unknown') ? _sess.track : 'this session';
-  const ok = window.confirm(
-    'Permanently delete '+trackHint+'?\n\n'+
-    'This removes the session, its lap data, raw archive, and any AI analysis. There is no undo.'
-  );
-  if(!ok) return;
+  if(!confirmed){
+    document.getElementById('edit-del-link').style.display = 'none';
+    document.getElementById('edit-del-confirm').style.display = '';
+    return;
+  }
   try{
     const res = await fetch('/sessions/delete', {method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({id: _id})});
     if(!res.ok) throw new Error('HTTP '+res.status);
-    location.href = '/sessions';
+    location.href = '/';
   } catch(e){
     alert('Could not delete session: '+(e && e.message || e));
+    _resetDelConfirm();
   }
 }
 
