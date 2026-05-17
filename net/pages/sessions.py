@@ -275,12 +275,16 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   <div class="page-head">
     <div>
       <h1 class="page-h1" id="hdr-track">Loading&hellip;</h1>
-      <a class="page-h2" id="hdr-car-link" href="#" style="display:none">
-        <span id="hdr-car-name"></span>
-        <span class="class-badge" id="hdr-car-class" style="display:none"></span>
-        <span class="pi" id="hdr-car-pi" style="display:none"></span>
-        <span class="page-h2-arrow">&rarr;</span>
-      </a>
+      <div class="page-sub">
+        <a class="page-sub-link" id="hdr-circuit-link" href="#"><span id="hdr-circuit-name">Circuit</span></a>
+        <span class="page-sub-meta" id="hdr-submeta"></span>
+        <a class="page-h2" id="hdr-car-link" href="#" style="display:none">
+          <span id="hdr-car-name"></span>
+          <span class="class-badge" id="hdr-car-class" style="display:none"></span>
+          <span class="pi" id="hdr-car-pi" style="display:none"></span>
+          <span class="page-h2-arrow">&rarr;</span>
+        </a>
+      </div>
     </div>
     <div class="page-head-result" id="hdr-result" style="display:none">
       <div class="result-eyebrow">Grid &rarr; Finish</div>
@@ -294,9 +298,6 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
   </div>
 
   <div class="strip">
-    <span class="pill" id="hdr-when" style="display:none"><span class="label">When</span><span class="val" id="hdr-when-val"></span></span>
-    <span class="pill" id="hdr-cond" style="display:none"><span class="label">Cond</span><span class="val" id="hdr-cond-val"></span></span>
-    <span class="pill type-chip" id="hdr-type" style="display:none"></span>
     <span class="strip-spacer"></span>
     <button class="edit-btn" onclick="openEdit()" title="Edit session metadata">Edit &#x2303;</button>
   </div>
