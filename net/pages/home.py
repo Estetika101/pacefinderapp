@@ -78,7 +78,7 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     <div class="panel">
       <div class="panel-head">
         <h2>Top circuits</h2>
-        <a href="/sessions">All circuits &rarr;</a>
+        <a href="/circuits">All circuits &rarr;</a>
       </div>
       <div id="top-circuits"></div>
     </div>

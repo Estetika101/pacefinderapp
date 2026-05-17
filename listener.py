@@ -31,6 +31,7 @@ from net.pages.cars import (
     CAR_DETAIL_HTML_PRE,
     CAR_INDEX_HTML_PRE,
 )
+from net.pages.circuits import CIRCUIT_INDEX_HTML_PRE
 from net.pages.home import HOME_HTML_PRE
 from net.pages.events import SESSION_EVENTS_HTML
 from net.pages.telemetry import TELEMETRY_HTML
@@ -316,6 +317,7 @@ SESSION_DETAIL_HTML = (
 # the whole page. Kept as a constant for parity with the other pages.
 CAR_DETAIL_HTML = CAR_DETAIL_HTML_PRE
 CAR_INDEX_HTML = CAR_INDEX_HTML_PRE
+CIRCUIT_INDEX_HTML = CIRCUIT_INDEX_HTML_PRE
 HOME_HTML = HOME_HTML_PRE
 
 
@@ -406,6 +408,7 @@ async def main(demo_mode: bool = False):
         "SESSION_DETAIL_HTML": SESSION_DETAIL_HTML,
         "CAR_DETAIL_HTML": CAR_DETAIL_HTML,
         "CAR_INDEX_HTML": CAR_INDEX_HTML,
+        "CIRCUIT_INDEX_HTML": CIRCUIT_INDEX_HTML,
         "SESSION_EVENTS_HTML": SESSION_EVENTS_HTML,
         "HOME_HTML": HOME_HTML,
         "TELEMETRY_HTML": TELEMETRY_HTML,
