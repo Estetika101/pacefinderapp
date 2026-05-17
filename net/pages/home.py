@@ -42,51 +42,31 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Hero: last session -->
-  <a class="last-session" id="last-session" href="#" style="display:none">
-    <div class="last-eyebrow">Pick up where you left off</div>
-    <div class="last-grid">
-      <div>
-        <div class="last-time" id="last-time">&mdash;</div>
-        <div class="last-sub" id="last-sub">&mdash;</div>
+  <!-- Two-column: recent feed leads, circuits/cars aside -->
+  <div class="home-cols">
+    <div class="home-main">
+      <div class="section-head">
+        <h2>Recent sessions</h2>
+        <span class="count" id="recent-count">&mdash;</span>
       </div>
-      <div class="last-meta">
-        <div class="last-track" id="last-track">&mdash;</div>
-        <div class="last-car" id="last-car"></div>
-        <div class="last-cond" id="last-cond"></div>
+      <div id="recent-list"></div>
+    </div>
+    <div class="home-side">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Top circuits</h2>
+          <a href="/circuits">All circuits &rarr;</a>
+        </div>
+        <div id="top-circuits"></div>
       </div>
-      <div class="last-arrow">&rarr;</div>
-    </div>
-  </a>
-  <div class="empty-hero" id="empty-hero" style="display:none">
-    No sessions recorded yet. Open <a href="/dashboard">Live dashboard</a> and drive.
-  </div>
-
-  <!-- Twin grid: circuits + cars -->
-  <div class="grid">
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Top circuits</h2>
-        <a href="/circuits">All circuits &rarr;</a>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Top cars</h2>
+          <a href="/cars">All cars &rarr;</a>
+        </div>
+        <div id="top-cars"></div>
       </div>
-      <div id="top-circuits"></div>
     </div>
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Top cars</h2>
-        <a href="/cars">All cars &rarr;</a>
-      </div>
-      <div id="top-cars"></div>
-    </div>
-  </div>
-
-  <!-- Recent sessions -->
-  <div class="recent">
-    <div class="section-head">
-      <h2>Recent sessions</h2>
-      <span class="count" id="recent-count">&mdash;</span>
-    </div>
-    <div id="recent-list"></div>
   </div>
 
   <!-- Footer: Pi stats -->

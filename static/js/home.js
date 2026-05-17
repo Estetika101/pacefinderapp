@@ -50,7 +50,6 @@ async function init(){
   catch(e){ return; }  // nav.js owns the live status pill
   _tf = d.time_format || '24h';
   renderWelcome(d.last_session, d.stats);
-  renderHero(d.last_session, d.pb_at_track_s);
   loadCareer();
   renderTopCircuits(d.top_circuits || []);
   renderTopCars(d.top_cars || []);
@@ -69,45 +68,6 @@ function renderWelcome(last, stats){
   }
 }
 
-function renderHero(last, pbHere){
-  const heroEl = document.getElementById('last-session');
-  const emptyEl = document.getElementById('empty-hero');
-  if(!last || !last.session_id){
-    heroEl.style.display = 'none';
-    emptyEl.style.display = '';
-    return;
-  }
-  heroEl.style.display = '';
-  emptyEl.style.display = 'none';
-
-  heroEl.href = '/sessions/session?id=' + encodeURIComponent(last.session_id);
-  document.getElementById('last-time').textContent = fmtLap(last.best_lap_time_s);
-
-  // Subtitle: "Best lap · +0.84s vs your PB here" or fall back to lap count
-  let sub = 'Best lap';
-  if(last.best_lap_time_s && pbHere && last.best_lap_time_s > pbHere){
-    const gap = last.best_lap_time_s - pbHere;
-    sub += ' · +' + gap.toFixed(2) + 's vs your PB here';
-  } else if(last.best_lap_time_s && pbHere && Math.abs(last.best_lap_time_s - pbHere) < 0.005){
-    sub += ' · matches your PB here';
-  } else if(last.best_lap_time_s && pbHere && last.best_lap_time_s < pbHere){
-    sub += ' · new PB!';
-  }
-  document.getElementById('last-sub').textContent = sub;
-
-  document.getElementById('last-track').textContent = last.track || '—';
-  const carName = carDisplay(last);
-  const cls = last.car_class != null ? `<span class="class-badge">${CLASS_NAMES[last.car_class] || ''}</span>` : '';
-  const pi = last.car_pi ? `<span style="color:var(--color-text-quaternary);font-size:11px">PI ${last.car_pi}</span>` : '';
-  document.getElementById('last-car').innerHTML =
-    escapeHtml(carName) + ' ' + cls + (cls && pi ? ' · ' : '') + pi;
-  const condBits = [];
-  if(last.weather_condition) condBits.push(last.weather_condition);
-  if(last.tyre_compound) condBits.push(last.tyre_compound);
-  if(last.track_temp_c != null) condBits.push(Math.round(last.track_temp_c) + '°C');
-  if(last.started_at) condBits.push(fmtShortDate(last.started_at) + ' ' + fmtTime(last.started_at));
-  document.getElementById('last-cond').textContent = condBits.join(' · ');
-}
 
 function renderTopCircuits(circuits){
   const el = document.getElementById('top-circuits');
@@ -148,10 +108,10 @@ function renderRecent(recents){
     recents.length ? ('showing ' + recents.length + ' latest') : '—';
   const list = document.getElementById('recent-list');
   if(!recents.length){
-    list.innerHTML = '<div class="recent-empty">No sessions recorded yet.</div>';
+    list.innerHTML = '<div class="recent-empty">No sessions recorded yet. Open the <a href="/dashboard">live dashboard</a> and drive.</div>';
     return;
   }
-  list.innerHTML = recents.map(s => {
+  list.innerHTML = recents.map((s, i) => {
     const href = '/sessions/session?id=' + encodeURIComponent(s.session_id);
     const date = fmtShortDate(s.started_at);
     const time = fmtTime(s.started_at);
@@ -161,7 +121,7 @@ function renderRecent(recents){
     if(s.weather_condition) condBits.push(s.weather_condition);
     if(s.tyre_compound) condBits.push(s.tyre_compound);
     if(s.track_temp_c != null) condBits.push(Math.round(s.track_temp_c) + '°C');
-    return `<a href="${href}" class="recent-row">
+    return `<a href="${href}" class="recent-row${i === 0 ? ' lead' : ''}">
       <span class="recent-date">${date}<small>${time}</small></span>
       <span class="recent-track">${escapeHtml(s.track || '—')}</span>
       <span class="recent-car">${escapeHtml(carName)} ${cls}</span>
