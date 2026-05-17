@@ -302,9 +302,12 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
     <button class="edit-btn" onclick="openEdit()" title="Edit session metadata">Edit &#x2303;</button>
   </div>
 <!-- Edit modal -->
-<div class="edit-ovl" id="edit-ovl">
+<div class="edit-ovl" id="edit-ovl" onclick="if(event.target===this)closeEdit()">
   <div class="edit-panel">
-    <div class="edit-ttl">Edit Session</div>
+    <div class="edit-head">
+      <div class="edit-ttl">Edit Session</div>
+      <button class="edit-x" onclick="closeEdit()" aria-label="Close" title="Close">&times;</button>
+    </div>
     <div class="edit-row"><label class="edit-lbl">Track</label>
       <input class="edit-sel" id="edit-track" placeholder="Search or type track name"></div>
     <div class="edit-row"><label class="edit-lbl">Car</label>
@@ -361,9 +364,16 @@ SESSION_DETAIL_HTML_PRE = """<!DOCTYPE html>
       <span id="edit-conditions" style="font-size:.7rem;color:var(--color-text-secondary);font-variant-numeric:tabular-nums"></span>
     </div>
     <div class="edit-btns">
-      <button class="edit-save" onclick="saveEdit()">Save</button>
       <button class="edit-cancel" onclick="closeEdit()">Cancel</button>
-      <button class="edit-delete" onclick="deleteSession()" title="Permanently remove this session and its data">Delete session</button>
+      <button class="edit-save" onclick="saveEdit()">Save</button>
+    </div>
+    <div class="edit-danger">
+      <button class="edit-delete-link" id="edit-del-link" onclick="deleteSession()">Delete session</button>
+      <span class="edit-del-confirm" id="edit-del-confirm" style="display:none">
+        Permanently delete this session?
+        <button class="edit-del-yes" onclick="deleteSession(true)">Confirm delete</button>
+        <button class="edit-del-no" onclick="cancelDelete()">Keep</button>
+      </span>
     </div>
   </div>
 </div>
