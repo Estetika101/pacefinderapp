@@ -1,14 +1,6 @@
 // race_type values: `real` (humans), `ai`, `time_trial`. Older code wrote
 // `race`, `race_ai`, etc. — keep both forms for backward compatibility.
 const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Qualifying',race:'Race',race_ai:'AI Race',race_online:'Online Race',hot_lap:'Hot Lap',real:'Race',ai:'AI Race'};
-function typeChipClass(t){
-  if(t==='real'||t==='race'||t==='race_online')return 't-race';
-  if(t==='ai'||t==='race_ai')return 't-ai';
-  if(t==='time_trial')return 't-time_trial';
-  if(t==='practice')return 't-practice';
-  if(t==='hot_lap')return 't-hot_lap';
-  return '';
-}
 // Forza drivetrain_type spec: 0=FWD, 1=RWD, 2=AWD
 const DRIVETRAIN_LABELS={0:'FWD',1:'RWD',2:'AWD'};
 // FH5 nine-class scheme. #103 tracks the FM2023 vs FH5 split.
@@ -22,15 +14,6 @@ function fmtDateShort(iso){
   if(!iso)return '—';
   const d=new Date(iso);
   return d.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:_h12()});
-}
-function fmtTimeRange(startIso, endIso){
-  if(!startIso)return '—';
-  const s=new Date(startIso);
-  const start=s.toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:_h12()});
-  if(!endIso)return start;
-  const e=new Date(endIso);
-  const end=e.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:_h12()});
-  return start+' – '+end;
 }
 
 const _qs=new URLSearchParams(location.search);
@@ -157,7 +140,41 @@ function renderCrumbAndNav(){
 function renderHeader(){
   const s=_sess;
   const track=s.track&&s.track!=='unknown'?s.track:(_strack||'Unknown Track');
-  document.getElementById('hdr-track').textContent=track;
+  const game=_sgame||s.game||'';
+
+  // H1 = "{Type} · {date}". The page is about the session; the circuit
+  // is carried by the breadcrumb and demoted to the subhead.
+  const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
+  const typeLabel=effType?(TYPE_LABELS[effType]||effType):'Session';
+  let dateStr='';
+  if(s.started_at){
+    dateStr=new Date(s.started_at).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+  }
+  document.getElementById('hdr-track').textContent=
+    dateStr ? (typeLabel+' · '+dateStr) : typeLabel;
+  document.title='Pacefinder · '+typeLabel+(dateStr?' · '+dateStr:'');
+
+  // Subhead: Circuit (link) · time · conditions
+  const cl=document.getElementById('hdr-circuit-link');
+  let trackHref='/sessions/track?name='+encodeURIComponent(track);
+  if(game)trackHref+='&game='+encodeURIComponent(game);
+  cl.href=trackHref;
+  document.getElementById('hdr-circuit-name').textContent=track;
+  const metaParts=[];
+  if(s.started_at){
+    const st=new Date(s.started_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:_h12()});
+    if(s.ended_at){
+      const en=new Date(s.ended_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:_h12()});
+      metaParts.push(st+' – '+en);
+    } else { metaParts.push(st); }
+  }
+  const cond=[];
+  if(s.weather_condition)cond.push(s.weather_condition);
+  if(s.tyre_compound)cond.push(s.tyre_compound);
+  if(s.track_temp_c!=null)cond.push(Math.round(s.track_temp_c)+'°C');
+  if(cond.length)metaParts.push(cond.join(' · '));
+  document.getElementById('hdr-submeta').textContent=
+    metaParts.length ? (' · '+metaParts.join(' · ')) : '';
 
   // H2 car link — nickname > resolved > Unknown Car (#N)
   let carText=null;
@@ -197,30 +214,6 @@ function renderHeader(){
     else if(g<0){gEl.textContent='↘ '+(-g)+' place'+(-g===1?'':'s')+' lost';gEl.classList.add('lost');}
     else{gEl.textContent='no change';gEl.classList.add('same');}
     document.getElementById('hdr-result').style.display='';
-  }
-
-  // Metadata strip pills
-  const whenVal=fmtTimeRange(s.started_at, s.ended_at);
-  if(whenVal && whenVal!=='—'){
-    document.getElementById('hdr-when-val').textContent=whenVal;
-    document.getElementById('hdr-when').style.display='';
-  }
-  // Conditions: weather + tyre + track_temp_c
-  const condParts=[];
-  if(s.weather_condition)condParts.push(s.weather_condition);
-  if(s.tyre_compound)condParts.push(s.tyre_compound);
-  if(s.track_temp_c!=null)condParts.push(Math.round(s.track_temp_c)+'°C');
-  if(condParts.length){
-    document.getElementById('hdr-cond-val').textContent=condParts.join(' · ');
-    document.getElementById('hdr-cond').style.display='';
-  }
-  // Type
-  const effType=s.race_type||(s.session_type&&s.session_type!=='unknown'?s.session_type:null);
-  if(effType){
-    const el=document.getElementById('hdr-type');
-    el.textContent=TYPE_LABELS[effType]||effType;
-    el.className='pill type-chip '+typeChipClass(effType);
-    el.style.display='';
   }
 }
 
