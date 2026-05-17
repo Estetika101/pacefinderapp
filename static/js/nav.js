@@ -31,20 +31,22 @@
   var pill = document.getElementById('pf-pill');
   var txt  = document.getElementById('pf-pill-text');
 
+  // The pill is ALWAYS a link to the live dashboard — you can open it
+  // before a session to check the dash. Only the state styling/text
+  // changes.
+  pill.href = '/dashboard';
+
   function paint(s){
     var status = s && s.status;
     if(status === 'racing' || status === 'paused'){
       pill.className = 'pf-pill live';
-      pill.href = '/dashboard';
       txt.textContent = 'Recording · view live';
     } else if(status === 'race_ended'){
       pill.className = 'pf-pill ended';
-      pill.href = '/dashboard';
       txt.textContent = 'Race ended';
     } else {
       pill.className = 'pf-pill';
-      pill.removeAttribute('href');
-      txt.textContent = 'Idle · waiting for telemetry';
+      txt.textContent = 'Idle · open live dashboard';
     }
   }
 
