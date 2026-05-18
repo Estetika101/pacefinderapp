@@ -77,3 +77,44 @@ html.pf-rail-icons .pf-it[data-tip]:hover::after{
   .pf-it.cur{box-shadow:none;color:var(--color-accent)}
   .pf-it.pf-end{margin-top:0}
 }
+
+/* ── Live takeover ── dramatic, auto on session start (ia.md).
+   Transform/opacity only; reduced-motion gets a plain cut. */
+.pf-to{
+  position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;
+  background:var(--color-bg);opacity:0;pointer-events:none;
+  transition:opacity .28s ease;
+}
+.pf-to.show{opacity:1;pointer-events:auto}
+.pf-to-card{
+  text-align:center;transform:scale(.86);opacity:0;
+  transition:transform .42s cubic-bezier(.16,1,.3,1) .06s, opacity .42s ease .06s;
+}
+.pf-to.show .pf-to-card{transform:scale(1);opacity:1}
+.pf-to-eyebrow{
+  font-size:13px;letter-spacing:.34em;text-transform:uppercase;
+  color:var(--color-red);margin-bottom:14px;
+}
+.pf-to-eyebrow .pf-ld{
+  display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--color-red);
+  box-shadow:0 0 12px var(--color-red);margin-right:10px;animation:pf-pulse 1.1s infinite;
+}
+.pf-to-title{
+  font-size:clamp(40px,9vw,96px);font-weight:800;letter-spacing:-.02em;line-height:1;
+  color:var(--color-text-primary);
+}
+.pf-to-sub{margin-top:12px;color:var(--color-text-tertiary);font-size:15px}
+.pf-to-actions{margin-top:34px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.pf-to-go{
+  background:var(--color-red);color:#fff;border:none;border-radius:8px;
+  padding:13px 26px;font:inherit;font-size:15px;font-weight:700;cursor:pointer;text-decoration:none;
+}
+.pf-to-back{
+  background:none;border:1px solid var(--color-border);color:var(--color-text-tertiary);
+  border-radius:8px;padding:13px 20px;font:inherit;font-size:14px;cursor:pointer;
+}
+.pf-to-back:hover{color:var(--color-text-primary);border-color:var(--color-text-tertiary)}
+@media (prefers-reduced-motion:reduce){
+  .pf-to,.pf-to-card{transition:none}
+  .pf-to-eyebrow .pf-ld{animation:none}
+}
