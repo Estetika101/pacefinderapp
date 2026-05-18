@@ -462,22 +462,23 @@ function renderCards(){
     const rank = _carCtx.rank_in_car;
     const total = _carCtx.total_in_car;
     const ord = (n) => {
-      if(n === 1) return '1st';
-      if(n === 2) return '2nd';
-      if(n === 3) return '3rd';
-      return n + 'th';
+      const v = n % 100;
+      if(v >= 11 && v <= 13) return n + 'th';
+      return n + ({1:'st',2:'nd',3:'rd'}[n % 10] || 'th');
     };
     const carText = s.car_nickname || s.car || 'this car';
-    document.getElementById('card-car-headline').innerHTML =
-      `Your <em>${ord(rank)}-best</em> of ${total} session${total===1?'':'s'} in this car`;
+    const trackText = (s.track && s.track !== 'unknown') ? s.track : 'this circuit';
+    document.getElementById('card-car-headline').innerHTML = total === 1
+      ? `Your <em>only</em> session in this car at ${trackText}`
+      : `Your <em>${ord(rank)}-best</em> of ${total} sessions in this car at ${trackText}`;
     const bh = _carCtx.best_in_car_at_track;
     if(bh && bh.best_lap_time_s){
       const dt = bh.started_at ? new Date(bh.started_at).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '';
       document.getElementById('card-car-body').innerHTML =
-        `Best ever in ${carText} at ${s.track}:<br>` +
+        `Best ever in ${carText} at ${trackText}:<br>` +
         `<strong style="color:var(--color-text-primary)">${fmtLap(bh.best_lap_time_s)}</strong>${dt?' — '+dt:''}`;
     } else {
-      document.getElementById('card-car-body').textContent = `First session in this car at ${s.track}.`;
+      document.getElementById('card-car-body').textContent = `First session in this car at ${trackText}.`;
     }
     if(s.car_ordinal != null){
       const link = document.getElementById('card-car-link');

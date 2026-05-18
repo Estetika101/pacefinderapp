@@ -1026,12 +1026,15 @@ def make_handler(ctx: dict):
                         car_ctx = None
                         if sess_row and sess_row["car_ordinal"] is not None:
                             ord_ = int(sess_row["car_ordinal"])
-                            # Best-lap rank among all sessions in this car
+                            # Rank among sessions in this car AT THIS TRACK —
+                            # ranking across mixed circuits is meaningless
+                            # (a short track always "wins" on raw lap time).
                             same_car = conn.execute(
                                 "SELECT session_id,track,best_lap_time_s,started_at "
-                                "FROM sessions WHERE car_ordinal=? AND best_lap_time_s IS NOT NULL "
+                                "FROM sessions WHERE car_ordinal=? AND track=? "
+                                "AND best_lap_time_s IS NOT NULL "
                                 "ORDER BY best_lap_time_s ASC",
-                                (ord_,)
+                                (ord_, sess_row["track"])
                             ).fetchall()
                             total_in_car = len(same_car)
                             rank_in_car = None
@@ -1039,16 +1042,15 @@ def make_handler(ctx: dict):
                                 if r["session_id"] == sid:
                                     rank_in_car = i + 1
                                     break
-                            # Best ever in this car at this track (across all sessions)
+                            # Fastest in this car at this track (rows sorted asc)
                             best_here = None
-                            for r in same_car:
-                                if r["track"] == sess_row["track"]:
-                                    best_here = {
-                                        "session_id": r["session_id"],
-                                        "best_lap_time_s": r["best_lap_time_s"],
-                                        "started_at": r["started_at"],
-                                    }
-                                    break  # rows are sorted, first hit is fastest
+                            if same_car:
+                                r = same_car[0]
+                                best_here = {
+                                    "session_id": r["session_id"],
+                                    "best_lap_time_s": r["best_lap_time_s"],
+                                    "started_at": r["started_at"],
+                                }
                             car_ctx = {
                                 "rank_in_car": rank_in_car,
                                 "total_in_car": total_in_car,
