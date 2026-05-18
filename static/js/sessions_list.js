@@ -17,7 +17,11 @@ function typeOf(s){ return s.race_type || (s.session_type && s.session_type!=='u
 
 let _all = [];
 const F = {car:null, track:null, cond:null, type:null, review:false};
-let SORT = 'recent';
+// Column sort. Raw time on "lap" — sorting short vs long circuits
+// together is the user's call ("let's see how I did on short tracks").
+const SORT_KEYS = ['date','track','car','lap'];
+function defaultDir(k){ return k==='date' ? 'desc' : (k==='lap' ? 'asc' : 'asc'); }
+let SORT = {key:'date', dir:'desc'};
 
 // Mirror of db/store.py _NEEDS_REVIEW_SQL — keep the two in sync.
 const _RACEY = ['race','race_ai','race_online','real','ai'];
@@ -31,12 +35,31 @@ function needsReview(s){
   return false;
 }
 
+function sortRows(rows){
+  const k = SORT.key, mul = SORT.dir === 'asc' ? 1 : -1;
+  const val = s =>
+    k==='date'  ? (s.started_at || '') :
+    k==='track' ? (s.track || '').toLowerCase() :
+    k==='car'   ? carName(s).toLowerCase() :
+                  (s.best_lap_time_s == null ? Infinity : s.best_lap_time_s);
+  return rows.slice().sort((a,b)=>{
+    const x = val(a), y = val(b);
+    // Missing lap times always sink, regardless of direction.
+    if(k==='lap'){ if(x===Infinity && y!==Infinity) return 1;
+                   if(y===Infinity && x!==Infinity) return -1; }
+    return x < y ? -1*mul : x > y ? 1*mul : 0;
+  });
+}
+
 function readURL(){
   const q = new URLSearchParams(location.search);
   F.car = q.get('car'); F.track = q.get('track');
   F.cond = q.get('cond'); F.type = q.get('type');
   F.review = q.get('review') === '1' ? '1' : false;
-  SORT = q.get('sort') === 'fastest' ? 'fastest' : 'recent';
+  const k = q.get('sort');
+  SORT.key = SORT_KEYS.indexOf(k) >= 0 ? k : 'date';
+  SORT.dir = (q.get('dir') === 'asc' || q.get('dir') === 'desc')
+    ? q.get('dir') : defaultDir(SORT.key);
 }
 function writeURL(){
   const q = new URLSearchParams();
@@ -45,7 +68,9 @@ function writeURL(){
   if(F.cond) q.set('cond', F.cond);
   if(F.type) q.set('type', F.type);
   if(F.review) q.set('review', '1');
-  if(SORT === 'fastest') q.set('sort', 'fastest');
+  if(SORT.key !== 'date' || SORT.dir !== 'desc'){
+    q.set('sort', SORT.key); q.set('dir', SORT.dir);
+  }
   const s = q.toString();
   history.replaceState(null, '', s ? '?' + s : location.pathname);
 }
@@ -78,14 +103,9 @@ function render(){
   const conds  = uniq(s=>s.weather_condition, s=>s.weather_condition);
   const types  = uniq(s=>typeOf(s), s=>TYPE_LABELS[typeOf(s)]||typeOf(s));
 
-  const revN = _all.filter(needsReview).length;
-  const revChip = revN ? `<div class="fgrp"><span class="fl">Flag</span>` +
-    `<button class="chip${F.review==='1'?' on':''}" data-g="review" data-v="1">` +
-    `Needs review<span style="opacity:.6"> ${revN}</span></button></div>` : '';
-
   document.getElementById('filters').innerHTML =
     grp('Car', cars, 'car') + grp('Track', tracks, 'track') +
-    grp('Cond', conds, 'cond') + grp('Type', types, 'type') + revChip;
+    grp('Cond', conds, 'cond') + grp('Type', types, 'type');
 
   function grp(label, opts, g){
     if(!opts.length) return '';
@@ -93,23 +113,25 @@ function render(){
       opts.map(o=>chip(g,o.val,o.label,o.n)).join('') + `</div>`;
   }
 
-  const trackOn = !!F.track;
-  if(!trackOn && SORT==='fastest') SORT='recent';
+  // Needs-review: a real toggle, not a chip. Deep-linked via ?review=1
+  // from the rail badge. Sort: clickable column headers (no Recent/
+  // Fastest segment).
+  const revN = _all.filter(needsReview).length;
+  const swtOn = F.review === '1';
+  const toggle = revN ? `<label class="swt${swtOn?' on':''}">` +
+    `<input type="checkbox" id="rev-t"${swtOn?' checked':''}>` +
+    `<span class="tr"></span>Needs review (${revN})</label>` : '';
+  const ar = SORT.dir === 'asc' ? '▲' : '▼';
+  const hbtn = (k,label) =>
+    `<button data-k="${k}" class="${SORT.key===k?'on':''}">${label}` +
+    `${SORT.key===k?`<span class="ar">${ar}</span>`:''}</button>`;
   document.getElementById('sortbar').innerHTML =
-    `<span>Sort</span><div class="seg">
-       <button data-s="recent" class="${SORT==='recent'?'on':''}">Recent</button>
-       <button data-s="fastest" class="${SORT==='fastest'?'on':''}" ${trackOn?'':'disabled'}>Fastest</button>
-     </div><span class="shint">${trackOn
-        ? 'Fastest = leaderboard for this circuit'
-        : 'Fastest unlocks when one Track is selected'}</span>`;
+    toggle + `<span style="flex:1"></span><span>Sort</span>` +
+    `<div class="sorth">` + hbtn('date','Date') + hbtn('track','Circuit') +
+    hbtn('car','Car') + hbtn('lap','Best lap') + `</div>`;
 
   let rows = _all.filter(match);
-  if(SORT==='fastest' && trackOn){
-    rows = rows.slice().sort((a,b)=>{
-      const x=a.best_lap_time_s, y=b.best_lap_time_s;
-      if(x==null) return 1; if(y==null) return -1; return x-y;
-    });
-  }
+  rows = sortRows(rows);
 
   document.getElementById('sess-sub').textContent =
     rows.length === _all.length
@@ -143,10 +165,15 @@ document.addEventListener('click', e=>{
   const c = e.target.closest('.chip');
   if(c){ const g=c.dataset.g, v=c.dataset.v;
     F[g] = (String(F[g])===String(v)) ? null : v;
-    if(!F.track && SORT==='fastest') SORT='recent';
     writeURL(); render(); return; }
-  const sb = e.target.closest('.seg button');
-  if(sb && !sb.disabled){ SORT = sb.dataset.s; writeURL(); render(); }
+  const h = e.target.closest('.sorth button');
+  if(h){ const k=h.dataset.k;
+    if(SORT.key===k) SORT.dir = SORT.dir==='asc' ? 'desc' : 'asc';
+    else { SORT.key=k; SORT.dir=defaultDir(k); }
+    writeURL(); render(); }
+});
+document.addEventListener('change', e=>{
+  if(e.target.id==='rev-t'){ F.review = e.target.checked ? '1' : false; writeURL(); render(); }
 });
 
 (async function init(){
