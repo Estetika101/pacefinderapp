@@ -31,7 +31,7 @@
   }
   .rail.icons{width:var(--rail-w-icons);flex-basis:var(--rail-w-icons)}
   .rail-top{padding:14px 12px;border-bottom:1px solid var(--border)}
-  .brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:-.01em;font-size:16px;white-space:nowrap;overflow:hidden}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:-.01em;font-size:15px;white-space:nowrap;overflow:hidden}
   .brand .dot{color:var(--accent)}
 
   /* Live indicator — state, top of rail, NOT a nav item */
@@ -49,11 +49,12 @@
 
   .nav{flex:1;padding:8px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
   .nav-item{
-    display:flex;align-items:center;gap:12px;
-    padding:10px 12px;border-radius:8px;color:var(--txt2);
+    display:flex;align-items:center;gap:11px;
+    padding:7px 12px;border-radius:7px;color:var(--txt2);
+    font-size:13px;
     white-space:nowrap;overflow:hidden;position:relative;
   }
-  .nav-item .ico{flex:0 0 20px;text-align:center;font-size:16px;opacity:.9}
+  .nav-item .ico{flex:0 0 18px;text-align:center;font-size:14px;opacity:.9}
   .nav-item .lbl{flex:1}
   .nav-item .badge{
     font-size:11px;color:var(--accent);background:rgba(232,184,75,.12);
@@ -75,10 +76,11 @@
     padding:5px 9px;border-radius:6px;font-size:12px;white-space:nowrap;z-index:50;
   }
   .collapse{
-    margin:6px 12px 12px;background:none;border:1px solid var(--border);
-    color:var(--txt3);border-radius:6px;padding:6px;font-size:12px;
+    margin:10px 12px 0;background:none;border:1px solid var(--border);
+    color:var(--txt3);border-radius:6px;padding:6px;font-size:11px;
   }
   .collapse:hover{color:var(--txt)}
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:88;display:none}
 
   /* ── Content ───────────────────────────────────────────────── */
   .main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -156,12 +158,14 @@
       position:fixed;z-index:90;left:0;top:0;height:100vh;width:var(--rail-w);
       flex-basis:var(--rail-w);transform:translateX(-100%);transition:transform .2s ease;
     }
-    body.m-burger .rail.open{transform:translateX(0)}
+    body.m-burger.nav-open .rail{transform:translateX(0)}
     body.m-burger .burger{
-      display:flex;position:fixed;top:10px;left:10px;z-index:95;
+      display:flex;position:fixed;top:10px;right:10px;z-index:95;
       background:var(--surface);border:1px solid var(--border);color:var(--txt);
       width:40px;height:40px;border-radius:8px;align-items:center;justify-content:center;font-size:18px;
     }
+    body.m-burger.nav-open .burger{display:none}
+    body.m-burger.nav-open .scrim{display:block}
     body.m-burger .main{padding-top:52px}
 
     /* Bottom-bar mode: rail becomes a fixed thumb-reachable bottom strip */
@@ -186,13 +190,15 @@
 </head>
 <body class="m-bottom">
 
-<button class="burger" onclick="document.querySelector('.rail').classList.toggle('open')">☰</button>
+<button class="burger" onclick="openNav()">☰</button>
+<div class="scrim" onclick="closeNav()"></div>
 
 <div class="app">
   <!-- LEFT RAIL -->
   <nav class="rail" id="rail">
     <div class="rail-top">
       <div class="brand"><span class="dot">●</span><span>pacefinder</span></div>
+      <button class="collapse" onclick="document.getElementById('rail').classList.toggle('icons')">⇆ Collapse</button>
     </div>
 
     <!-- Live = state, front & centre, above Home. Not a nav row. -->
@@ -212,7 +218,6 @@
     <div class="rail-bottom">
       <a class="nav-item" data-tip="Settings" onclick="go(this,'settings')"><span class="ico">⚙</span><span class="lbl">Settings</span></a>
     </div>
-    <button class="collapse" onclick="document.getElementById('rail').classList.toggle('icons')">⇆ Collapse</button>
   </nav>
 
   <!-- CONTENT -->
@@ -319,8 +324,11 @@
     };
     C.innerHTML = `<h1>${titles[where]}</h1><div class="sub">${subs[where]}</div>
       <div class="placeholder">${titles[where]} — placeholder. This prototype focuses on the rail, mobile modes, live takeover, and the Sessions filter.</div>`;
+    closeNav(); // tapping a destination closes the mobile drawer
   };
 
+  window.openNav=()=>{ document.body.classList.add('nav-open'); };
+  window.closeNav=()=>{ document.body.classList.remove('nav-open'); };
   window.takeover=(on)=>{ document.getElementById('takeover').classList.toggle('show',on); };
   window.simLive=()=>{
     const l=document.getElementById('live');
