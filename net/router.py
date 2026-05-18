@@ -56,6 +56,7 @@ def make_handler(ctx: dict):
     FM2023_TRACKS          = ctx["FM2023_TRACKS"]
     FORZA_CARS             = ctx["FORZA_CARS"]
     db_sessions_list       = ctx["db_sessions_list"]
+    db_needs_review_count  = ctx["db_needs_review_count"]
     db_games_index         = ctx["db_games_index"]
     db_career_kpis         = ctx["db_career_kpis"]
     db_form_data           = ctx["db_form_data"]
@@ -430,6 +431,10 @@ def make_handler(ctx: dict):
                     _lim = 100
                 result = db_sessions_list(_lim)
                 writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
+
+            elif path == "/sessions/needs-review":
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps({"count": db_needs_review_count()}).encode()))
 
             elif path == "/sessions/games":
                 result = db_games_index()

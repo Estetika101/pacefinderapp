@@ -16,13 +16,26 @@ function carName(s){
 function typeOf(s){ return s.race_type || (s.session_type && s.session_type!=='unknown' ? s.session_type : null); }
 
 let _all = [];
-const F = {car:null, track:null, cond:null, type:null};
+const F = {car:null, track:null, cond:null, type:null, review:false};
 let SORT = 'recent';
+
+// Mirror of db/store.py _NEEDS_REVIEW_SQL — keep the two in sync.
+const _RACEY = ['race','race_ai','race_online','real','ai'];
+function needsReview(s){
+  const t = s.track, c = s.car;
+  if(t==null || t==='unknown' || /^Track #/.test(t)) return true;
+  if(c==null || c==='unknown' || /^Unknown Car/i.test(c)) return true;
+  if(s.race_type==null && (s.session_type==null || s.session_type==='unknown')) return true;
+  const racey = _RACEY.indexOf(s.race_type)>=0 || s.session_type==='race';
+  if(racey && (s.grid_pos==null || s.finish_pos==null)) return true;
+  return false;
+}
 
 function readURL(){
   const q = new URLSearchParams(location.search);
   F.car = q.get('car'); F.track = q.get('track');
   F.cond = q.get('cond'); F.type = q.get('type');
+  F.review = q.get('review') === '1' ? '1' : false;
   SORT = q.get('sort') === 'fastest' ? 'fastest' : 'recent';
 }
 function writeURL(){
@@ -31,16 +44,18 @@ function writeURL(){
   if(F.track) q.set('track', F.track);
   if(F.cond) q.set('cond', F.cond);
   if(F.type) q.set('type', F.type);
+  if(F.review) q.set('review', '1');
   if(SORT === 'fastest') q.set('sort', 'fastest');
   const s = q.toString();
   history.replaceState(null, '', s ? '?' + s : location.pathname);
 }
 
 function match(s){
-  if(F.car   && String(s.car_ordinal) !== String(F.car)) return false;
-  if(F.track && s.track !== F.track) return false;
-  if(F.cond  && s.weather_condition !== F.cond) return false;
-  if(F.type  && typeOf(s) !== F.type) return false;
+  if(F.car    && String(s.car_ordinal) !== String(F.car)) return false;
+  if(F.track  && s.track !== F.track) return false;
+  if(F.cond   && s.weather_condition !== F.cond) return false;
+  if(F.type   && typeOf(s) !== F.type) return false;
+  if(F.review && !needsReview(s)) return false;
   return true;
 }
 
@@ -63,9 +78,14 @@ function render(){
   const conds  = uniq(s=>s.weather_condition, s=>s.weather_condition);
   const types  = uniq(s=>typeOf(s), s=>TYPE_LABELS[typeOf(s)]||typeOf(s));
 
+  const revN = _all.filter(needsReview).length;
+  const revChip = revN ? `<div class="fgrp"><span class="fl">Flag</span>` +
+    `<button class="chip${F.review==='1'?' on':''}" data-g="review" data-v="1">` +
+    `Needs review<span style="opacity:.6"> ${revN}</span></button></div>` : '';
+
   document.getElementById('filters').innerHTML =
     grp('Car', cars, 'car') + grp('Track', tracks, 'track') +
-    grp('Cond', conds, 'cond') + grp('Type', types, 'type');
+    grp('Cond', conds, 'cond') + grp('Type', types, 'type') + revChip;
 
   function grp(label, opts, g){
     if(!opts.length) return '';
