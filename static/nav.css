@@ -1,42 +1,79 @@
-/* Shared top bar — one component, every page (docs/specs/ia.md).
-   Rendered by /static/js/nav.js into <div id="pf-nav"></div>.
-   The status pill IS the Live affordance: quiet when idle, alive and
-   clickable → the dashboard when a session is recording. */
+/* Shared chrome — the left rail (docs/specs/ia.md). Rendered by
+   /static/js/nav.js into <div id="pf-nav"></div>. Fixed rail + a body
+   offset so existing pages don't need DOM restructuring. Mobile (<760)
+   becomes a thumb-reachable bottom bar. */
 
-.pf-nav{
-  display:flex;align-items:center;gap:var(--space-3);
-  height:50px;padding:0 var(--space-4);
-  border-bottom:1px solid var(--color-border);
-  position:sticky;top:0;background:var(--color-bg);z-index:30;
+:root{ --pf-rail-w:220px; --pf-rail-w-ic:60px; --pf-bar-h:58px; }
+
+html.pf-has-rail body{ padding-left:var(--pf-rail-w); transition:padding-left .16s ease; }
+html.pf-has-rail.pf-rail-icons body{ padding-left:var(--pf-rail-w-ic); }
+
+#pf-nav.pf-rail{
+  position:fixed;left:0;top:0;height:100vh;width:var(--pf-rail-w);
+  display:flex;flex-direction:column;
+  background:var(--color-surface);border-right:1px solid var(--color-border);
+  z-index:40;transition:width .16s ease;
 }
-.pf-brand{
-  font-size:var(--text-lg);font-weight:700;letter-spacing:-0.01em;
-  color:var(--color-text-primary);text-decoration:none;
-}
+html.pf-rail-icons #pf-nav.pf-rail{ width:var(--pf-rail-w-ic); }
+
+.pf-top{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 8px}
+.pf-brand{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-decoration:none}
 .pf-brand .pf-dot{color:var(--color-accent)}
-.pf-pill{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:4px 12px;background:var(--color-surface);
-  border:1px solid var(--color-border);border-radius:999px;
-  font-size:11px;color:var(--color-text-secondary);
-  text-transform:uppercase;letter-spacing:0.08em;
-  text-decoration:none;cursor:pointer;
+.pf-collapse{background:none;border:1px solid var(--color-border);color:var(--color-text-tertiary);border-radius:6px;padding:4px 7px;font-size:11px;cursor:pointer;flex:0 0 auto}
+.pf-collapse:hover{color:var(--color-text-primary)}
+
+.pf-live{
+  margin:8px 12px;padding:8px 10px;border-radius:8px;
+  display:flex;align-items:center;gap:9px;text-decoration:none;
+  border:1px solid var(--color-border);background:var(--color-surface-2);
+  color:var(--color-text-tertiary);font-size:11px;text-transform:uppercase;
+  letter-spacing:.08em;white-space:nowrap;overflow:hidden;cursor:pointer;
 }
-.pf-pill:hover{border-color:var(--color-text-secondary);color:var(--color-text-primary)}
-.pf-pill-dot{width:8px;height:8px;border-radius:50%;background:#555}
-.pf-pill.live{border-color:var(--color-red);color:var(--color-red);cursor:pointer}
-.pf-pill.live .pf-pill-dot{
-  background:var(--color-red);box-shadow:0 0 8px var(--color-red);
-  animation:pf-pulse 1.4s ease-in-out infinite;
+.pf-live .pf-ld{width:8px;height:8px;border-radius:50%;background:#555;flex:0 0 8px}
+.pf-live.live{border-color:var(--color-red);color:var(--color-red);background:rgba(239,68,68,.06)}
+.pf-live.live .pf-ld{background:var(--color-red);box-shadow:0 0 8px var(--color-red);animation:pf-pulse 1.3s infinite}
+.pf-live.ended{border-color:var(--color-accent);color:var(--color-accent)}
+.pf-live.ended .pf-ld{background:var(--color-accent)}
+@keyframes pf-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.pf-items{flex:1;display:flex;flex-direction:column;gap:2px;padding:6px 8px;overflow-y:auto}
+.pf-it.pf-end{margin-top:auto}
+.pf-it{
+  display:flex;align-items:center;gap:11px;padding:8px 12px;border-radius:7px;
+  color:var(--color-text-secondary);font-size:13px;text-decoration:none;
+  white-space:nowrap;overflow:hidden;position:relative;
 }
-.pf-pill.ended{border-color:var(--color-accent);color:var(--color-accent);cursor:pointer}
-.pf-pill.ended .pf-pill-dot{background:var(--color-accent)}
-@keyframes pf-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.pf-spacer{flex:1}
-.pf-util{display:inline-flex;gap:var(--space-3)}
-.pf-util a{
-  font-size:var(--text-sm);color:var(--color-text-secondary);
-  padding:6px 10px;border-radius:6px;text-decoration:none;
+.pf-it .pf-ic{flex:0 0 18px;text-align:center;font-size:14px;opacity:.9}
+.pf-it .pf-lb{flex:1}
+.pf-it .pf-bd{font-size:11px;color:var(--color-accent);background:rgba(232,184,75,.12);padding:1px 7px;border-radius:999px}
+.pf-it:hover{background:var(--color-surface-2);color:var(--color-text-primary)}
+.pf-it.cur{background:var(--color-surface-2);color:var(--color-text-primary);box-shadow:inset 2px 0 0 var(--color-accent)}
+
+/* Icon-collapsed: labels/badges hidden, tooltip on hover */
+html.pf-rail-icons .pf-brand span:not(.pf-dot),
+html.pf-rail-icons .pf-lb,
+html.pf-rail-icons .pf-bd,
+html.pf-rail-icons .pf-live span:not(.pf-ld){display:none}
+html.pf-rail-icons .pf-it{justify-content:center;gap:0}
+html.pf-rail-icons .pf-live{justify-content:center}
+html.pf-rail-icons .pf-it[data-tip]:hover::after{
+  content:attr(data-tip);position:absolute;left:calc(100% + 8px);
+  background:#000;border:1px solid var(--color-border);color:var(--color-text-primary);
+  padding:5px 9px;border-radius:6px;font-size:12px;white-space:nowrap;z-index:60;
 }
-.pf-util a:hover{color:var(--color-text-primary);background:var(--color-surface)}
-.pf-util a.cur{color:var(--color-text-primary)}
+
+@media (max-width:760px){
+  html.pf-has-rail body,html.pf-has-rail.pf-rail-icons body{padding-left:0;padding-bottom:var(--pf-bar-h)}
+  #pf-nav.pf-rail,html.pf-rail-icons #pf-nav.pf-rail{
+    width:100%;height:auto;top:auto;bottom:0;left:0;flex-direction:row;
+    border-right:none;border-top:1px solid var(--color-border);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .pf-top,.pf-live{display:none}
+  .pf-items{flex-direction:row;justify-content:space-around;padding:6px 4px;overflow:visible}
+  .pf-it{flex-direction:column;gap:3px;font-size:10px;padding:6px 8px}
+  .pf-it .pf-lb{flex:none}
+  .pf-it .pf-bd{display:none}
+  .pf-it.cur{box-shadow:none;color:var(--color-accent)}
+  .pf-it.pf-end{margin-top:0}
+}

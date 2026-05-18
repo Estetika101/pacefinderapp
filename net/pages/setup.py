@@ -4,7 +4,7 @@ SETUP_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pacefinder · Setup</title>
-<link rel="stylesheet" href="/static/tokens.css"><link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/tokens.css"><link rel="stylesheet" href="/static/base.css"><link rel="stylesheet" href="/static/nav.css">
 <style>
 /* Page-scoped reskin to match the layered-IA visual language. base.css
    is shared with admin/debug so we override here, not there. */
@@ -103,17 +103,8 @@ body{
 </style>
 </head>
 <body>
-<div class="topbar">
-  <h1>Pacefinder</h1>
-  <nav>
-    <a href="/dashboard">Live</a>
-    <a href="/">Home</a>
-    <a href="/sessions">Career</a>
-    <a href="/setup" class="active">Setup</a>
-    <a href="/admin" id="nav-admin" style="display:none">Admin</a>
-  </nav>
-</div>
-<script>if(location.search.includes('debug=true'))document.getElementById('nav-admin').style.display='';</script>
+<div id="pf-nav"></div>
+<script src="/static/js/nav.js"></script>
 
 <!-- ── Point your game here ──────────────────────────────────────── -->
 <div class="section">
