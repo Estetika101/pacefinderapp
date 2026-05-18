@@ -398,6 +398,21 @@ SESSIONS_HTML = """<!DOCTYPE html>
   .seg button.on{background:var(--color-surface-2);color:var(--color-text-primary)}
   .seg button:disabled{opacity:.35;cursor:not-allowed}
   .shint{color:var(--color-text-quaternary);font-size:11px}
+  .sorth{display:flex;gap:0;border:1px solid var(--color-border);border-radius:6px;overflow:hidden}
+  .sorth button{background:var(--color-surface);border:none;border-right:1px solid var(--color-border);
+    color:var(--color-text-secondary);padding:6px 13px;font-size:12px;cursor:pointer;display:flex;gap:5px;align-items:center}
+  .sorth button:last-child{border-right:none}
+  .sorth button.on{background:var(--color-surface-2);color:var(--color-text-primary)}
+  .sorth .ar{font-size:10px;color:var(--color-accent)}
+  .swt{display:inline-flex;align-items:center;gap:9px;cursor:pointer;color:var(--color-text-secondary);font-size:12px;user-select:none}
+  .swt input{position:absolute;opacity:0;width:0;height:0}
+  .swt .tr{width:34px;height:19px;border-radius:999px;background:var(--color-surface-2);
+    border:1px solid var(--color-border);position:relative;transition:background .15s}
+  .swt .tr::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
+    background:var(--color-text-tertiary);transition:transform .15s,background .15s}
+  .swt input:checked + .tr{background:rgba(232,184,75,.25);border-color:var(--color-accent)}
+  .swt input:checked + .tr::after{transform:translateX(15px);background:var(--color-accent)}
+  .swt.on{color:var(--color-text-primary)}
 </style>
 </head>
 <body>
