@@ -3,7 +3,7 @@
 // into the static markup defined in net/pages/cars.py.
 
 const DRIVETRAIN_LABELS = {0: 'FWD', 1: 'RWD', 2: 'AWD'};
-const CLASS_NAMES = {0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+// car class resolved via shared pfCarClass() — see static/js/class.js
 
 function fmtLap(s){if(s == null) return '—'; const m = Math.floor(s/60); return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDate(iso){if(!iso) return '—'; return new Date(iso).toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'});}
@@ -59,9 +59,10 @@ function renderTitle(car){
   } else if(car.name && car.year){
     document.getElementById('canonical').textContent = car.year;
   }
-  if(car.class != null){
+  const _cc = pfCarClass(car.pi, car.class);
+  if(_cc){
     const cl = document.getElementById('car-class');
-    cl.textContent = CLASS_NAMES[car.class] || '';
+    cl.textContent = _cc;
     cl.style.display = '';
   }
   if(car.pi){

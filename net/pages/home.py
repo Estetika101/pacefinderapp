@@ -82,6 +82,7 @@ HOME_HTML_PRE = """<!DOCTYPE html>
 </div>
 
 <script>if(location.search.includes('debug=true'))document.getElementById('link-admin').style.display='';</script>
+<script src="/static/js/class.js"></script>
 <script src="/static/js/home.js"></script>
 </body>
 </html>

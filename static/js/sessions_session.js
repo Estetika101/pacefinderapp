@@ -4,7 +4,7 @@ const TYPE_LABELS={practice:'Practice',time_trial:'Time Trial',qualifying:'Quali
 // Forza drivetrain_type spec: 0=FWD, 1=RWD, 2=AWD
 const DRIVETRAIN_LABELS={0:'FWD',1:'RWD',2:'AWD'};
 // FH5 nine-class scheme. #103 tracks the FM2023 vs FH5 split.
-const CLASS_NAMES={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+// car class resolved via shared pfCarClass() — see static/js/class.js
 
 function fmtLap(s){if(s==null)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtDelta(d){if(d==null)return '—';const sign=d>0?'+':'';return sign+d.toFixed(3);}
@@ -187,9 +187,10 @@ function renderHeader(){
     if(s.car_ordinal!=null){
       document.getElementById('hdr-car-link').href='/cars/'+s.car_ordinal;
     }
-    if(s.car_class!=null){
+    const _cc=pfCarClass(s.car_pi, s.car_class);
+    if(_cc){
       const el=document.getElementById('hdr-car-class');
-      el.textContent=CLASS_NAMES[s.car_class]||'';
+      el.textContent=_cc;
       el.style.display='';
     }
     if(s.car_pi){
