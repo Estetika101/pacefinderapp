@@ -428,18 +428,23 @@ SESSIONS_HTML = """<!DOCTYPE html>
   .fclear-all{background:none;border:1px solid var(--color-border);color:var(--color-text-tertiary);
     padding:7px 15px;border-radius:7px;font-size:14px;cursor:pointer}
   .fclear-all:hover{color:var(--color-text-primary);border-color:var(--color-text-tertiary)}
-  .sortbar{display:flex;gap:8px;align-items:center;margin:var(--space-3) 0;color:var(--color-text-tertiary);font-size:12px}
-  .seg{display:flex;border:1px solid var(--color-border);border-radius:6px;overflow:hidden}
-  .seg button{background:var(--color-surface);border:none;color:var(--color-text-secondary);padding:5px 12px;font-size:12px;cursor:pointer}
-  .seg button.on{background:var(--color-surface-2);color:var(--color-text-primary)}
-  .seg button:disabled{opacity:.35;cursor:not-allowed}
-  .shint{color:var(--color-text-quaternary);font-size:11px}
-  .sorth{display:flex;gap:0;border:1px solid var(--color-border);border-radius:6px;overflow:hidden}
-  .sorth button{background:var(--color-surface);border:none;border-right:1px solid var(--color-border);
-    color:var(--color-text-secondary);padding:6px 13px;font-size:12px;cursor:pointer;display:flex;gap:5px;align-items:center}
-  .sorth button:last-child{border-right:none}
-  .sorth button.on{background:var(--color-surface-2);color:var(--color-text-primary)}
-  .sorth .ar{font-size:10px;color:var(--color-accent)}
+  .stbl-wrap{overflow-x:auto;margin-top:var(--space-3)}
+  .stbl{width:100%;border-collapse:collapse;font-size:14px}
+  .stbl th{position:sticky;top:0;background:var(--color-bg);text-align:left;
+    font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-tertiary);
+    font-weight:600;padding:10px 14px;border-bottom:1px solid var(--color-border);
+    cursor:pointer;white-space:nowrap;user-select:none}
+  .stbl th:hover{color:var(--color-text-primary)}
+  .stbl th.on{color:var(--color-text-primary)}
+  .stbl th .ar{color:var(--color-accent);font-size:10px;margin-left:5px}
+  .stbl th.num,.stbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .stbl td{padding:11px 14px;border-bottom:1px solid var(--color-border-subtle);
+    color:var(--color-text-secondary);white-space:nowrap}
+  .stbl tbody tr{cursor:pointer}
+  .stbl tbody tr:hover td{background:var(--color-surface)}
+  .stbl .c-name{color:var(--color-text-primary);font-weight:500}
+  .stbl .c-sub{color:var(--color-text-quaternary);font-size:12px;margin-top:2px}
+  .stbl .c-empty{padding:26px;text-align:center;color:var(--color-text-quaternary);font-style:italic}
   .swt{display:inline-flex;align-items:center;gap:9px;cursor:pointer;color:var(--color-text-secondary);font-size:14px;user-select:none}
   .swt input{position:absolute;opacity:0;width:0;height:0}
   .swt .tr{width:34px;height:19px;border-radius:999px;background:var(--color-surface-2);
@@ -464,10 +469,12 @@ SESSIONS_HTML = """<!DOCTYPE html>
   </div>
 
   <div class="filters" id="filters"></div>
-  <div class="sortbar" id="sortbar"></div>
 
-  <div class="section" style="padding-top:var(--space-2)">
-    <div class="track-list" id="sess-list"></div>
+  <div class="stbl-wrap">
+    <table class="stbl">
+      <thead id="sess-head"></thead>
+      <tbody id="sess-list"></tbody>
+    </table>
   </div>
 
 </div>

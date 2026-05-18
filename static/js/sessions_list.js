@@ -144,24 +144,26 @@ function render(){
   const conds  = uniq(s=>s.weather_condition, s=>s.weather_condition);
   const types  = uniq(s=>typeOf(s), s=>TYPE_LABELS[typeOf(s)]||typeOf(s));
 
-  document.getElementById('filters').innerHTML =
-    dropdown('Car','car',cars) + dropdown('Circuit','track',tracks,true) +
-    dropdown('Condition','cond',conds) + dropdown('Type','type',types) +
-    (anyFilter() ? `<button class="fclear-all">Clear all</button>` : '');
-
   const revN = _all.filter(needsReview).length;
   const swtOn = F.review === '1';
   const toggle = revN ? `<label class="swt${swtOn?' on':''}">`+
     `<input type="checkbox" id="rev-t"${swtOn?' checked':''}>`+
     `<span class="tr"></span>Needs review (${revN})</label>` : '';
+
+  document.getElementById('filters').innerHTML =
+    dropdown('Car','car',cars) + dropdown('Circuit','track',tracks,true) +
+    dropdown('Condition','cond',conds) + dropdown('Type','type',types) +
+    (anyFilter() ? `<button class="fclear-all">Clear all</button>` : '') +
+    toggle;
+
+  // Sort IS the table header — column order = header order.
   const ar = SORT.dir === 'asc' ? '▲' : '▼';
-  const hbtn = (k,label) =>
-    `<button data-k="${k}" class="${SORT.key===k?'on':''}">${label}`+
-    `${SORT.key===k?`<span class="ar">${ar}</span>`:''}</button>`;
-  document.getElementById('sortbar').innerHTML =
-    toggle + `<span style="flex:1"></span><span>Sort</span>`+
-    `<div class="sorth">` + hbtn('date','Date') + hbtn('track','Circuit') +
-    hbtn('car','Car') + hbtn('lap','Best lap') + `</div>`;
+  const th = (k,label,num) =>
+    `<th data-k="${k}" class="${num?'num ':''}${SORT.key===k?'on':''}">${label}`+
+    `${SORT.key===k?`<span class="ar">${ar}</span>`:''}</th>`;
+  document.getElementById('sess-head').innerHTML =
+    `<tr>${th('track','Circuit')}${th('car','Car')}`+
+    `${th('lap','Best lap',true)}${th('date','Date',true)}</tr>`;
 
   let rows = sortRows(_all.filter(match));
   document.getElementById('sess-sub').textContent =
@@ -170,7 +172,7 @@ function render(){
       : `${rows.length} of ${_all.length} sessions`;
 
   const list = document.getElementById('sess-list');
-  if(!rows.length){ list.innerHTML = '<div class="empty">No sessions match this filter.</div>'; return; }
+  if(!rows.length){ list.innerHTML = '<tr><td colspan="4" class="c-empty">No sessions match this filter.</td></tr>'; return; }
   list.innerHTML = rows.map(s=>{
     const href = '/sessions/session?id='+encodeURIComponent(s.session_id)
       + (s.game?'&game='+encodeURIComponent(s.game):'')
@@ -179,16 +181,14 @@ function render(){
     const badge = cc ? ` <span class="class-badge">${cc}</span>` : '';
     const t = typeOf(s); const tl = t ? (TYPE_LABELS[t]||t) : '';
     const cond = [s.weather_condition, s.tyre_compound].filter(Boolean).join(' · ');
-    const meta = [tl, esc(carName(s))+badge, cond].filter(Boolean).join(' &middot; ');
-    return `<a href="${href}" class="track-row">
-      <div>
-        <div class="track-name">${esc(s.track||'Unknown Circuit')}</div>
-        <div class="track-meta">${meta}</div>
-      </div>
-      <div class="track-pb">${fmtLap(s.best_lap_time_s)}</div>
-      <div class="track-sessions">${fmtD(s.started_at)}<br><span style="opacity:.6">${fmtT(s.started_at)}</span></div>
-      <div class="track-arrow">→</div>
-    </a>`;
+    const sub = [tl, cond].filter(Boolean).join(' &middot; ');
+    return `<tr onclick="location.href='${href}'">`+
+      `<td><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
+      `${sub?`<div class="c-sub">${sub}</div>`:''}</td>`+
+      `<td>${esc(carName(s))}${badge}</td>`+
+      `<td class="num">${fmtLap(s.best_lap_time_s)}</td>`+
+      `<td class="num">${fmtD(s.started_at)} <span style="opacity:.6">${fmtT(s.started_at)}</span></td>`+
+      `</tr>`;
   }).join('');
 }
 
@@ -203,7 +203,7 @@ document.addEventListener('click', e=>{
     FACETS.forEach(g=>F[g]=[]); F.review=false; _openF=null; writeURL(); render(); return; }
   const fd = e.target.closest('.fdrop-btn');
   if(fd){ _openF = (_openF===fd.dataset.fd) ? null : fd.dataset.fd; render(); return; }
-  const h = e.target.closest('.sorth button');
+  const h = e.target.closest('.stbl th[data-k]');
   if(h){ const k=h.dataset.k;
     if(SORT.key===k) SORT.dir = SORT.dir==='asc' ? 'desc' : 'asc';
     else { SORT.key=k; SORT.dir=defaultDir(k); }
