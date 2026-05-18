@@ -59,14 +59,41 @@
 
   var live = document.getElementById('pf-live');
   var lt   = document.getElementById('pf-live-t');
+
+  // Dramatic live takeover — auto on session start. Bold (per the IA
+  // call) with one quiet, non-blocking escape. Shown once per race;
+  // never on the dashboard itself (you're already in the live view).
+  var onDash = (p.indexOf('/dashboard') === 0);
+  var to = document.createElement('div');
+  to.className = 'pf-to';
+  to.innerHTML =
+    '<div class="pf-to-card">' +
+      '<div class="pf-to-eyebrow"><span class="pf-ld"></span>Telemetry live</div>' +
+      '<div class="pf-to-title">You’re in a race.</div>' +
+      '<div class="pf-to-sub">Recording every lap.</div>' +
+      '<div class="pf-to-actions">' +
+        '<a class="pf-to-go" href="/dashboard">Open live dashboard</a>' +
+        '<button class="pf-to-back" id="pf-to-back">‹ back to analysis</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(to);
+  var shown = false;            // already taken over for this race
+  document.getElementById('pf-to-back').addEventListener('click', function(){
+    to.classList.remove('show');
+  });
+
   function paint(s){
     var st = s && s.status;
-    if(st === 'racing' || st === 'paused'){
+    var hot = (st === 'racing' || st === 'paused');
+    if(hot){
       live.className = 'pf-live live'; lt.textContent = 'Recording · view live';
+      if(!shown && !onDash){ shown = true; to.classList.add('show'); }
     } else if(st === 'race_ended'){
       live.className = 'pf-live ended'; lt.textContent = 'Race ended';
+      to.classList.remove('show');
     } else {
       live.className = 'pf-live'; lt.textContent = 'Idle · no session';
+      to.classList.remove('show'); shown = false; // re-arm for next race
     }
   }
   async function poll(){
