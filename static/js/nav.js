@@ -1,60 +1,77 @@
-// Shared top bar — one component, every page (docs/specs/ia.md).
-// Renders into <div id="pf-nav"></div>: brand → Home, the live status
-// pill (the entire Live story), and Setup. Polls /status so the pill is
-// live on every page. No standalone "Live dashboard" link — the pill is
-// the affordance: quiet when idle, alive + clickable when recording.
+// Shared chrome — the left rail (docs/specs/ia.md). Renders into
+// <div id="pf-nav"></div>: Live state indicator (top), Home / Sessions
+// / Tracks / Cars, Settings at the bottom. Fixed rail + a body offset
+// (via html.pf-has-rail) so pages need no DOM changes. Collapsible to
+// icons (persisted). Mobile (<760) is a bottom bar — CSS-driven, same
+// DOM. The live indicator polls /status and links to the dashboard;
+// the dramatic takeover is a separate layer.
 (function(){
   var root = document.getElementById('pf-nav');
   if(!root) return;
 
-  // Embedded (telemetry iframe inside session detail) → the parent page
-  // already shows the bar; suppress this one to avoid a double header.
+  // Embedded telemetry (iframe in session detail): parent shows chrome.
   if(new URLSearchParams(location.search).get('embed') === '1'){
     root.style.display = 'none';
     return;
   }
 
-  var path = location.pathname;
-  var setupCur = (path === '/setup') ? ' class="cur"' : '';
-  root.className = 'pf-nav';
-  root.innerHTML =
-    '<a href="/" class="pf-brand">pacefinder<span class="pf-dot">.</span></a>' +
-    '<a class="pf-pill" id="pf-pill">' +
-      '<span class="pf-pill-dot"></span>' +
-      '<span id="pf-pill-text">Loading…</span>' +
-    '</a>' +
-    '<span class="pf-spacer"></span>' +
-    '<span class="pf-util">' +
-      '<a href="/setup"' + setupCur + '>Setup</a>' +
-    '</span>';
+  var doc = document.documentElement;
+  doc.classList.add('pf-has-rail');
+  if(localStorage.getItem('pf-rail-icons') === '1') doc.classList.add('pf-rail-icons');
 
-  var pill = document.getElementById('pf-pill');
-  var txt  = document.getElementById('pf-pill-text');
-
-  // The pill is ALWAYS a link to the live dashboard — you can open it
-  // before a session to check the dash. Only the state styling/text
-  // changes.
-  pill.href = '/dashboard';
-
-  function paint(s){
-    var status = s && s.status;
-    if(status === 'racing' || status === 'paused'){
-      pill.className = 'pf-pill live';
-      txt.textContent = 'Recording · view live';
-    } else if(status === 'race_ended'){
-      pill.className = 'pf-pill ended';
-      txt.textContent = 'Race ended';
-    } else {
-      pill.className = 'pf-pill';
-      txt.textContent = 'Idle · open live dashboard';
-    }
+  var p = location.pathname;
+  function section(){
+    if(p === '/' ) return 'home';
+    if(p.indexOf('/sessions/track') === 0 || p.indexOf('/circuits') === 0) return 'tracks';
+    if(p.indexOf('/cars') === 0) return 'cars';
+    if(p.indexOf('/sessions') === 0) return 'sessions';
+    if(p.indexOf('/setup') === 0) return 'settings';
+    return '';
+  }
+  var cur = section();
+  function item(id, href, ico, label, end){
+    return '<a class="pf-it' + (end?' pf-end':'') + (cur===id?' cur':'') +
+      '" href="' + href + '" data-tip="' + label + '">' +
+      '<span class="pf-ic">' + ico + '</span><span class="pf-lb">' + label + '</span></a>';
   }
 
+  root.className = 'pf-rail';
+  root.innerHTML =
+    '<div class="pf-top">' +
+      '<a href="/" class="pf-brand">pacefinder<span class="pf-dot">.</span></a>' +
+      '<button class="pf-collapse" id="pf-collapse" title="Collapse">⇆</button>' +
+    '</div>' +
+    '<a class="pf-live" id="pf-live" href="/dashboard">' +
+      '<span class="pf-ld"></span><span id="pf-live-t">Loading…</span>' +
+    '</a>' +
+    '<div class="pf-items">' +
+      item('home','/','⌂','Home') +
+      item('sessions','/sessions','≣','Sessions') +
+      item('tracks','/circuits','⌖','Tracks') +
+      item('cars','/cars','⚙','Cars') +
+      item('settings','/setup','⚙','Settings', true) +
+    '</div>';
+
+  document.getElementById('pf-collapse').addEventListener('click', function(){
+    var on = doc.classList.toggle('pf-rail-icons');
+    localStorage.setItem('pf-rail-icons', on ? '1' : '0');
+  });
+
+  var live = document.getElementById('pf-live');
+  var lt   = document.getElementById('pf-live-t');
+  function paint(s){
+    var st = s && s.status;
+    if(st === 'racing' || st === 'paused'){
+      live.className = 'pf-live live'; lt.textContent = 'Recording · view live';
+    } else if(st === 'race_ended'){
+      live.className = 'pf-live ended'; lt.textContent = 'Race ended';
+    } else {
+      live.className = 'pf-live'; lt.textContent = 'Idle · no session';
+    }
+  }
   async function poll(){
-    try{
-      var s = await fetch('/status').then(function(r){ return r.json(); });
-      paint(s);
-    }catch(e){ /* keep last state on a transient failure */ }
+    try{ paint(await fetch('/status').then(function(r){return r.json();})); }
+    catch(e){}
   }
   poll();
   setInterval(poll, 10000);
