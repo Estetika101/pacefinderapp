@@ -30,9 +30,12 @@
   }
   var cur = section();
   function item(id, href, ico, label, end){
+    var badge = (id === 'sessions')
+      ? '<span class="pf-bd" id="pf-rev" style="display:none"></span>' : '';
     return '<a class="pf-it' + (end?' pf-end':'') + (cur===id?' cur':'') +
-      '" href="' + href + '" data-tip="' + label + '">' +
-      '<span class="pf-ic">' + ico + '</span><span class="pf-lb">' + label + '</span></a>';
+      '" id="pf-i-' + id + '" href="' + href + '" data-tip="' + label + '">' +
+      '<span class="pf-ic">' + ico + '</span><span class="pf-lb">' + label +
+      '</span>' + badge + '</a>';
   }
 
   root.className = 'pf-rail';
@@ -56,6 +59,20 @@
     var on = doc.classList.toggle('pf-rail-icons');
     localStorage.setItem('pf-rail-icons', on ? '1' : '0');
   });
+
+  // Needs-review badge on Sessions — actionable count, not a total.
+  // When there's a backlog the Sessions item drops you straight into
+  // the review filter.
+  (async function(){
+    try{
+      var n = (await fetch('/sessions/needs-review').then(function(r){return r.json();})).count || 0;
+      if(n > 0){
+        var b = document.getElementById('pf-rev');
+        b.textContent = n + ' to review'; b.style.display = '';
+        document.getElementById('pf-i-sessions').setAttribute('href', '/sessions?review=1');
+      }
+    }catch(e){}
+  })();
 
   var live = document.getElementById('pf-live');
   var lt   = document.getElementById('pf-live-t');

@@ -617,6 +617,31 @@ def compute_lap_aggregates(samples: list) -> dict:
 
 # ─── Session Queries ──────────────────────────────────────────────────────────
 
+_NEEDS_REVIEW_SQL = """
+  track IS NULL OR track='unknown' OR track LIKE 'Track #%'
+  OR car IS NULL OR car='unknown' OR car LIKE 'Unknown Car%'
+  OR (race_type IS NULL AND (session_type IS NULL OR session_type='unknown'))
+  OR ((race_type IN ('race','race_ai','race_online','real','ai')
+       OR session_type='race')
+      AND (grid_pos IS NULL OR finish_pos IS NULL))
+"""
+
+
+def _db_needs_review_count() -> int:
+    """Count sessions where the user's input would materially improve the
+    data: unresolved track, unmapped car, unknown type, or a race missing
+    grid→finish. Predicate mirrored client-side in sessions_list.js —
+    keep the two in sync. See docs/specs/ia.md."""
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            return conn.execute(
+                "SELECT COUNT(*) FROM sessions WHERE" + _NEEDS_REVIEW_SQL
+            ).fetchone()[0]
+        finally:
+            conn.close()
+
+
 def _db_sessions_list(limit: int = 100) -> list:
     """Return sessions newest-first — summary stats only, no sample data."""
     with _db_lock:
