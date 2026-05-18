@@ -514,3 +514,60 @@ SESSION_DETAIL_HTML_POST = """;</script>
 </body>
 </html>
 """
+
+
+# Sessions — the core content surface: a filter mechanism over every
+# recorded session. H1 stays "Sessions"; filtering narrows all → slice.
+# See docs/specs/ia.md.
+SESSIONS_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Pacefinder &middot; Sessions</title>
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/sessions_car.css">
+<link rel="stylesheet" href="/static/nav.css">
+<style>
+  .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:var(--space-3) 0}
+  .fgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .fgrp .fl{font-size:11px;color:var(--color-text-quaternary);text-transform:uppercase;letter-spacing:.08em;margin-right:2px}
+  .chip{border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text-secondary);
+    padding:5px 12px;border-radius:999px;font-size:12px;cursor:pointer}
+  .chip:hover{border-color:var(--color-text-tertiary);color:var(--color-text-primary)}
+  .chip.on{background:var(--color-accent);border-color:var(--color-accent);color:#000;font-weight:600}
+  .sortbar{display:flex;gap:8px;align-items:center;margin:var(--space-3) 0;color:var(--color-text-tertiary);font-size:12px}
+  .seg{display:flex;border:1px solid var(--color-border);border-radius:6px;overflow:hidden}
+  .seg button{background:var(--color-surface);border:none;color:var(--color-text-secondary);padding:5px 12px;font-size:12px;cursor:pointer}
+  .seg button.on{background:var(--color-surface-2);color:var(--color-text-primary)}
+  .seg button:disabled{opacity:.35;cursor:not-allowed}
+  .shint{color:var(--color-text-quaternary);font-size:11px}
+</style>
+</head>
+<body>
+<div id="pf-nav"></div>
+<script src="/static/js/nav.js"></script>
+<div class="page">
+
+  <div class="breadcrumb"><a href="/">Home</a> &rsaquo; <span>Sessions</span></div>
+
+  <div class="titlewrap">
+    <h1 class="nickname">Sessions</h1>
+    <span class="canonical" id="sess-sub">Loading&hellip;</span>
+  </div>
+
+  <div class="filters" id="filters"></div>
+  <div class="sortbar" id="sortbar"></div>
+
+  <div class="section" style="padding-top:var(--space-2)">
+    <div class="track-list" id="sess-list"></div>
+  </div>
+
+</div>
+
+<script src="/static/js/class.js"></script>
+<script src="/static/js/sessions_list.js"></script>
+</body>
+</html>
+"""

@@ -623,8 +623,10 @@ def _db_sessions_list(limit: int = 100) -> list:
         conn = _db_connect()
         try:
             rows = conn.execute(
-                "SELECT session_id,game,track,car,session_type,race_type,"
-                "started_at,ended_at,packet_count,best_lap_time_s,lap_count "
+                "SELECT session_id,game,track,car,car_ordinal,car_class,car_pi,"
+                "session_type,race_type,started_at,ended_at,packet_count,"
+                "best_lap_time_s,lap_count,finish_pos,grid_pos,"
+                "weather_condition,tyre_compound,track_temp_c "
                 "FROM sessions ORDER BY started_at DESC LIMIT ?", (limit,)
             ).fetchall()
             return [dict(r) for r in rows]

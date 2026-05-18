@@ -41,6 +41,7 @@ def make_handler(ctx: dict):
     CAR_DETAIL_HTML        = ctx["CAR_DETAIL_HTML"]
     CAR_INDEX_HTML         = ctx["CAR_INDEX_HTML"]
     CIRCUIT_INDEX_HTML     = ctx["CIRCUIT_INDEX_HTML"]
+    SESSIONS_HTML          = ctx["SESSIONS_HTML"]
     SESSION_EVENTS_HTML    = ctx["SESSION_EVENTS_HTML"]
     HOME_HTML              = ctx["HOME_HTML"]
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
@@ -385,9 +386,9 @@ def make_handler(ctx: dict):
                     writer.write(_http_response("400 Bad Request", "text/plain", b"bad json"))
 
             elif path in ("/sessions", "/sessions/"):
-                # Career stats now live on the Home page (compact strip).
-                # Keep the URL alive for old bookmarks → redirect to /.
-                writer.write(_http_response("301 Moved Permanently", "text/plain", b"", "Location: /\r\n"))
+                # Sessions is the core content surface — a filter mechanism
+                # over every recorded session. See docs/specs/ia.md.
+                writer.write(_http_response("200 OK", "text/html", SESSIONS_HTML.encode()))
 
             elif path == "/sessions/game":
                 qs = {k: urllib.parse.unquote_plus(v)
@@ -420,7 +421,14 @@ def make_handler(ctx: dict):
                 writer.write(_http_response("200 OK", "text/html", TELEMETRY_HTML.encode()))
 
             elif path == "/sessions/data":
-                result = db_sessions_list(100)
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                try:
+                    _lim = min(max(int(qs.get("limit", "100") or "100"), 1), 2000)
+                except ValueError:
+                    _lim = 100
+                result = db_sessions_list(_lim)
                 writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
 
             elif path == "/sessions/games":
