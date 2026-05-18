@@ -386,12 +386,42 @@ SESSIONS_HTML = """<!DOCTYPE html>
 <link rel="stylesheet" href="/static/nav.css">
 <style>
   .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:var(--space-3) 0}
-  .fgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-  .fgrp .fl{font-size:11px;color:var(--color-text-quaternary);text-transform:uppercase;letter-spacing:.08em;margin-right:2px}
-  .chip{border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text-secondary);
-    padding:5px 12px;border-radius:999px;font-size:12px;cursor:pointer}
-  .chip:hover{border-color:var(--color-text-tertiary);color:var(--color-text-primary)}
-  .chip.on{background:var(--color-accent);border-color:var(--color-accent);color:#000;font-weight:600}
+  .fdrop{position:relative}
+  .fdrop-btn{display:flex;align-items:center;gap:7px;border:1px solid var(--color-border);
+    background:var(--color-surface);color:var(--color-text-secondary);padding:6px 13px;
+    border-radius:7px;font-size:12px;cursor:pointer}
+  .fdrop-btn:hover{border-color:var(--color-text-tertiary);color:var(--color-text-primary)}
+  .fdrop-btn.on{border-color:var(--color-accent);color:var(--color-text-primary)}
+  .fdrop-btn .fct{background:var(--color-accent);color:#000;font-weight:700;border-radius:999px;
+    padding:0 7px;font-size:11px}
+  .fdrop-btn .fcar{color:var(--color-text-quaternary);font-size:10px}
+  .fdrop-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:50;
+    min-width:240px;background:var(--color-surface);border:1px solid var(--color-border);
+    border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+  .fdrop.open .fdrop-panel{display:block}
+  .fdrop-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
+    border-bottom:1px solid var(--color-border);font-size:11px;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--color-text-quaternary)}
+  .fclear{background:none;border:none;color:var(--color-accent);font:inherit;font-size:11px;cursor:pointer}
+  .fclear:disabled{color:var(--color-text-quaternary);cursor:default}
+  .fdrop-list{max-height:340px;overflow-y:auto;padding:6px}
+  .fempty{padding:10px 12px;color:var(--color-text-quaternary);font-size:12px}
+  .fopt{display:flex;align-items:center;gap:9px;width:100%;background:none;border:none;
+    color:var(--color-text-secondary);font:inherit;font-size:13px;text-align:left;
+    padding:7px 9px;border-radius:6px;cursor:pointer}
+  .fopt:hover{background:var(--color-surface-2);color:var(--color-text-primary)}
+  .fopt.on{color:var(--color-text-primary)}
+  .fopt .fck{flex:0 0 14px;color:var(--color-accent);font-size:12px}
+  .fopt .fnm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fopt .fn{color:var(--color-text-quaternary);font-size:11px}
+  .fopt.rich{display:grid;grid-template-columns:14px 1fr auto auto auto auto;gap:9px;align-items:center}
+  .fopt .fbest{font-variant-numeric:tabular-nums;color:var(--color-text-secondary);font-size:12px}
+  .fopt .fsp{display:block}
+  .ftr{font-size:11px}
+  .ftr.up{color:#22c55e}.ftr.dn{color:#ef4444}.ftr.fl{color:var(--color-text-quaternary)}
+  .fclear-all{background:none;border:1px solid var(--color-border);color:var(--color-text-tertiary);
+    padding:6px 13px;border-radius:7px;font-size:12px;cursor:pointer}
+  .fclear-all:hover{color:var(--color-text-primary);border-color:var(--color-text-tertiary)}
   .sortbar{display:flex;gap:8px;align-items:center;margin:var(--space-3) 0;color:var(--color-text-tertiary);font-size:12px}
   .seg{display:flex;border:1px solid var(--color-border);border-radius:6px;overflow:hidden}
   .seg button{background:var(--color-surface);border:none;color:var(--color-text-secondary);padding:5px 12px;font-size:12px;cursor:pointer}
