@@ -399,6 +399,8 @@ SESSIONS_HTML = """<!DOCTYPE html>
     min-width:240px;background:var(--color-surface);border:1px solid var(--color-border);
     border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
   .fdrop.open .fdrop-panel{display:block}
+  .fdrop.rich .fdrop-panel{min-width:430px}
+  .fopt.rich .fnm{min-width:150px}
   .fdrop-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
     border-bottom:1px solid var(--color-border);font-size:11px;text-transform:uppercase;
     letter-spacing:.08em;color:var(--color-text-quaternary)}
