@@ -905,3 +905,21 @@ async function init(){
   if(window.Perf){Perf.measure('render:initial', 'render:start');Perf.measure('init:total','init:start');}
 }
 init();
+
+// Mistakes & opportunities — modal-only (docs/specs/mistakes-modal.md).
+// Embeds the events view; the standalone page 301s here when hit
+// directly. Opened from the subnav or via ?events=1 (Overview teaser).
+(function(){
+  if(_isEmbed) return; // telemetry itself is embedded — no nested modal
+  var ovl=$('mo-ovl'), f=$('mo-if'), btn=$('link-mistakes'), x=$('mo-x');
+  if(!ovl) return;
+  function open(){
+    if(f.dataset.l!=='1'){ f.src='/sessions/session/events?id='+encodeURIComponent(_id)+'&embed=1'; f.dataset.l='1'; }
+    ovl.classList.add('open');
+  }
+  function close(){ ovl.classList.remove('open'); }
+  if(btn) btn.addEventListener('click', open);
+  if(x) x.addEventListener('click', close);
+  ovl.addEventListener('click', function(e){ if(e.target===ovl) close(); });
+  if(new URLSearchParams(location.search).get('events')==='1') open();
+})();

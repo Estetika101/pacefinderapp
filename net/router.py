@@ -416,7 +416,18 @@ def make_handler(ctx: dict):
                 writer.write(_http_response("200 OK", "text/html", SESSION_DETAIL_HTML.encode()))
 
             elif path == "/sessions/session/events":
-                writer.write(_http_response("200 OK", "text/html", SESSION_EVENTS_HTML.encode()))
+                # Modal-only (docs/specs/mistakes-modal.md): served only as
+                # the telemetry modal's embed; a direct hit 301s to the
+                # telemetry page with the modal open.
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                if qs.get("embed") == "1":
+                    writer.write(_http_response("200 OK", "text/html", SESSION_EVENTS_HTML.encode()))
+                else:
+                    loc = "/sessions/telemetry?id=" + urllib.parse.quote(qs.get("id", "")) + "&events=1"
+                    writer.write(_http_response("301 Moved Permanently", "text/plain", b"",
+                                                "Location: " + loc + "\r\n"))
 
             elif path == "/sessions/telemetry":
                 writer.write(_http_response("200 OK", "text/html", TELEMETRY_HTML.encode()))

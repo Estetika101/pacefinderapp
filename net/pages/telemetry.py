@@ -111,6 +111,12 @@ html.embed .track-map-wrap{top:0}
 .ctrl-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:4px;padding-left:2px}
 .cs-ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:300;align-items:center;justify-content:center}
 .cs-ovl.open{display:flex}
+.mo-ovl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:310;align-items:center;justify-content:center;padding:24px}
+.mo-ovl.open{display:flex}
+.mo-card{position:relative;width:min(1000px,96vw);height:min(86vh,820px);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden}
+.mo-if{width:100%;height:100%;border:0;background:var(--color-bg)}
+.mo-x{position:absolute;top:8px;right:10px;z-index:2;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-primary);border-radius:6px;font-size:18px;line-height:1;padding:4px 10px;cursor:pointer}
+.mo-x:hover{border-color:var(--color-text-secondary)}
 .cs-panel{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:18px 20px;min-width:360px;max-width:640px;max-height:80vh;overflow:auto}
 .cs-ttl{font-size:var(--text-md);color:var(--color-text-primary);margin-bottom:14px;font-weight:600}
 .cs-sess{padding:10px 12px;border:1px solid var(--color-border-subtle);border-radius:var(--radius-sm);margin-bottom:6px;cursor:pointer;background:var(--color-bg)}
@@ -153,6 +159,13 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
 <div class="subnav" id="tele-subnav">
   <a class="subnav-item" id="link-overview" href="#">Overview</a>
   <span class="subnav-item active">Full telemetry</span>
+  <button class="subnav-item" id="link-mistakes" style="background:none;border:none;cursor:pointer;font:inherit">Mistakes &amp; opportunities</button>
+</div>
+<div class="mo-ovl" id="mo-ovl">
+  <div class="mo-card">
+    <button class="mo-x" id="mo-x" aria-label="Close">&times;</button>
+    <iframe class="mo-if" id="mo-if" title="Mistakes &amp; opportunities"></iframe>
+  </div>
 </div>
 <div class="tele-layout">
 <div class="ctrl-col" id="ctrl-col">
