@@ -14,6 +14,8 @@ SESSION_EVENTS_HTML = """<!DOCTYPE html>
 <link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/base.css">
 <link rel="stylesheet" href="/static/sessions_events.css">
+<style>html.embed .tb,html.embed #crumb{display:none}html.embed .page{padding-top:var(--space-3)}</style>
+<script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('embed');</script>
 </head>
 <body>
 <div class="tb">

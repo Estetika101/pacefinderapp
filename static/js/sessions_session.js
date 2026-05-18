@@ -421,7 +421,10 @@ function renderCards(){
       return `<div style="margin-bottom:6px"><span class="card-corner">${label}</span><span style="color:var(--color-text-quaternary);font-size:11px">${meta}</span></div>`;
     }).join('');
     document.getElementById('card-loss-link').href =
-      '/sessions/session/events?id=' + encodeURIComponent(_id);
+      '/sessions/telemetry?id=' + encodeURIComponent(_id)
+      + (_sgame ? '&game=' + encodeURIComponent(_sgame) : '')
+      + (_strack ? '&track=' + encodeURIComponent(_strack) : '')
+      + '&events=1';
     document.getElementById('card-loss-link').textContent = 'View all ' + _events.length + ' events →';
     document.getElementById('card-loss-link').style.display = '';
   } else {
