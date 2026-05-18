@@ -34,8 +34,6 @@ def make_handler(ctx: dict):
     DASHBOARD_HTML         = ctx["DASHBOARD_HTML"]
     SETUP_HTML             = ctx["SETUP_HTML"]
     ADMIN_HTML             = ctx["ADMIN_HTML"]
-    GAMES_HTML             = ctx["GAMES_HTML"]
-    TRACKS_HTML            = ctx["TRACKS_HTML"]
     TRACK_DETAIL_HTML      = ctx["TRACK_DETAIL_HTML"]
     SESSION_DETAIL_HTML    = ctx["SESSION_DETAIL_HTML"]
     CAR_DETAIL_HTML        = ctx["CAR_DETAIL_HTML"]

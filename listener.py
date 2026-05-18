@@ -23,7 +23,7 @@ from net.pages.dashboard import DASHBOARD_HTML
 from net.pages.setup import SETUP_HTML
 from net.pages.admin import ADMIN_HTML
 from net.pages.sessions import (
-    GAMES_HTML, TRACKS_HTML, SESSIONS_HTML,
+    SESSIONS_HTML,
     TRACK_DETAIL_HTML_PRE, TRACK_DETAIL_HTML_POST,
     SESSION_DETAIL_HTML_PRE, SESSION_DETAIL_HTML_MID, SESSION_DETAIL_HTML_POST,
 )
@@ -403,8 +403,6 @@ async def main(demo_mode: bool = False):
         "DASHBOARD_HTML": DASHBOARD_HTML,
         "SETUP_HTML": SETUP_HTML,
         "ADMIN_HTML": ADMIN_HTML,
-        "GAMES_HTML": GAMES_HTML,
-        "TRACKS_HTML": TRACKS_HTML,
         "SESSIONS_HTML": SESSIONS_HTML,
         "TRACK_DETAIL_HTML": TRACK_DETAIL_HTML,
         "SESSION_DETAIL_HTML": SESSION_DETAIL_HTML,
