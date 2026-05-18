@@ -130,7 +130,7 @@ function dropdown(label, g, opts, rich){
       `<span class="fnm">${esc(o.label)}</span>`+
       `<span class="fn">${o.n}</span>${extra}</button>`;
   }).join('');
-  return `<div class="fdrop${_openF===g?' open':''}">${head}`+
+  return `<div class="fdrop${rich?' rich':''}${_openF===g?' open':''}">${head}`+
     `<div class="fdrop-panel">`+
       `<div class="fdrop-top"><span>${label}</span>`+
       `<button class="fclear" data-fc="${g}"${sel.length?'':' disabled'}>Clear</button></div>`+
