@@ -68,10 +68,8 @@ es.onmessage=e=>{
   gEl.textContent=d.game?gameLabels[d.game]||d.game.replace(/_/g,' ').toUpperCase():'—';
   gEl.className='tb-game game-'+(d.game?gameClsMap[d.game]||'none':'none');
   $('tb-track').textContent=d.track&&d.track!=='unknown'?d.track:'—';
-  // Car name + class badge + PI. Class indices follow the FH5 scheme today
-  // (D/C/B/A/S1/S2/X/R/P) — FM2023 only has 7 classes so an FM session may
-  // mislabel S as S1. See issue: FM/FH split.
-  const TB_CC={0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+  // Car name + class badge + PI. Class derived from PI via shared
+  // pfCarClass() (FM2023 ranges) — see static/js/class.js.
   const carName=d.car&&d.car!=='unknown'?d.car:null;
   const hasCar=!!(carName||d.car_class!=null||d.car_pi!=null);
   $('tb-car-sep').style.display=hasCar?'inline':'none';
@@ -79,10 +77,10 @@ es.onmessage=e=>{
   carEl.style.display=carName?'inline':'none';
   carEl.textContent=carName||'';
   const ccEl=$('tb-cc');
-  if(d.car_class!=null && TB_CC[d.car_class]){
-    const n=TB_CC[d.car_class];
-    ccEl.textContent=n;
-    ccEl.className='cc tb-cc cc-'+n;
+  const _cc=pfCarClass(d.car_pi, d.car_class);
+  if(_cc){
+    ccEl.textContent=_cc;
+    ccEl.className='cc tb-cc cc-'+_cc;
     ccEl.style.display='inline';
   } else { ccEl.style.display='none'; }
   const piEl=$('tb-pi');

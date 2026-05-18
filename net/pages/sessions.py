@@ -237,6 +237,7 @@ const FORZA_TRACK_NAMES=
 TRACK_DETAIL_HTML_POST = """;</script>
 <script src="/static/js/perf.js"></script>
 <script>Perf.autoReport('/sessions/track');</script>
+<script src="/static/js/class.js"></script>
 <script src="/static/js/sessions_track.js"></script>
 <div id="sp-tip"></div>
 </body>
@@ -508,6 +509,7 @@ const CAR_CATALOG=
 
 SESSION_DETAIL_HTML_POST = """;</script>
 <script src="/static/js/widgets/autocomplete.js"></script>
+<script src="/static/js/class.js"></script>
 <script src="/static/js/sessions_session.js"></script>
 </body>
 </html>

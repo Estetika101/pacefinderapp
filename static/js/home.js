@@ -3,7 +3,7 @@
 // the recording indicator flips green→red when telemetry starts (the
 // driver can then click "Live dashboard" knowing it has a session).
 
-const CLASS_NAMES = {0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+// car class resolved via shared pfCarClass() — see static/js/class.js
 
 function fmtLap(s){if(s == null) return '—'; const m = Math.floor(s/60); return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtShortDate(iso){if(!iso) return '—'; return new Date(iso).toLocaleDateString([], {month:'short', day:'numeric'});}
@@ -91,7 +91,8 @@ function renderTopCars(cars){
   el.innerHTML = cars.map(c => {
     const href = '/cars/' + c.ordinal;
     const name = c.nickname || c.name || ('Car #' + c.ordinal);
-    const cls = c.class != null ? `<span class="class-badge" style="margin-left:6px">${CLASS_NAMES[c.class] || ''}</span>` : '';
+    const _cc = pfCarClass(c.car_pi, c.class);
+    const cls = _cc ? `<span class="class-badge" style="margin-left:6px">${_cc}</span>` : '';
     return `<a href="${href}" class="panel-row">
       <div>
         <div class="panel-name">${escapeHtml(name)} ${cls}</div>
@@ -116,7 +117,8 @@ function renderRecent(recents){
     const date = fmtShortDate(s.started_at);
     const time = fmtTime(s.started_at);
     const carName = carDisplay(s);
-    const cls = s.car_class != null ? `<span class="class-badge">${CLASS_NAMES[s.car_class] || ''}</span>` : '';
+    const _cc = pfCarClass(s.car_pi, s.car_class);
+    const cls = _cc ? `<span class="class-badge">${_cc}</span>` : '';
     const condBits = [];
     if(s.weather_condition) condBits.push(s.weather_condition);
     if(s.tyre_compound) condBits.push(s.tyre_compound);

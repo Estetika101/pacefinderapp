@@ -2,7 +2,7 @@
 // Lists every car the user has driven, sorted by session count desc.
 
 const DRIVETRAIN_LABELS = {0: 'FWD', 1: 'RWD', 2: 'AWD'};
-const CLASS_NAMES = {0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+// car class resolved via shared pfCarClass() — see static/js/class.js
 
 function fmtLap(s){if(s == null) return '—'; const m = Math.floor(s/60); return m+':'+(s%60).toFixed(3).padStart(6,'0');}
 function fmtRelative(iso){
@@ -46,7 +46,7 @@ function render(cars){
     const canonical = car.nickname && car.name
       ? (car.year ? car.year + ' ' : '') + car.name
       : '';
-    const cls = car.class != null ? CLASS_NAMES[car.class] : '';
+    const cls = pfCarClass(car.pi, car.class);
     const pi = car.pi || '';
     const dt = car.drivetrain_type != null ? DRIVETRAIN_LABELS[car.drivetrain_type] : '';
 

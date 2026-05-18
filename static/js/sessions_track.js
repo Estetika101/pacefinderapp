@@ -3,7 +3,7 @@
 // enriched /sessions/track/data payload: { sessions, personal_best,
 // progress, theoretical }.
 
-const CLASS_NAMES = {0:'D',1:'C',2:'B',3:'A',4:'S1',5:'S2',6:'X',7:'R',8:'P'};
+// car class resolved via shared pfCarClass() — see static/js/class.js
 const GAME_LABELS = {'forza_motorsport':'Forza','acc':'ACC','f1':'F1'};
 
 function fmtLap(s){if(s==null)return '—';const m=Math.floor(s/60);return m+':'+(s%60).toFixed(3).padStart(6,'0');}
@@ -231,7 +231,8 @@ function renderSessions(){
     const isBest = s.session_id === bestId;
     const href = '/sessions/session?id=' + encodeURIComponent(s.session_id) +
                  (s.game ? '&game=' + encodeURIComponent(s.game) : '');
-    const cls = s.car_class != null ? `<span class="cc cc-${CLASS_NAMES[s.car_class]||'?'}">${CLASS_NAMES[s.car_class]||'?'}</span>` : '';
+    const _cc = pfCarClass(s.car_pi, s.car_class);
+    const cls = _cc ? `<span class="cc cc-${_cc}">${_cc}</span>` : '';
     const condBits = [];
     if(s.weather_condition) condBits.push(escapeHtml(s.weather_condition));
     if(s.tyre_compound) condBits.push(escapeHtml(s.tyre_compound));
