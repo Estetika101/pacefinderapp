@@ -461,7 +461,19 @@ def make_handler(ctx: dict):
                 qs = {k: urllib.parse.unquote_plus(v)
                       for pair in query_string.split("&") if "=" in pair
                       for k, v in [pair.split("=", 1)]}
-                result = db_career_kpis(qs.get("game") or None)
+                game = qs.get("game") or None
+                result = db_career_kpis(game)
+                # Circuit progression tally (last-3 best laps per circuit) —
+                # the headline improvement signal on Home per home-stats.md.
+                up = dn = fl = 0
+                for t in db_tracks_index(game):
+                    tr = t.get("trend")
+                    if   tr == "up": up += 1
+                    elif tr == "dn": dn += 1
+                    elif tr == "fl": fl += 1
+                result["trend_improving"]  = up
+                result["trend_regressing"] = dn
+                result["trend_flat"]       = fl
                 writer.write(_http_response("200 OK", "application/json", json.dumps(result).encode()))
 
             elif path == "/sessions/track-options":

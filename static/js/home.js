@@ -148,14 +148,37 @@ async function loadCareer(){
   const strip = document.getElementById('career-strip');
   if(!k || (k.total_sessions || 0) === 0){strip.style.display = 'none'; return;}
   strip.style.display = '';
-  setCV('cs-total', k.total_sessions || '0', 'muted');
-  setCV('cs-finish', k.avg_finish_real != null ? 'P' + (+k.avg_finish_real.toFixed(1)) : null, 'blue');
-  const pg = k.avg_pos_gained;
-  setCV('cs-gained', pg != null ? ((pg >= 0 ? '+' : '') + (+pg.toFixed(1))) : null,
-        pg > 0 ? 'green' : pg < 0 ? 'red' : null);
-  setCV('cs-win', k.win_rate != null ? Math.round(k.win_rate) + '%' : null, 'amber');
-  setCV('cs-podium', k.podium_rate != null ? Math.round(k.podium_rate) + '%' : null, 'green');
-  setCV('cs-laps', k.total_laps || '0', 'muted');
+
+  // Primary tier — reliable, telemetry-derived. Always shown.
+  setCV('cs-total',    k.total_sessions || '0', 'muted');
+  setCV('cs-laps',     k.total_laps     || '0', 'muted');
+  setCV('cs-circuits', k.circuit_count  || '0', 'muted');
+  setCV('cs-cars',     k.cars_driven    || '0', 'muted');
+
+  // Circuit progression tally — the headline improvement signal.
+  const up = k.trend_improving || 0, dn = k.trend_regressing || 0, fl = k.trend_flat || 0;
+  const tally = document.getElementById('cs-trend-tally');
+  if(up + dn + fl > 0){
+    document.getElementById('cs-t-up').textContent = '▲' + up;
+    document.getElementById('cs-t-dn').textContent = '▼' + dn;
+    document.getElementById('cs-t-fl').textContent = '—' + fl;
+    tally.style.display = '';
+  } else { tally.style.display = 'none'; }
+
+  // Results tier — gated on real races, sample labelled, never bare 0%.
+  const realN = k.real_race_count || 0;
+  const results = document.getElementById('career-results');
+  if(realN >= 1){
+    setCV('cs-finish', k.avg_finish_real != null ? 'P' + (+k.avg_finish_real.toFixed(1)) : null, 'blue');
+    const pg = k.avg_pos_gained;
+    setCV('cs-gained', pg != null ? ((pg >= 0 ? '+' : '') + (+pg.toFixed(1))) : null,
+          pg > 0 ? 'green' : pg < 0 ? 'red' : null);
+    setCV('cs-podium', k.podium_rate != null ? Math.round(k.podium_rate) + '%' : null, 'green');
+    document.getElementById('cs-results-sample').textContent =
+      'across ' + realN + ' real race' + (realN === 1 ? '' : 's');
+    results.style.display = '';
+  } else { results.style.display = 'none'; }
+
   renderCareerSpark(form);
 }
 function renderCareerSpark(form){
