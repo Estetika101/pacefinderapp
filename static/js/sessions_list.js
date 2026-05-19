@@ -130,15 +130,21 @@ function dropdown(label, g, opts, rich){
       `<span class="fnm">${esc(o.label)}</span>`+
       `<span class="fn">${o.n}</span>${extra}</button>`;
   }).join('');
+  // Typeahead when the list is long (circuits especially).
+  const srch = opts.length > 8
+    ? `<input class="fsrch" placeholder="Filter ${label.toLowerCase()}…" autocomplete="off">` : '';
   return `<div class="fdrop${rich?' rich':''}${_openF===g?' open':''}">${head}`+
     `<div class="fdrop-panel">`+
       `<div class="fdrop-top"><span>${label}</span>`+
       `<button class="fclear" data-fc="${g}"${sel.length?'':' disabled'}>Clear</button></div>`+
+      `${srch}`+
       `<div class="fdrop-list">${rows||'<div class="fempty">None</div>'}</div>`+
     `</div></div>`;
 }
 
-function render(){
+function render(){ renderFilters(); renderTable(); }
+
+function renderFilters(){
   const cars   = uniq(s=>s.car_ordinal, s=>carName(s));
   const tracks = uniq(s=>s.track, s=>s.track);
   const conds  = uniq(s=>s.weather_condition, s=>s.weather_condition);
@@ -150,12 +156,16 @@ function render(){
     `<input type="checkbox" id="rev-t"${swtOn?' checked':''}>`+
     `<span class="tr"></span>Needs review (${revN})</label>` : '';
 
+  // clear-all stays in the DOM (display-toggled) so an option click can
+  // sync it in place without rebuilding — keeps the open panel/scroll.
   document.getElementById('filters').innerHTML =
     dropdown('Car','car',cars) + dropdown('Circuit','track',tracks,true) +
     dropdown('Condition','cond',conds) + dropdown('Type','type',types) +
-    (anyFilter() ? `<button class="fclear-all">Clear all</button>` : '') +
+    `<button class="fclear-all" style="${anyFilter()?'':'display:none'}">Clear all</button>` +
     toggle;
+}
 
+function renderTable(){
   // Sort IS the table header — column order = header order.
   const ar = SORT.dir === 'asc' ? '▲' : '▼';
   const th = (k,label,num) =>
@@ -192,13 +202,47 @@ function render(){
   }).join('');
 }
 
+// In-place sync so an option/clear click never rebuilds #filters —
+// the open panel keeps its scroll position and typeahead text.
+function syncDropBtn(drop, g){
+  const dbtn = drop.querySelector('.fdrop-btn');
+  dbtn.classList.toggle('on', F[g].length > 0);
+  let ct = dbtn.querySelector('.fct');
+  if(F[g].length){
+    if(!ct){ ct = document.createElement('span'); ct.className = 'fct';
+      dbtn.insertBefore(ct, dbtn.querySelector('.fcar')); }
+    ct.textContent = F[g].length;
+  } else if(ct){ ct.remove(); }
+  const clr = drop.querySelector('.fclear'); if(clr) clr.disabled = !F[g].length;
+}
+function syncClearAll(){
+  const b = document.querySelector('.fclear-all');
+  if(b) b.style.display = anyFilter() ? '' : 'none';
+}
+
 document.addEventListener('click', e=>{
   const opt = e.target.closest('.fopt');
-  if(opt){ const g=opt.dataset.g, v=opt.dataset.v;
-    const i=F[g].indexOf(v); if(i>=0) F[g].splice(i,1); else F[g].push(v);
-    writeURL(); render(); return; }
+  if(opt){
+    const g=opt.dataset.g, v=opt.dataset.v;
+    const i=F[g].indexOf(v), now=i<0;
+    if(now) F[g].push(v); else F[g].splice(i,1);
+    opt.classList.toggle('on', now);
+    opt.querySelector('.fck').textContent = now ? '✓' : '';
+    syncDropBtn(opt.closest('.fdrop'), g);
+    syncClearAll(); writeURL(); renderTable();
+    return;
+  }
   const fc = e.target.closest('.fclear');
-  if(fc){ if(!fc.disabled){ F[fc.dataset.fc]=[]; writeURL(); render(); } return; }
+  if(fc){
+    if(!fc.disabled){
+      const g=fc.dataset.fc, drop=fc.closest('.fdrop');
+      F[g]=[];
+      drop.querySelectorAll('.fopt.on').forEach(o=>{
+        o.classList.remove('on'); o.querySelector('.fck').textContent=''; });
+      syncDropBtn(drop,g); syncClearAll(); writeURL(); renderTable();
+    }
+    return;
+  }
   if(e.target.closest('.fclear-all')){
     FACETS.forEach(g=>F[g]=[]); F.review=false; _openF=null; writeURL(); render(); return; }
   const fd = e.target.closest('.fdrop-btn');
@@ -207,12 +251,22 @@ document.addEventListener('click', e=>{
   if(h){ const k=h.dataset.k;
     if(SORT.key===k) SORT.dir = SORT.dir==='asc' ? 'desc' : 'asc';
     else { SORT.key=k; SORT.dir=defaultDir(k); }
-    writeURL(); render(); return; }
-  // Click anywhere else closes an open dropdown.
-  if(_openF && !e.target.closest('.fdrop-panel')){ _openF=null; render(); }
+    writeURL(); renderTable(); return; }
+  // Click outside an open panel closes it.
+  if(_openF && !e.target.closest('.fdrop-panel') && !e.target.closest('.fdrop-btn')){
+    _openF=null; render(); }
+});
+document.addEventListener('input', e=>{
+  if(e.target.classList.contains('fsrch')){
+    const q = e.target.value.trim().toLowerCase();
+    e.target.closest('.fdrop-panel').querySelectorAll('.fopt').forEach(o=>{
+      const nm = o.querySelector('.fnm').textContent.toLowerCase();
+      o.style.display = (!q || nm.indexOf(q) >= 0) ? '' : 'none';
+    });
+  }
 });
 document.addEventListener('change', e=>{
-  if(e.target.id==='rev-t'){ F.review = e.target.checked ? '1' : false; writeURL(); render(); }
+  if(e.target.id==='rev-t'){ F.review = e.target.checked ? '1' : false; writeURL(); renderTable(); }
 });
 
 (async function init(){
