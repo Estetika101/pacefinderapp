@@ -32,7 +32,11 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
         <div class="chart-title">Best lap by session</div>
         <div class="chart-meta" id="chart-meta"></div>
       </div>
-      <svg class="progress-svg" id="progress-svg" viewBox="0 0 1000 200" preserveAspectRatio="none"></svg>
+      <div class="chart-plot">
+        <span class="axis-cue top">faster &uarr;</span>
+        <span class="axis-cue bot">slower &darr;</span>
+        <svg class="progress-svg" id="progress-svg" viewBox="0 0 1000 200" preserveAspectRatio="none"></svg>
+      </div>
       <div class="progress-empty" id="progress-empty" style="display:none">Not enough sessions to chart progress yet.</div>
     </div>
   </div>
