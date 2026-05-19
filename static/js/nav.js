@@ -31,7 +31,8 @@
   var cur = section();
   function item(id, href, ico, label, end){
     var badge = (id === 'sessions')
-      ? '<span class="pf-bd" id="pf-rev" style="display:none"></span>' : '';
+      ? '<span class="pf-bd new" id="pf-new" style="display:none"></span>'+
+        '<span class="pf-bd" id="pf-rev" style="display:none"></span>' : '';
     return '<a class="pf-it' + (end?' pf-end':'') + (cur===id?' cur':'') +
       '" id="pf-i-' + id + '" href="' + href + '" data-tip="' + label + '">' +
       '<span class="pf-ic">' + ico + '</span><span class="pf-lb">' + label +
@@ -60,9 +61,14 @@
     localStorage.setItem('pf-rail-icons', on ? '1' : '0');
   });
 
-  // Needs-review badge on Sessions — actionable count, not a total.
-  // When there's a backlog the Sessions item drops you straight into
-  // the review filter.
+  // Sessions badges:
+  //  • "N new"      → sessions recorded since the user's last visit to
+  //                   /sessions (capture is browser-independent, so
+  //                   unattended races would otherwise be invisible —
+  //                   see docs/specs/unattended-capture-confirmation.md).
+  //  • "N to review" → metadata gaps the user can fix (rail deep-links
+  //                    into /sessions?review=1 when there's a backlog).
+  // Both can show together; they're independent signals.
   (async function(){
     try{
       var n = (await fetch('/sessions/needs-review').then(function(r){return r.json();})).count || 0;
@@ -70,6 +76,18 @@
         var b = document.getElementById('pf-rev');
         b.textContent = n + ' to review'; b.style.display = '';
         document.getElementById('pf-i-sessions').setAttribute('href', '/sessions?review=1');
+      }
+    }catch(e){}
+  })();
+  (async function(){
+    var ts = localStorage.getItem('pf-last-seen-sessions');
+    if(!ts) return;   // first-load seed happens on /sessions visit
+    try{
+      var n = (await fetch('/sessions/new-since?ts=' + encodeURIComponent(ts))
+        .then(function(r){return r.json();})).count || 0;
+      if(n > 0){
+        var b = document.getElementById('pf-new');
+        b.textContent = n + ' new'; b.style.display = '';
       }
     }catch(e){}
   })();

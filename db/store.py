@@ -627,6 +627,22 @@ _NEEDS_REVIEW_SQL = """
 """
 
 
+def _db_sessions_since_count(iso: str) -> int:
+    """Count sessions recorded since the given ISO timestamp — drives
+    the "N new since last visit" rail badge so unattended captures are
+    visible. See docs/specs/unattended-capture-confirmation.md."""
+    if not iso:
+        return 0
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            return conn.execute(
+                "SELECT COUNT(*) FROM sessions WHERE started_at > ?", (iso,)
+            ).fetchone()[0]
+        finally:
+            conn.close()
+
+
 def _db_needs_review_count() -> int:
     """Count sessions where the user's input would materially improve the
     data: unresolved track, unmapped car, unknown type, or a race missing

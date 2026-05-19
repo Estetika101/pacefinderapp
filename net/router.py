@@ -55,6 +55,7 @@ def make_handler(ctx: dict):
     FORZA_CARS             = ctx["FORZA_CARS"]
     db_sessions_list       = ctx["db_sessions_list"]
     db_needs_review_count  = ctx["db_needs_review_count"]
+    db_sessions_since_count = ctx["db_sessions_since_count"]
     db_games_index         = ctx["db_games_index"]
     db_career_kpis         = ctx["db_career_kpis"]
     db_form_data           = ctx["db_form_data"]
@@ -444,6 +445,13 @@ def make_handler(ctx: dict):
             elif path == "/sessions/needs-review":
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps({"count": db_needs_review_count()}).encode()))
+
+            elif path == "/sessions/new-since":
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                writer.write(_http_response("200 OK", "application/json",
+                    json.dumps({"count": db_sessions_since_count(qs.get("ts", ""))}).encode()))
 
             elif path == "/sessions/games":
                 result = db_games_index()

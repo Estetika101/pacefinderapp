@@ -279,5 +279,11 @@ document.addEventListener('change', e=>{
     _all = sess || [];
     (tix||[]).forEach(t=>_tix.set(t.track, t));
   }catch(e){ document.getElementById('sess-sub').textContent='Failed to load.'; return; }
+  // Mark these sessions as "seen" — the rail's "N new" badge reads
+  // from this marker. Seeds on first-ever load so day one isn't noisy.
+  if(_all.length){
+    const newest = _all.map(s=>s.started_at||'').sort().slice(-1)[0];
+    if(newest) localStorage.setItem('pf-last-seen-sessions', newest);
+  }
   render();
 })();

@@ -46,6 +46,7 @@ html.pf-rail-icons #pf-nav.pf-rail{ width:var(--pf-rail-w-ic); }
 .pf-it .pf-ic{flex:0 0 18px;text-align:center;font-size:14px;opacity:.9}
 .pf-it .pf-lb{flex:1}
 .pf-it .pf-bd{font-size:11px;color:var(--color-accent);background:rgba(232,184,75,.12);padding:1px 7px;border-radius:999px}
+.pf-it .pf-bd.new{color:var(--color-green);background:rgba(34,197,94,.12);margin-right:4px}
 .pf-it:hover{background:var(--color-surface-2);color:var(--color-text-primary)}
 .pf-it.cur{background:var(--color-surface-2);color:var(--color-text-primary);box-shadow:inset 2px 0 0 var(--color-accent)}
 
