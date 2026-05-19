@@ -26,20 +26,32 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     <h1 class="welcome-title">Welcome back.</h1>
   </div>
 
-  <!-- Career strip (compact lifetime stats) -->
+  <!-- Career stats (improvement-first; results gated; see docs/specs/home-stats.md) -->
   <div class="career-strip" id="career-strip" style="display:none">
     <div class="cs-stats">
       <div class="cs-cell"><span class="cs-v muted" id="cs-total">&mdash;</span><span class="cs-l">Sessions</span></div>
-      <div class="cs-cell"><span class="cs-v blue" id="cs-finish">&mdash;</span><span class="cs-l">Avg Finish</span></div>
-      <div class="cs-cell"><span class="cs-v" id="cs-gained">&mdash;</span><span class="cs-l">Pos Gained</span></div>
-      <div class="cs-cell"><span class="cs-v amber" id="cs-win">&mdash;</span><span class="cs-l">Win Rate</span></div>
-      <div class="cs-cell"><span class="cs-v green" id="cs-podium">&mdash;</span><span class="cs-l">Podium</span></div>
       <div class="cs-cell"><span class="cs-v muted" id="cs-laps">&mdash;</span><span class="cs-l">Laps</span></div>
+      <div class="cs-cell"><span class="cs-v muted" id="cs-circuits">&mdash;</span><span class="cs-l">Circuits</span></div>
+      <div class="cs-cell"><span class="cs-v muted" id="cs-cars">&mdash;</span><span class="cs-l">Cars</span></div>
+      <div class="cs-cell cs-trend-tally" id="cs-trend-tally" style="display:none">
+        <span class="cs-v"><span class="t-up" id="cs-t-up">&mdash;</span>
+          <span class="t-dn" id="cs-t-dn">&mdash;</span>
+          <span class="t-fl" id="cs-t-fl">&mdash;</span></span>
+        <span class="cs-l">Circuit progression</span>
+      </div>
     </div>
     <div class="cs-form">
       <span class="cs-trend fl" id="cs-trend">&mdash;</span>
       <span class="cs-spark" id="cs-spark"></span>
     </div>
+  </div>
+
+  <!-- Results tier — hidden unless there are real races (spec gate) -->
+  <div class="career-results" id="career-results" style="display:none">
+    <div class="cs-cell"><span class="cs-v blue" id="cs-finish">&mdash;</span><span class="cs-l">Avg Finish</span></div>
+    <div class="cs-cell"><span class="cs-v" id="cs-gained">&mdash;</span><span class="cs-l">Pos Gained</span></div>
+    <div class="cs-cell"><span class="cs-v green" id="cs-podium">&mdash;</span><span class="cs-l">Podium</span></div>
+    <span class="cs-results-sample" id="cs-results-sample"></span>
   </div>
 
   <!-- Two-column: recent feed leads, circuits/cars aside -->

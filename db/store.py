@@ -745,7 +745,9 @@ def _db_career_kpis(game: Optional[str] = None) -> dict:
                         / NULLIF(SUM(CASE WHEN race_type='real' AND session_type='race' THEN 1 ELSE 0 END), 0) as podium_rate,
                   SUM(lap_count) as total_laps,
                   MIN(best_lap_time_s) as best_lap_time_s,
-                  COUNT(DISTINCT CASE WHEN track IS NOT NULL AND track != 'unknown' THEN track END) as circuit_count
+                  COUNT(DISTINCT CASE WHEN track IS NOT NULL AND track != 'unknown' THEN track END) as circuit_count,
+                  COUNT(DISTINCT CASE WHEN car_ordinal IS NOT NULL THEN car_ordinal END) as cars_driven,
+                  SUM(CASE WHEN race_type='real' AND session_type='race' AND finish_pos IS NOT NULL THEN 1 ELSE 0 END) as real_race_count
                 FROM sessions {where}
             """, params).fetchone()
             return dict(row) if row else {}
