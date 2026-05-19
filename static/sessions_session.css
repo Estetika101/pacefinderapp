@@ -100,7 +100,7 @@ a{color:inherit;text-decoration:none}
 .result-positions .finish{color:var(--color-green)}
 .result-positions .finish.lost{color:var(--color-red)}
 .result-positions .finish.same{color:var(--color-text-primary)}
-.result-delta{font-size:var(--text-sm);color:var(--color-green);margin-top:4px}
+.result-delta{font-size:var(--text-md);font-weight:700;color:var(--color-green);margin-top:4px;font-variant-numeric:tabular-nums}
 .result-delta.lost{color:var(--color-red)}
 .result-delta.same{color:var(--color-text-tertiary)}
 
