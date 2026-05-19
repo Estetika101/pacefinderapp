@@ -36,10 +36,42 @@ async function init(){
 
   renderSubtitle();
   renderHero();
+  renderTrackMap();
   renderTheo();
   renderTip();
   renderFilters();
   renderSessions();
+}
+
+// Faint outline of the PB lap's racing line — a license-free, authentic
+// "this is the track" cue (your own line, not a logo). Bbox-normalized;
+// hidden when the PB lap has no stored position samples.
+async function renderTrackMap(){
+  const el = document.getElementById('hero-trackmap');
+  if(!el || !_pb || !_pb.session_id || _pb.lap_number == null) return;
+  let s;
+  try{
+    s = await fetch('/sessions/lap-samples?session_id='+encodeURIComponent(_pb.session_id)
+      +'&lap='+_pb.lap_number).then(r=>r.json());
+  }catch(e){ return; }
+  if(!s || s.length < 8 || s.some(p=>p.px==null)) return;
+  const hasPz = s.some(p=>p.pz!=null);
+  const zf = hasPz ? p=>p.pz : p=>(p.py??0);
+  const xs = s.map(p=>p.px), zs = s.map(zf);
+  const mnX=Math.min(...xs), mxX=Math.max(...xs), mnZ=Math.min(...zs), mxZ=Math.max(...zs);
+  const W=220, H=150, pd=10;
+  const sc=Math.min((W-pd*2)/((mxX-mnX)||1),(H-pd*2)/((mxZ-mnZ)||1));
+  const ox=(W-(mxX-mnX)*sc)/2, oz=(H-(mxZ-mnZ)*sc)/2;
+  const cx=x=>(ox+(x-mnX)*sc).toFixed(1);
+  const cy=z=>(H-oz-(z-mnZ)*sc).toFixed(1);
+  const step=Math.max(1,Math.floor(s.length/240));
+  const pts=[];
+  for(let i=0;i<s.length;i+=step) pts.push(cx(s[i].px)+','+cy(zf(s[i])));
+  pts.push(cx(s[0].px)+','+cy(zf(s[0])));   // close the loop
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Track outline">`+
+    `<polyline class="tm-line" points="${pts.join(' ')}"/>`+
+    `<circle class="tm-start" cx="${cx(s[0].px)}" cy="${cy(zf(s[0]))}" r="4"/></svg>`;
+  el.style.display='';
 }
 
 function renderSubtitle(){

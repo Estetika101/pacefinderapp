@@ -26,6 +26,7 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
       <div class="hero-time-sub" id="hero-pb-sub">Personal best</div>
       <div class="hero-gap" id="hero-gap" style="display:none">&mdash;</div>
       <div class="hero-gap-sub" id="hero-gap-sub" style="display:none">vs your theoretical</div>
+      <div class="hero-trackmap" id="hero-trackmap" style="display:none"></div>
     </div>
     <div class="progress">
       <div class="chart-header">
