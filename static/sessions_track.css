@@ -56,6 +56,11 @@ a{color:inherit;text-decoration:none}
 .chart-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
 .chart-title{font-size:var(--text-xs);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em}
 .chart-meta{font-size:11px;color:var(--color-text-quaternary)}
+.hero-trackmap{margin-top:var(--space-4);max-width:220px}
+.hero-trackmap svg{display:block;width:100%;height:auto;overflow:visible}
+.hero-trackmap .tm-line{fill:none;stroke:var(--color-accent);stroke-width:3;
+  stroke-linejoin:round;stroke-linecap:round;opacity:0.55}
+.hero-trackmap .tm-start{fill:var(--color-accent)}
 .chart-plot{position:relative}
 .axis-cue{position:absolute;left:2px;font-size:9px;letter-spacing:0.08em;
   text-transform:uppercase;pointer-events:none;font-weight:600;opacity:0.7}

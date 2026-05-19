@@ -755,6 +755,15 @@ def make_handler(ctx: dict):
                 with db_lock:
                     conn = db_connect()
                     try:
+                        # Best lap's lap_number in the PB session — lets the
+                        # circuit hero draw that lap's racing-line outline.
+                        if pb:
+                            lr = conn.execute(
+                                "SELECT lap_number FROM laps WHERE session_id=? "
+                                "AND lap_time_s IS NOT NULL ORDER BY lap_time_s ASC LIMIT 1",
+                                (pb["session_id"],)
+                            ).fetchone()
+                            pb["lap_number"] = lr["lap_number"] if lr else None
                         theo_row = conn.execute(
                             "SELECT theoretical_s1_s, theoretical_s1_session_id, theoretical_s1_lap, "
                             "theoretical_s2_s, theoretical_s2_session_id, theoretical_s2_lap, "
