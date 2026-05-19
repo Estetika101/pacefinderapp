@@ -406,6 +406,10 @@ SESSIONS_HTML = """<!DOCTYPE html>
     letter-spacing:.08em;color:var(--color-text-quaternary)}
   .fclear{background:none;border:none;color:var(--color-accent);font:inherit;font-size:13px;cursor:pointer}
   .fclear:disabled{color:var(--color-text-quaternary);cursor:default}
+  .fsrch{display:block;width:calc(100% - 16px);margin:8px;padding:7px 10px;
+    background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:6px;
+    color:var(--color-text-primary);font:inherit;font-size:14px;outline:none}
+  .fsrch:focus{border-color:var(--color-accent)}
   .fdrop-list{max-height:360px;overflow-y:auto;padding:6px}
   .fempty{padding:10px 12px;color:var(--color-text-quaternary);font-size:14px}
   .fopt{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;
