@@ -211,9 +211,9 @@ function renderHeader(){
     else if(g<0){fEl.classList.add('lost');fEl.classList.remove('finish','same');}
     else{fEl.classList.add('same');fEl.classList.remove('finish','lost');}
     const gEl=document.getElementById('hdr-gained');
-    if(g>0){gEl.textContent='↗ '+g+' place'+(g===1?'':'s')+' gained';gEl.classList.remove('lost','same');}
-    else if(g<0){gEl.textContent='↘ '+(-g)+' place'+(-g===1?'':'s')+' lost';gEl.classList.add('lost');}
-    else{gEl.textContent='no change';gEl.classList.add('same');}
+    if(g>0){gEl.textContent='+'+g;gEl.classList.remove('lost','same');}
+    else if(g<0){gEl.textContent=String(g);gEl.classList.add('lost');gEl.classList.remove('same');}
+    else{gEl.textContent='±0';gEl.classList.add('same');gEl.classList.remove('lost');}
     document.getElementById('hdr-result').style.display='';
   }
 }
