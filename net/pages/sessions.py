@@ -439,7 +439,10 @@ SESSIONS_HTML = """<!DOCTYPE html>
   .fclear-all:hover{color:var(--color-text-primary);border-color:var(--color-text-tertiary)}
   .stbl-wrap{overflow-x:auto;margin-top:var(--space-3)}
   .stbl{width:100%;border-collapse:collapse;font-size:14px}
-  .stbl th{position:sticky;top:0;background:var(--color-bg);text-align:left;
+  .sess-stickyhead{position:sticky;top:0;z-index:20;background:var(--color-bg);
+    margin:0 calc(var(--space-4) * -1);padding:var(--space-3) var(--space-4) 8px;
+    border-bottom:1px solid var(--color-border-subtle)}
+  .stbl th{text-align:left;
     font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-tertiary);
     font-weight:600;padding:10px 14px;border-bottom:1px solid var(--color-border);
     cursor:pointer;white-space:nowrap;user-select:none}
@@ -470,14 +473,16 @@ SESSIONS_HTML = """<!DOCTYPE html>
 <script src="/static/js/nav.js"></script>
 <div class="page">
 
-  <div class="breadcrumb"><a href="/">Home</a> &rsaquo; <span>Sessions</span></div>
+  <div class="sess-stickyhead">
+    <div class="breadcrumb"><a href="/">Home</a> &rsaquo; <span>Sessions</span></div>
 
-  <div class="titlewrap">
-    <h1 class="nickname">Sessions</h1>
-    <span class="canonical" id="sess-sub">Loading&hellip;</span>
+    <div class="titlewrap">
+      <h1 class="nickname">Sessions</h1>
+      <span class="canonical" id="sess-sub">Loading&hellip;</span>
+    </div>
+
+    <div class="filters" id="filters"></div>
   </div>
-
-  <div class="filters" id="filters"></div>
 
   <div class="stbl-wrap">
     <table class="stbl">
