@@ -271,6 +271,20 @@ table.lap-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular
 .card-headline{font-size:var(--text-lg);font-weight:500;line-height:1.2}
 .card-headline em{font-style:normal;color:var(--color-red)}
 .card-body{font-size:var(--text-sm);color:var(--color-text-secondary);line-height:1.5}
+.car-pb-row{display:flex;justify-content:space-between;align-items:baseline;
+  padding:6px 0;border-bottom:1px solid var(--color-border-subtle);
+  color:var(--color-text-secondary);text-decoration:none}
+.car-pb-row:last-of-type{border-bottom:0}
+.car-pb-row strong{color:var(--color-text-primary);font-variant-numeric:tabular-nums;font-weight:700}
+.car-pb-row.pb-here strong{color:var(--color-accent)}
+.car-pb-row.pb-link:hover{color:var(--color-text-primary)}
+.car-pb-row.pb-link:hover strong{color:var(--color-accent)}
+.car-pb-date{color:var(--color-text-quaternary);font-size:11px}
+.car-pb-delta{margin-top:6px;font-size:var(--text-md);font-weight:700;
+  font-variant-numeric:tabular-nums;text-align:right}
+.car-pb-delta.gain{color:var(--color-green)}
+.car-pb-delta.lost{color:var(--color-red)}
+.car-pb-delta.same{color:var(--color-text-tertiary)}
 .card-link{margin-top:auto;font-size:var(--text-sm);color:var(--color-accent)}
 .card-link:hover{text-decoration:underline}
 .card-corner{

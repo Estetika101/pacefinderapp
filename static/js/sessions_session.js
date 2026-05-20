@@ -230,9 +230,24 @@ function renderHero(){
   const subBits=[];
   if(bestLap && bestLap.lap_number!=null)subBits.push('Best lap · L'+(bestLap.lap_number+1));
   if(_laps.length)subBits.push((_laps.length-(bestLap?1:0))+(_laps.length-1===1?' other lap':' other laps'));
-  document.getElementById('hero-best-sub').textContent = bestLap
+  // Delta vs your PB in THIS car at THIS track — the honest pace
+  // comparison (a cross-car PB would mix Radical and 911). Data from
+  // _carCtx.best_in_car_at_track (no new endpoint).
+  let carPbTail = '';
+  const bh = _carCtx && _carCtx.best_in_car_at_track;
+  if(best && bh && bh.best_lap_time_s){
+    if(bh.session_id === _id){
+      carPbTail = ' · 🏆 new PB in this car here';
+    } else {
+      const d = best - bh.best_lap_time_s;
+      if(Math.abs(d) < 0.005) carPbTail = ' · matches your PB in this car here';
+      else if(d < 0)          carPbTail = ' · ' + d.toFixed(3) + 's vs PB in this car here';
+      else                    carPbTail = ' · +' + d.toFixed(3) + 's vs PB in this car here';
+    }
+  }
+  document.getElementById('hero-best-sub').textContent = (bestLap
     ? 'Best lap · L'+(bestLap.lap_number+1)+' of '+_laps.length
-    : 'Best lap';
+    : 'Best lap') + carPbTail;
 
   // Gap to theoretical (if we have track-level theoretical and a best lap)
   if(_theo && _theo.theoretical_best_s && best){
@@ -472,13 +487,38 @@ function renderCards(){
       ? `Your <em>only</em> session in this car at ${trackText}`
       : `Your <em>${ord(rank)}-best</em> of ${total} sessions in this car at ${trackText}`;
     const bh = _carCtx.best_in_car_at_track;
+    const body = document.getElementById('card-car-body');
+    const sBest = s.best_lap_time_s;
     if(bh && bh.best_lap_time_s){
       const dt = bh.started_at ? new Date(bh.started_at).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '';
-      document.getElementById('card-car-body').innerHTML =
-        `Best ever in ${carText} at ${trackText}:<br>` +
-        `<strong style="color:var(--color-text-primary)">${fmtLap(bh.best_lap_time_s)}</strong>${dt?' — '+dt:''}`;
+      if(bh.session_id === _id){
+        // This session IS the car-PB at this track — don't render a Δ row.
+        body.innerHTML =
+          `<div class="car-pb-row pb-here"><span>🏆 PB in this car here</span>` +
+          `<strong>${fmtLap(bh.best_lap_time_s)}</strong></div>` +
+          `${dt?`<div class="car-pb-date">${dt}</div>`:''}`;
+      } else if(sBest){
+        const d = sBest - bh.best_lap_time_s;
+        const matchTol = 0.005;
+        const dClass = Math.abs(d) < matchTol ? 'same' : (d < 0 ? 'gain' : 'lost');
+        const dTxt = Math.abs(d) < matchTol ? 'matches' :
+                     (d < 0 ? d.toFixed(3) + 's' : '+' + d.toFixed(3) + 's');
+        const pbHref = '/sessions/session?id=' + encodeURIComponent(bh.session_id);
+        body.innerHTML =
+          `<div class="car-pb-row"><span>This session</span>` +
+          `<strong>${fmtLap(sBest)}</strong></div>` +
+          `<a class="car-pb-row pb-link" href="${pbHref}">` +
+          `<span>PB (this car here)${dt?` <span class="car-pb-date">· ${dt}</span>`:''}</span>` +
+          `<strong>${fmtLap(bh.best_lap_time_s)}</strong></a>` +
+          `<div class="car-pb-delta ${dClass}">Δ ${dTxt}</div>`;
+      } else {
+        // No best lap this session — fall through to the bare PB line.
+        body.innerHTML =
+          `Best ever in ${carText} at ${trackText}:<br>` +
+          `<strong style="color:var(--color-text-primary)">${fmtLap(bh.best_lap_time_s)}</strong>${dt?' — '+dt:''}`;
+      }
     } else {
-      document.getElementById('card-car-body').textContent = `First session in this car at ${trackText}.`;
+      body.textContent = `First session in this car at ${trackText}.`;
     }
     if(s.car_ordinal != null){
       const link = document.getElementById('card-car-link');
