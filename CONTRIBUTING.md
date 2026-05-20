@@ -63,11 +63,43 @@ confidence.
 > the local suite is the only thing guarding the lap-counting regressions.
 > Running it before every merge is mandatory, not optional.
 
+### Performance bench
+
+Hot back-end paths are tracked with a real bench, not vibes:
+
+```bash
+python3 bench_perf.py            # run + print table
+python3 bench_perf.py --baseline # save current numbers as baseline
+python3 bench_perf.py --check    # compare vs baseline; nonzero on regression
+```
+
+Seeds a deterministic synthetic DB in a temp dir (no Pi required) and times
+the audit-flagged hot paths: `_db_tracks_index`, `_db_sessions_list(2000)`,
+career KPIs, recent, needs-review, new-since. Reports median + p95 + payload
+bytes per op. The baseline lives at [`bench_baseline.json`](./bench_baseline.json).
+
+**Numbers are not Pi numbers** — they reflect the runner's CPU/SQLite. The
+point is *relative tracking*: a fresh `--check` on the same machine catches
+regressions before they hit the Pi.
+
+When to run:
+- Any change that touches `db/store.py`, the HTTP routes serving JSON, or
+  any new endpoint hit on Home / Sessions / Circuits.
+- Before/after a perf optimisation — capture before, ship the change, run
+  `--check` after, attach numbers to the PR.
+- Re-baseline (`--baseline`) only when an *intentional* speedup lands and
+  you want it locked in as the new floor; explain why in the commit.
+
+Default regression budget is +25 % median; tune with `--threshold` if a
+change is expected to grow (e.g. wider query for a new feature).
+
 ## Before you merge
 
 - [ ] `python3 test_listener.py` — every check green
 - [ ] `py_compile` / `node --check` clean for every touched file
 - [ ] Regression test added for any bug fix (proven to fail without the fix)
+- [ ] `python3 bench_perf.py --check` clean *if your change touches a
+      benched hot path* (else not required)
 - [ ] CHANGELOG entry for user-facing changes
 - [ ] One concern per PR
 
