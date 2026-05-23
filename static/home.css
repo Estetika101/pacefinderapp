@@ -49,16 +49,96 @@ a{color:inherit;text-decoration:none}
 .top-nav a#nav-live{color:var(--color-accent)}
 .top-nav a#nav-live:hover{background:rgba(232,184,75,0.08)}
 
-/* ── Welcome strip ──────────────────────────────────────────────── */
-.welcome{padding:var(--space-6) 0 var(--space-4)}
-.welcome-eyebrow{
-  font-size:var(--text-xs);color:var(--color-text-tertiary);
-  text-transform:uppercase;letter-spacing:0.08em;
+/* ── Last-session hero (the page's lede) ────────────────────────── */
+.hero-last{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:var(--space-5);
+  padding:var(--space-5);
+  margin:var(--space-4) 0;
+  background:var(--color-surface);
+  border:1px solid var(--color-border);
+  border-radius:var(--radius-md);
 }
-.welcome-title{
-  margin:4px 0 0;
-  font-size:clamp(28px,5vw,48px);
-  font-weight:700;letter-spacing:-0.02em;line-height:1;
+.hl-outline{
+  width:160px;height:120px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.hl-outline svg{width:100%;height:100%;overflow:visible}
+.hl-outline .tm-line line{stroke-width:1.6;stroke-linecap:round}
+.hl-body{min-width:0}
+.hl-eyebrow{
+  font-size:var(--text-xs);color:var(--color-text-quaternary);
+  text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;
+}
+.hl-title{
+  margin:0;font-weight:600;line-height:1.15;
+  font-size:clamp(20px,2.6vw,28px);
+  color:var(--color-text-primary);letter-spacing:-0.01em;
+  display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;
+}
+.hl-title a{color:inherit;transition:color 120ms}
+.hl-title a:hover{color:var(--color-accent)}
+.hl-dot{color:var(--color-text-quaternary);font-weight:400}
+.hl-class-badge{
+  display:inline-block;padding:2px 7px;
+  background:var(--color-accent);color:#000;
+  border-radius:4px;font-size:11px;font-weight:700;letter-spacing:0.05em;
+}
+.hl-class-badge:empty{display:none}
+.hl-stats{
+  display:flex;align-items:baseline;gap:14px;margin-top:10px;flex-wrap:wrap;
+}
+.hl-laptime{
+  font-size:clamp(32px,4.4vw,44px);font-weight:700;line-height:1;
+  letter-spacing:-0.02em;font-variant-numeric:tabular-nums;
+}
+.hl-delta{
+  font-size:var(--text-md);font-weight:600;
+  font-variant-numeric:tabular-nums;line-height:1;
+}
+.hl-delta.gain{color:var(--color-green,#22c55e)}
+.hl-delta.lost{color:var(--color-red,#ef4444)}
+.hl-delta.same{color:var(--color-text-tertiary)}
+.hl-meta{
+  margin-top:8px;
+  font-size:var(--text-sm);color:var(--color-text-tertiary);
+}
+.hl-actions{display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.hl-cta{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:9px 16px;border-radius:6px;
+  font-size:var(--text-sm);font-weight:500;text-decoration:none;
+  border:1px solid var(--color-border);
+  color:var(--color-text-secondary);
+  transition:border-color 120ms,color 120ms,background 120ms;
+  white-space:nowrap;
+}
+.hl-cta:hover{color:var(--color-text-primary);border-color:var(--color-text-secondary)}
+.hl-cta.primary{
+  background:var(--color-accent);color:#000;border-color:var(--color-accent);font-weight:600;
+}
+.hl-cta.primary:hover{background:rgba(232,184,75,.85)}
+@media(max-width:800px){
+  .hero-last{grid-template-columns:1fr;text-align:left}
+  .hl-outline{width:100%;max-width:240px;height:140px;margin:0 auto}
+  .hl-actions{flex-direction:row;flex-wrap:wrap}
+  .hl-cta{flex:1;min-width:160px}
+}
+/* Empty state — no sessions on record yet */
+.hero-empty{
+  padding:var(--space-6);margin:var(--space-4) 0;
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:var(--radius-md);text-align:center;
+}
+.hero-empty h1{
+  margin:0 0 var(--space-2);font-size:clamp(24px,4vw,36px);
+  font-weight:700;letter-spacing:-0.02em;
+}
+.hero-empty p{
+  margin:0 0 var(--space-4);
+  color:var(--color-text-tertiary);
 }
 
 /* ── Career strip (compact lifetime stats) ──────────────────────── */

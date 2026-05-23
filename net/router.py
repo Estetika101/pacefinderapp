@@ -227,17 +227,35 @@ def make_handler(ctx: dict):
                             "LIMIT 5"
                         ).fetchall()]
                         # Last session (the very first recent, if any) gets
-                        # an extra lookup for PB at this track
+                        # extra lookups for the home hero card:
+                        #   • PB lap time + session_id at this track in this car
+                        #     (so the hero can show ±delta and link to the PB
+                        #     session for context)
+                        #   • last-session's own best lap_number, so the hero's
+                        #     mini track outline can render via track_mini.js
                         last_sess = recents[0] if recents else None
                         pb_here = None
+                        pb_here_sid = None
                         if last_sess and last_sess.get("track") and last_sess.get("car_ordinal") is not None:
                             r = conn.execute(
-                                "SELECT MIN(best_lap_time_s) as pb FROM sessions "
-                                "WHERE track=? AND car_ordinal=? AND best_lap_time_s IS NOT NULL",
+                                "SELECT session_id, best_lap_time_s "
+                                "FROM sessions "
+                                "WHERE track=? AND car_ordinal=? AND best_lap_time_s IS NOT NULL "
+                                "ORDER BY best_lap_time_s ASC LIMIT 1",
                                 (last_sess["track"], last_sess["car_ordinal"])
                             ).fetchone()
                             if r:
-                                pb_here = r["pb"]
+                                pb_here = r["best_lap_time_s"]
+                                pb_here_sid = r["session_id"]
+                        if last_sess:
+                            blr = conn.execute(
+                                "SELECT lap_number FROM laps "
+                                "WHERE session_id=? AND lap_time_s IS NOT NULL "
+                                "ORDER BY lap_time_s ASC LIMIT 1",
+                                (last_sess["session_id"],)
+                            ).fetchone()
+                            last_sess["best_lap_number"] = blr["lap_number"] if blr else None
+                            last_sess["pb_session_id"] = pb_here_sid
                         total_sessions = conn.execute(
                             "SELECT COUNT(*) FROM sessions"
                         ).fetchone()[0]

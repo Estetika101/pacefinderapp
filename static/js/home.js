@@ -49,7 +49,7 @@ async function init(){
   try{d = await fetch('/home/data').then(r => r.json());}
   catch(e){ return; }  // nav.js owns the live status pill
   _tf = d.time_format || '24h';
-  renderWelcome(d.last_session, d.stats);
+  renderHeroLast(d.last_session, d.pb_at_track_s, d.stats);
   loadCareer();
   renderTopCircuits(d.top_circuits || []);
   renderTopCars(d.top_cars || []);
@@ -57,15 +57,80 @@ async function init(){
   renderFooter(d.stats);
 }
 
-function renderWelcome(last, stats){
-  const eyebrow = document.getElementById('welcome-eyebrow');
-  if(last && last.started_at && last.track){
-    eyebrow.textContent = 'Last drove ' + fmtRelative(last.started_at) + ' · ' + last.track;
-  } else if(stats && stats.total_sessions){
-    eyebrow.textContent = stats.total_sessions + ' session' + (stats.total_sessions === 1 ? '' : 's') + ' recorded';
-  } else {
-    eyebrow.textContent = 'No sessions yet';
+// Hero card at the top of Home — answers "what happened while I was
+// away?" and surfaces the single best CTA: jump into the trace you
+// just drove. Replaces the throat-clearing "Welcome back" strip.
+function renderHeroLast(last, pbAtTrack, stats){
+  const hero = document.getElementById('hero-last');
+  const empty = document.getElementById('hero-empty');
+  if(!last || !last.session_id){
+    if(stats && stats.total_sessions){
+      // Has sessions but couldn't load last — fail silent, leave page bare.
+      return;
+    }
+    empty.style.display = '';
+    return;
   }
+  hero.style.display = '';
+  // Outline (speed-coloured mini, lazy-loaded). Uses the same renderer
+  // as /sessions and /circuits — last-session's own best lap so the
+  // shape is what the driver actually drove.
+  const outline = document.getElementById('hl-outline');
+  if(last.session_id && last.best_lap_number != null){
+    outline.dataset.sid = last.session_id;
+    outline.dataset.lap = last.best_lap_number;
+  }
+  // Track + car names with deep links
+  const track = last.track || 'Unknown circuit';
+  const carName = carDisplay(last);
+  document.getElementById('hl-track').textContent = track;
+  document.getElementById('hl-track-link').href =
+    '/sessions/track?name=' + encodeURIComponent(track);
+  document.getElementById('hl-car').textContent = carName;
+  if(last.car_ordinal != null){
+    document.getElementById('hl-car-link').href = '/cars/' + last.car_ordinal;
+  } else {
+    document.getElementById('hl-car-link').removeAttribute('href');
+  }
+  const cc = pfCarClass(last.car_pi, last.car_class);
+  const cb = document.getElementById('hl-class-badge');
+  if(cc){ cb.textContent = cc; cb.style.display = ''; }
+  else { cb.style.display = 'none'; }
+  // Big lap time + ± vs the same car at this circuit
+  document.getElementById('hl-laptime').textContent = fmtLap(last.best_lap_time_s);
+  const deltaEl = document.getElementById('hl-delta');
+  if(last.best_lap_time_s != null && pbAtTrack != null){
+    const d = last.best_lap_time_s - pbAtTrack;
+    if(Math.abs(d) < 0.005){
+      deltaEl.textContent = '= car PB here';
+      deltaEl.className = 'hl-delta same';
+    } else if(d < 0){
+      // New PB. The trophy framing matches the session-detail hero.
+      deltaEl.textContent = '★ New PB in this car here';
+      deltaEl.className = 'hl-delta gain';
+    } else {
+      deltaEl.textContent = '+' + d.toFixed(2) + 's vs your PB here';
+      deltaEl.className = 'hl-delta lost';
+    }
+  } else if(last.best_lap_time_s != null){
+    deltaEl.textContent = 'First session in this car here';
+    deltaEl.className = 'hl-delta';
+  } else {
+    deltaEl.textContent = 'No valid lap';
+    deltaEl.className = 'hl-delta';
+  }
+  // Meta line: when + conditions
+  const bits = [fmtRelative(last.started_at)];
+  if(last.weather_condition) bits.push(last.weather_condition);
+  if(last.tyre_compound)     bits.push(last.tyre_compound);
+  if(last.track_temp_c != null) bits.push(Math.round(last.track_temp_c) + '°C');
+  document.getElementById('hl-meta').textContent = bits.join(' · ');
+  // CTAs
+  const sidQ = '?id=' + encodeURIComponent(last.session_id);
+  document.getElementById('hl-cta-telemetry').href = '/sessions/telemetry' + sidQ;
+  document.getElementById('hl-cta-session').href = '/sessions/session' + sidQ;
+  // Kick the lazy outline loader now that the data-* are set.
+  if(window.pfLoadMinis) window.pfLoadMinis(hero);
 }
 
 

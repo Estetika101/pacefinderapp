@@ -20,10 +20,36 @@ HOME_HTML_PRE = """<!DOCTYPE html>
 <script src="/static/js/nav.js"></script>
 <div class="page">
 
-  <!-- Welcome strip -->
-  <div class="welcome">
-    <div class="welcome-eyebrow" id="welcome-eyebrow">&mdash;</div>
-    <h1 class="welcome-title">Welcome back.</h1>
+  <!-- Last session hero — answers "what happened while I was away?"
+       and surfaces the single best CTA: jump into the trace you just
+       drove. See docs/specs/home-last-session-hero.md (brainstorm). -->
+  <div class="hero-last" id="hero-last" style="display:none">
+    <div class="hl-outline track-outline" id="hl-outline"></div>
+    <div class="hl-body">
+      <div class="hl-eyebrow" id="hl-eyebrow">Last session</div>
+      <h1 class="hl-title">
+        <a id="hl-track-link" href="#"><span id="hl-track">&mdash;</span></a>
+        <span class="hl-dot">&middot;</span>
+        <a id="hl-car-link" href="#"><span id="hl-car">&mdash;</span></a>
+        <span class="hl-class-badge" id="hl-class-badge"></span>
+      </h1>
+      <div class="hl-stats">
+        <span class="hl-laptime" id="hl-laptime">&mdash;</span>
+        <span class="hl-delta" id="hl-delta"></span>
+      </div>
+      <div class="hl-meta" id="hl-meta">&mdash;</div>
+    </div>
+    <div class="hl-actions">
+      <a class="hl-cta primary" id="hl-cta-telemetry" href="#">Open telemetry &rarr;</a>
+      <a class="hl-cta" id="hl-cta-session" href="#">Session details</a>
+    </div>
+  </div>
+  <!-- Empty state when no session has ever been recorded. The hero
+       above hides; this prompts the user toward the live dashboard. -->
+  <div class="hero-empty" id="hero-empty" style="display:none">
+    <h1>No sessions yet.</h1>
+    <p>Point your game at port 5300 and drive — Pacefinder records every lap.</p>
+    <a class="hl-cta primary" href="/dashboard">Open live dashboard &rarr;</a>
   </div>
 
   <!-- Career stats (improvement-first; results gated; see docs/specs/home-stats.md) -->
@@ -95,6 +121,7 @@ HOME_HTML_PRE = """<!DOCTYPE html>
 
 <script>if(location.search.includes('debug=true'))document.getElementById('link-admin').style.display='';</script>
 <script src="/static/js/class.js"></script>
+<script src="/static/js/track_mini.js"></script>
 <script src="/static/js/home.js"></script>
 </body>
 </html>
