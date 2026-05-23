@@ -498,19 +498,6 @@ SESSIONS_HTML = """<!DOCTYPE html>
     border-top-color:var(--color-border)}
   .swt-help:hover .swt-help-tip,
   .swt-help:focus .swt-help-tip{opacity:1;visibility:visible}
-  /* Best-lap fingerprint glyph — sits next to the track outline. Same
-     row cell, side-by-side. Speed line on top, throttle band middle,
-     brake spikes bottom. Lazy-loaded via lap_fingerprint.js. Hidden
-     (but preserves width) when no best lap exists for the session, so
-     rows stay aligned. */
-  .stbl .lap-fp{width:70px;height:42px;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;overflow:hidden}
-  .stbl .lap-fp:not([data-sid]){visibility:hidden}
-  .stbl .lap-fp svg{width:100%;height:100%;display:block}
-  .stbl .lap-fp .fp-speed{stroke:var(--color-text-secondary);stroke-width:1;opacity:.85}
-  .stbl .lap-fp .fp-thr line{stroke:var(--color-green,#22c55e);stroke-width:1;opacity:.55}
-  .stbl .lap-fp .fp-brk line{stroke:var(--color-red,#f87171);stroke-width:1;opacity:.8}
-  @media(max-width:900px){.stbl .lap-fp{display:none}}
   /* Day separator — quiet banner between sessions of different days.
      Inserted as a <tr class="day-sep"> by sessions_list.js renderTable.
      Makes the page read like a journal (Sat: 5 sessions, Sun: 0…). */
@@ -558,6 +545,20 @@ SESSIONS_HTML = """<!DOCTYPE html>
   .stbl .bl-amber{color:var(--color-amber,#fbbf24)}
   .stbl .bl-bad  {color:var(--color-red,#f87171)}
   .stbl .bl-pb-star{margin-right:3px}
+
+  /* Per-row lap-time sparkline — answers "how did this session go?"
+     X = lap order, Y = lap_time_s (inverted: faster = up). A descending
+     curve = improving over the session; ascending = fading; tight
+     cluster = consistent. Best lap marked with an accent dot. Renders
+     inline from s.lap_times (no fetch). Hidden when <2 valid laps. */
+  .stbl .lap-spark{width:80px;height:36px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center}
+  .stbl .lap-spark svg{width:100%;height:100%;display:block}
+  .stbl .lap-spark .ls-line{stroke:var(--color-text-secondary);stroke-width:1.3;
+    fill:none;opacity:.7;stroke-linejoin:round;stroke-linecap:round}
+  .stbl .lap-spark .ls-best{fill:var(--color-accent);stroke:none}
+  .stbl .lap-spark:not([data-has-laps]){visibility:hidden}
+  @media(max-width:900px){.stbl .lap-spark{display:none}}
 
   /* Pagination — filtering applies to ALL sessions; pager just slices
      to a 25-row page. Hidden when total filtered count fits one page. */
@@ -615,7 +616,6 @@ SESSIONS_HTML = """<!DOCTYPE html>
 
 <script src="/static/js/class.js"></script>
 <script src="/static/js/track_mini.js"></script>
-<script src="/static/js/lap_fingerprint.js"></script>
 <script src="/static/js/sessions_list.js"></script>
 </body>
 </html>

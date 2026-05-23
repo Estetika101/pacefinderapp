@@ -661,27 +661,38 @@ def _db_needs_review_count() -> int:
 def _db_sessions_list(limit: int = 100) -> list:
     """Return sessions newest-first — summary stats only, no sample data.
 
-    Includes best_lap_number per session (the lap_number whose lap_time_s
-    matches the session's best). Powers the per-row best-lap fingerprint
-    glyph on /sessions; MIN() picks the lowest lap_number on the rare
-    occasion two laps tie at the best time.
+    Includes a chronological lap_times array per session (powers the
+    per-row lap-time sparkline on /sessions). Pulled in a single batch
+    query rather than N subqueries so adding 25 sparklines to the page
+    costs one extra SELECT, not 25.
     """
     with _db_lock:
         conn = _db_connect()
         try:
-            rows = conn.execute(
-                "SELECT s.session_id,s.game,s.track,s.car,s.car_ordinal,s.car_class,s.car_pi,"
-                "s.session_type,s.race_type,s.started_at,s.ended_at,s.packet_count,"
-                "s.best_lap_time_s,s.lap_count,s.finish_pos,s.grid_pos,"
-                "s.weather_condition,s.tyre_compound,s.track_temp_c, "
-                "MIN(l.lap_number) AS best_lap_number "
-                "FROM sessions s "
-                "LEFT JOIN laps l ON l.session_id = s.session_id "
-                "  AND l.lap_time_s = s.best_lap_time_s "
-                "GROUP BY s.session_id "
-                "ORDER BY s.started_at DESC LIMIT ?", (limit,)
-            ).fetchall()
-            return [dict(r) for r in rows]
+            rows = [dict(r) for r in conn.execute(
+                "SELECT session_id,game,track,car,car_ordinal,car_class,car_pi,"
+                "session_type,race_type,started_at,ended_at,packet_count,"
+                "best_lap_time_s,lap_count,finish_pos,grid_pos,"
+                "weather_condition,tyre_compound,track_temp_c "
+                "FROM sessions ORDER BY started_at DESC LIMIT ?", (limit,)
+            ).fetchall()]
+            if rows:
+                sids = [r["session_id"] for r in rows]
+                placeholders = ",".join("?" for _ in sids)
+                lap_rows = conn.execute(
+                    f"SELECT session_id, lap_number, lap_time_s FROM laps "
+                    f"WHERE session_id IN ({placeholders}) "
+                    f"  AND lap_time_s IS NOT NULL "
+                    f"ORDER BY session_id, lap_number",
+                    sids
+                ).fetchall()
+                from collections import defaultdict
+                lap_times: dict = defaultdict(list)
+                for r in lap_rows:
+                    lap_times[r["session_id"]].append(r["lap_time_s"])
+                for r in rows:
+                    r["lap_times"] = lap_times.get(r["session_id"], [])
+            return rows
         finally:
             conn.close()
 
