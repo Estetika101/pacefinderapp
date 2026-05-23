@@ -119,3 +119,46 @@ html.pf-rail-icons .pf-it[data-tip]:hover::after{
   .pf-to,.pf-to-card{transition:none}
   .pf-to-eyebrow .pf-ld{animation:none}
 }
+
+/* ── Perf overlay (debug mode) ─────────────────────────────────────
+   Floating bottom-right card on every page when config.debug_mode is
+   true. Reads /debug/perf (already collected by net/perf.py) and
+   surfaces median + p95 + last request. Low opacity by default so it
+   doesn't fight the page; hover lifts it. Hidden in embed mode and
+   when debug_mode is off. */
+.pf-perf-hud{
+  position:fixed;right:12px;bottom:12px;z-index:9999;
+  min-width:200px;max-width:320px;padding:8px 10px;
+  background:rgba(8,8,8,.85);backdrop-filter:blur(8px);
+  border:1px solid var(--color-border);border-radius:8px;
+  font-family:var(--font-mono,ui-monospace,monospace);
+  font-size:11px;color:var(--color-text-secondary);
+  opacity:.6;transition:opacity .15s,max-width .2s,min-width .2s;
+  user-select:none;cursor:default;font-variant-numeric:tabular-nums;
+}
+.pf-perf-hud:hover{opacity:1}
+.pf-perf-hud.expanded{max-width:520px;min-width:360px;opacity:1}
+.pf-perf-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}
+.pf-perf-eyebrow{color:var(--color-text-quaternary);text-transform:uppercase;letter-spacing:.06em;font-size:9px}
+.pf-perf-toggle{background:none;border:none;color:var(--color-text-quaternary);
+  font:inherit;font-size:10px;cursor:pointer;padding:0}
+.pf-perf-toggle:hover{color:var(--color-text-primary)}
+.pf-perf-grid{display:grid;grid-template-columns:auto 1fr;column-gap:10px;row-gap:2px}
+.pf-perf-grid .k{color:var(--color-text-quaternary)}
+.pf-perf-grid .v{text-align:right;color:var(--color-text-primary)}
+.pf-perf-grid .v.warn{color:var(--color-amber,#fbbf24)}
+.pf-perf-grid .v.bad{color:var(--color-red,#f87171)}
+.pf-perf-last{margin-top:6px;padding-top:6px;border-top:1px solid var(--color-border);
+  color:var(--color-text-tertiary);font-size:10px;line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-perf-list{margin-top:6px;padding-top:6px;border-top:1px solid var(--color-border);
+  display:none;max-height:180px;overflow:auto}
+.pf-perf-hud.expanded .pf-perf-list{display:block}
+.pf-perf-list .r{display:grid;grid-template-columns:1fr 60px 50px;gap:8px;
+  font-size:10px;line-height:1.5;color:var(--color-text-tertiary)}
+.pf-perf-list .r .p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-perf-list .r .t{text-align:right}
+.pf-perf-list .r .t.warn{color:var(--color-amber,#fbbf24)}
+.pf-perf-list .r .t.bad{color:var(--color-red,#f87171)}
+.pf-perf-list .r .d{text-align:right;color:var(--color-text-quaternary)}
+@media (max-width:760px){.pf-perf-hud{display:none}}
