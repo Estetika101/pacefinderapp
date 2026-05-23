@@ -498,6 +498,37 @@ SESSIONS_HTML = """<!DOCTYPE html>
     border-top-color:var(--color-border)}
   .swt-help:hover .swt-help-tip,
   .swt-help:focus .swt-help-tip{opacity:1;visibility:visible}
+  /* Session-type chip — neutral letter badge that prefixes the row's
+     sub-text (e.g. [R] Wet · Soft). Colour-neutral by design: the
+     lap-time column already uses red/amber/green for the PB gap, so
+     stacking another colour scale on race type was confusing. */
+  .stbl .rt-chip{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:20px;height:16px;padding:0 5px;margin-right:6px;
+    background:var(--color-surface-2);border:1px solid var(--color-border);
+    color:var(--color-text-secondary);
+    border-radius:3px;font-size:9px;font-weight:700;
+    letter-spacing:0.04em;font-variant-numeric:tabular-nums;
+    vertical-align:middle;line-height:1;
+  }
+  /* Lap-count pill in the Date cell — tells apart a 1-lap test
+     session from a 47-lap race without forcing a column. */
+  .stbl .lap-count{
+    display:inline-block;margin-left:8px;padding:1px 7px;
+    background:var(--color-surface-2);border:1px solid var(--color-border);
+    border-radius:999px;font-size:10px;color:var(--color-text-tertiary);
+    font-variant-numeric:tabular-nums;letter-spacing:0.02em;vertical-align:middle;
+  }
+  /* Lap-time coloured by Δ to the track PB (across all cars). PBs
+     get a ★; soft green for close; amber/red as the gap grows. */
+  .stbl .bl{font-variant-numeric:tabular-nums}
+  .stbl .bl-pb   {color:var(--color-green,#22c55e);font-weight:600}
+  .stbl .bl-close{color:#86efac}
+  .stbl .bl-mid  {color:var(--color-text-primary)}
+  .stbl .bl-amber{color:var(--color-amber,#fbbf24)}
+  .stbl .bl-bad  {color:var(--color-red,#f87171)}
+  .stbl .bl-pb-star{margin-right:3px}
+
   /* Pagination — filtering applies to ALL sessions; pager just slices
      to a 25-row page. Hidden when total filtered count fits one page. */
   .pager{display:flex;align-items:center;justify-content:center;gap:6px;
