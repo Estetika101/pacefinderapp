@@ -60,11 +60,13 @@ html.embed .hud-col{top:0;max-height:100vh}
 .hud-delta-sub{font-size:10px;color:var(--color-text-quaternary);margin-left:4px}
 @media(max-width:1180px){.hud-col{display:none}}
 /* Track map lives inside the HUD column now. Strip the wide-layout
-   sticky/shadow that was needed when it sat above the charts; the
-   HUD column is already sticky. Slim the SVG height for the narrow rail. */
-.hud-map{position:static;top:auto;box-shadow:none;background:var(--color-surface);margin:0}
-.hud-map .tm-lbl{padding:8px 12px;border-bottom:1px solid var(--color-border-subtle)}
-.hud-map #track-map-inner svg{max-height:140px !important}
+   sticky/shadow and the inset border so the SVG goes edge-to-edge of
+   the rail. HUD column is already sticky — no need for own sticky. */
+.hud-map{position:static;top:auto;box-shadow:none;background:transparent;margin:0;
+  border:none;border-radius:0;overflow:visible}
+.hud-map .tm-lbl{padding:0 2px 6px;border-bottom:none}
+.hud-map #track-map-inner{background:transparent}
+.hud-map #track-map-inner svg{max-height:none !important;background:transparent}
 /* In embed mode the iframe's own .tb is hidden, so anchor sticky to 0 and
    give the iframe body min-height:0 so it doesn't double-scroll the parent. */
 html.embed body{min-height:0}
