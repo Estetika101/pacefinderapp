@@ -24,6 +24,11 @@ function typeOf(s){
   return raw ? (_RT_ALIAS[raw] || raw) : null;
 }
 
+// Pagination — filtering applies to the full set; pager slices to one
+// page. Tunable PAGE_SIZE; URL carries ?page=N so browser-back works.
+const PAGE_SIZE = 25;
+let PAGE = 1;
+
 let _all = [];
 let _tix = new Map();          // track name → {best_lap_time_s, spark_laps, trend}
 let _openF = null;             // which facet dropdown panel is open
@@ -69,15 +74,23 @@ function readURL(){
   SORT.key = SORT_KEYS.indexOf(k) >= 0 ? k : 'date';
   SORT.dir = (q.get('dir') === 'asc' || q.get('dir') === 'desc')
     ? q.get('dir') : defaultDir(SORT.key);
+  const p = parseInt(q.get('page'), 10);
+  PAGE = (!isNaN(p) && p >= 1) ? p : 1;
 }
 function writeURL(){
   const q = new URLSearchParams();
   FACETS.forEach(g => { if(F[g].length) q.set(g, F[g].join(',')); });
   if(F.review) q.set('review', '1');
   if(SORT.key !== 'date' || SORT.dir !== 'desc'){ q.set('sort', SORT.key); q.set('dir', SORT.dir); }
+  if(PAGE > 1) q.set('page', PAGE);
   const s = q.toString();
   history.replaceState(null, '', s ? '?' + s : location.pathname);
 }
+// Reset to page 1 whenever the filter set changes — paging through a
+// stale filter is disorienting (you'd land on a page that no longer
+// has matches). Sort changes preserve PAGE because the same rows are
+// still in scope, just reordered.
+function resetPage(){ PAGE = 1; }
 
 function facetVal(s, g){
   return g==='car'  ? String(s.car_ordinal) :
@@ -186,15 +199,35 @@ function renderTable(){
     `<tr>${th('track','Circuit')}${th('car','Car')}`+
     `${th('lap','Best lap',true)}${th('date','Date',true)}</tr>`;
 
-  let rows = sortRows(_all.filter(match));
-  document.getElementById('sess-sub').textContent =
-    rows.length === _all.length
+  const rows = sortRows(_all.filter(match));
+  // Pagination — slice AFTER filter+sort so all sessions remain in
+  // scope of every filter. Clamp page if filter shrank the result set.
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  if(PAGE > totalPages) PAGE = totalPages;
+  const start = (PAGE - 1) * PAGE_SIZE;
+  const pageRows = rows.slice(start, start + PAGE_SIZE);
+
+  const sub = document.getElementById('sess-sub');
+  if(rows.length === 0){
+    sub.textContent = `0 of ${_all.length} sessions`;
+  } else if(rows.length <= PAGE_SIZE){
+    sub.textContent = rows.length === _all.length
       ? `${_all.length} session${_all.length===1?'':'s'}`
       : `${rows.length} of ${_all.length} sessions`;
+  } else {
+    const end = Math.min(start + PAGE_SIZE, rows.length);
+    sub.textContent = `${start+1}–${end} of ${rows.length}`+
+      (rows.length === _all.length ? ` session${rows.length===1?'':'s'}`
+                                   : ` (filtered from ${_all.length})`);
+  }
 
   const list = document.getElementById('sess-list');
-  if(!rows.length){ list.innerHTML = '<tr><td colspan="4" class="c-empty">No sessions match this filter.</td></tr>'; return; }
-  list.innerHTML = rows.map(s=>{
+  if(!rows.length){
+    list.innerHTML = '<tr><td colspan="4" class="c-empty">No sessions match this filter.</td></tr>';
+    renderPager(0);
+    return;
+  }
+  list.innerHTML = pageRows.map(s=>{
     const href = '/sessions/session?id='+encodeURIComponent(s.session_id)
       + (s.game?'&game='+encodeURIComponent(s.game):'')
       + (s.track?'&track='+encodeURIComponent(s.track):'');
@@ -221,6 +254,50 @@ function renderTable(){
       `</tr>`;
   }).join('');
   if(window.pfLoadMinis) window.pfLoadMinis(list);
+  renderPager(rows.length);
+}
+
+// Pagination control — page number row + prev/next. Hides itself when
+// the filtered set fits on a single page. Wired via event delegation
+// on a handler attached once at init (see DOM-ready section below).
+function renderPager(totalRows){
+  const wrap  = document.getElementById('sess-pager');
+  const pages = document.getElementById('pg-pages');
+  const prev  = document.getElementById('pg-prev');
+  const next  = document.getElementById('pg-next');
+  if(!wrap || !pages || !prev || !next) return;
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  if(totalPages <= 1){ wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  prev.disabled = (PAGE <= 1);
+  next.disabled = (PAGE >= totalPages);
+  // Page-number window: always show first + last; ellipses around the
+  // current page when there are more than 7 pages, so the bar stays
+  // compact regardless of total count.
+  const out = [];
+  const push = (n) => out.push(`<button class="pg-num${n===PAGE?' cur':''}" data-pg="${n}">${n}</button>`);
+  const gap = () => out.push('<span class="pg-gap">…</span>');
+  if(totalPages <= 7){
+    for(let i = 1; i <= totalPages; i++) push(i);
+  } else {
+    push(1);
+    let lo = Math.max(2, PAGE - 1), hi = Math.min(totalPages - 1, PAGE + 1);
+    if(PAGE <= 3){ lo = 2; hi = 4; }
+    if(PAGE >= totalPages - 2){ lo = totalPages - 3; hi = totalPages - 1; }
+    if(lo > 2) gap();
+    for(let i = lo; i <= hi; i++) push(i);
+    if(hi < totalPages - 1) gap();
+    push(totalPages);
+  }
+  pages.innerHTML = out.join('');
+}
+function gotoPage(n){
+  PAGE = Math.max(1, n);
+  writeURL();
+  renderTable();
+  // Jump back to the top of the table so the new page reads from the top.
+  const head = document.getElementById('sess-head');
+  if(head && head.scrollIntoView) head.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 // In-place sync so an option/clear click never rebuilds #filters —
@@ -250,7 +327,7 @@ document.addEventListener('click', e=>{
     opt.classList.toggle('on', now);
     opt.querySelector('.fck').textContent = now ? '✓' : '';
     syncDropBtn(opt.closest('.fdrop'), g);
-    syncClearAll(); writeURL(); renderTable();
+    syncClearAll(); resetPage(); writeURL(); renderTable();
     return;
   }
   const fc = e.target.closest('.fclear');
@@ -260,19 +337,25 @@ document.addEventListener('click', e=>{
       F[g]=[];
       drop.querySelectorAll('.fopt.on').forEach(o=>{
         o.classList.remove('on'); o.querySelector('.fck').textContent=''; });
-      syncDropBtn(drop,g); syncClearAll(); writeURL(); renderTable();
+      syncDropBtn(drop,g); syncClearAll(); resetPage(); writeURL(); renderTable();
     }
     return;
   }
   if(e.target.closest('.fclear-all')){
-    FACETS.forEach(g=>F[g]=[]); F.review=false; _openF=null; writeURL(); render(); return; }
+    FACETS.forEach(g=>F[g]=[]); F.review=false; _openF=null;
+    resetPage(); writeURL(); render(); return; }
   const fd = e.target.closest('.fdrop-btn');
   if(fd){ _openF = (_openF===fd.dataset.fd) ? null : fd.dataset.fd; render(); return; }
   const h = e.target.closest('.stbl th[data-k]');
   if(h){ const k=h.dataset.k;
     if(SORT.key===k) SORT.dir = SORT.dir==='asc' ? 'desc' : 'asc';
     else { SORT.key=k; SORT.dir=defaultDir(k); }
-    writeURL(); renderTable(); return; }
+    resetPage(); writeURL(); renderTable(); return; }
+  // Pagination clicks — page-number button, prev, or next.
+  const pn = e.target.closest('.pg-num');
+  if(pn){ gotoPage(parseInt(pn.dataset.pg, 10) || 1); return; }
+  if(e.target.id === 'pg-prev'){ if(PAGE > 1) gotoPage(PAGE - 1); return; }
+  if(e.target.id === 'pg-next'){ gotoPage(PAGE + 1); return; }
   // Click outside an open panel closes it.
   if(_openF && !e.target.closest('.fdrop-panel') && !e.target.closest('.fdrop-btn')){
     _openF=null; render(); }
@@ -287,7 +370,10 @@ document.addEventListener('input', e=>{
   }
 });
 document.addEventListener('change', e=>{
-  if(e.target.id==='rev-t'){ F.review = e.target.checked ? '1' : false; writeURL(); renderTable(); }
+  if(e.target.id==='rev-t'){
+    F.review = e.target.checked ? '1' : false;
+    resetPage(); writeURL(); renderTable();
+  }
 });
 
 (async function init(){

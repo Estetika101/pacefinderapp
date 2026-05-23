@@ -498,6 +498,24 @@ SESSIONS_HTML = """<!DOCTYPE html>
     border-top-color:var(--color-border)}
   .swt-help:hover .swt-help-tip,
   .swt-help:focus .swt-help-tip{opacity:1;visibility:visible}
+  /* Pagination — filtering applies to ALL sessions; pager just slices
+     to a 25-row page. Hidden when total filtered count fits one page. */
+  .pager{display:flex;align-items:center;justify-content:center;gap:6px;
+    margin:var(--space-4) 0;flex-wrap:wrap}
+  .pg-btn{background:var(--color-surface);border:1px solid var(--color-border);
+    color:var(--color-text-secondary);font:inherit;font-size:var(--text-sm);
+    padding:6px 12px;border-radius:6px;cursor:pointer;
+    transition:border-color 120ms,color 120ms,background 120ms}
+  .pg-btn:hover:not(:disabled){color:var(--color-text-primary);border-color:var(--color-text-secondary)}
+  .pg-btn:disabled{opacity:.35;cursor:default}
+  .pg-pages{display:flex;gap:4px;flex-wrap:wrap}
+  .pg-num{background:none;border:1px solid transparent;
+    color:var(--color-text-secondary);font:inherit;font-size:var(--text-sm);
+    min-width:32px;padding:6px 10px;border-radius:6px;cursor:pointer;
+    font-variant-numeric:tabular-nums}
+  .pg-num:hover{color:var(--color-text-primary);background:var(--color-surface)}
+  .pg-num.cur{background:var(--color-accent);color:#000;font-weight:600;cursor:default}
+  .pg-gap{padding:6px 4px;color:var(--color-text-quaternary);user-select:none}
 </style>
 </head>
 <body>
@@ -521,6 +539,15 @@ SESSIONS_HTML = """<!DOCTYPE html>
       <thead id="sess-head"></thead>
       <tbody id="sess-list"></tbody>
     </table>
+  </div>
+
+  <!-- Pagination — filtering applies to the full set; only the current
+       page renders into the table. JS toggles visibility based on total
+       filtered count. See sessions_list.js renderPager(). -->
+  <div class="pager" id="sess-pager" style="display:none">
+    <button class="pg-btn" id="pg-prev" aria-label="Previous page">&lsaquo; Prev</button>
+    <div class="pg-pages" id="pg-pages"></div>
+    <button class="pg-btn" id="pg-next" aria-label="Next page">Next &rsaquo;</button>
   </div>
 
 </div>
