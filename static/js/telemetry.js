@@ -425,9 +425,11 @@ function renderAll(){
     if(empty)empty.style.display='';
     allPanelIds.forEach(id=>{const p=$(id);if(p)p.style.display='none';});
     const tm=$('track-map-wrap');if(tm)tm.style.display='none';
+    hideHud();
     return;
   }
   if(empty)empty.style.display='none';
+  showHud(); resetHud();
   // Delta panel only renders when a reference is selected AND a non-reference lap is also selected.
   let deltaHtml='',showDeltaPanel=false;
   if(_refSamples){
@@ -492,6 +494,7 @@ function paintCursor(xFrac, mouseEvent){
   }
   if(_cursorLocked) lines.push('🔒 locked — Esc to release');
   tip.textContent=lines.join('\\n');
+  updateHud(pos);
   if(mouseEvent){
     tip.style.left=Math.min(mouseEvent.clientX+14,window.innerWidth-180)+'px';
     tip.style.top=Math.max(8,mouseEvent.clientY-tip.offsetHeight-8)+'px';
@@ -649,6 +652,80 @@ function setupInteraction(){
 function hideX(){
   document.querySelectorAll('.px-line').forEach(l=>{l.style.display='none';l.classList.remove('locked');});
   $('tele-tip').style.display='none';
+  resetHud();
+}
+// ── HUD column ────────────────────────────────────────────────────────────
+// Live cockpit readouts on the right rail. Driven entirely by paintCursor:
+// no separate state, no extra DB calls — just another consumer of the same
+// interpolated samples that build the floating tooltip. Shows the primary
+// lap vs the selected reference; hidden when no lap is selected.
+function _set(id,v){const el=document.getElementById(id);if(el)el.textContent=v;}
+function _setFill(id,pct){const el=document.getElementById(id);if(el)el.style.width=Math.max(0,Math.min(100,pct))+'%';}
+function _setTick(id,pct){const el=document.getElementById(id);if(!el)return;
+  if(pct==null||isNaN(pct)){el.style.display='none';return;}
+  el.style.display='block';el.style.left=Math.max(0,Math.min(100,pct))+'%';
+}
+function showHud(){const c=document.getElementById('hud-col');if(c)c.style.display='';}
+function hideHud(){const c=document.getElementById('hud-col');if(c)c.style.display='none';}
+function resetHud(){
+  // Cursor not active — clear the cards back to em-dashes so a stale read
+  // doesn't look live. The column itself stays visible (it's tied to lap
+  // selection, not cursor presence).
+  _set('hud-pos','— %');_set('hud-speed-val','—');_set('hud-speed-ref','');
+  const sd=document.getElementById('hud-speed-delta');if(sd)sd.innerHTML='';
+  _setFill('hud-thr-fill',0);_setFill('hud-brk-fill',0);
+  _setTick('hud-thr-tick',null);_setTick('hud-brk-tick',null);
+  _set('hud-thr-val','—');_set('hud-brk-val','—');
+  _set('hud-gear-val','—');
+  const dv=document.getElementById('hud-delta-val');if(dv){dv.className='hud-mid';dv.innerHTML='—<span class="hud-delta-sub">here</span>';}
+}
+function updateHud(pos){
+  if(!_primaryLap||!_lapSamples[_primaryLap])return;
+  const s=_lapSamples[_primaryLap];
+  const sp=interpAt(s,pos,'speed_mph');
+  const th=interpAt(s,pos,'throttle_pct');
+  const br=interpAt(s,pos,'brake_pct');
+  const gr=interpAt(s,pos,'gear');
+  _set('hud-pos',(pos*100).toFixed(1)+' %');
+  _set('hud-speed-val',sp==null||isNaN(sp)?'—':Math.round(sp));
+  _set('hud-thr-val',th==null||isNaN(th)?'—':Math.round(th)+'%');
+  _set('hud-brk-val',br==null||isNaN(br)?'—':Math.round(br)+'%');
+  _setFill('hud-thr-fill',th||0);
+  _setFill('hud-brk-fill',br||0);
+  _set('hud-gear-val',gr==null||isNaN(gr)?'—':Math.round(gr));
+  // Reference comparison — only when a ref is loaded and the primary lap
+  // is NOT the reference itself (showing 0 deltas vs your own lap is noise).
+  if(_refSamples && !isRefLap(_primaryLap)){
+    const rsp=interpAt(_refSamples,pos,'speed_mph');
+    const rth=interpAt(_refSamples,pos,'throttle_pct');
+    const rbr=interpAt(_refSamples,pos,'brake_pct');
+    const rt=interpAt(_refSamples,pos,'t');
+    const ct=interpAt(s,pos,'t');
+    _set('hud-speed-ref',rsp==null||isNaN(rsp)?'':'ref '+Math.round(rsp));
+    _setTick('hud-thr-tick',rth);
+    _setTick('hud-brk-tick',rbr);
+    const sd=document.getElementById('hud-speed-delta');
+    if(sd){
+      if(sp!=null&&rsp!=null&&!isNaN(sp)&&!isNaN(rsp)){
+        const d=sp-rsp,sign=d>0?'+':(d<0?'−':'·'),cls=d>0?'gain':(d<0?'lost':'');
+        sd.innerHTML='<span class="v '+cls+'">'+sign+Math.abs(d).toFixed(0)+' vs ref</span>';
+      } else sd.innerHTML='';
+    }
+    const dv=document.getElementById('hud-delta-val');
+    if(dv){
+      if(ct!=null&&rt!=null&&!isNaN(ct)&&!isNaN(rt)){
+        const dd=ct-rt,sign=dd>0?'+':(dd<0?'−':'·'),cls=dd>0?'lost':(dd<0?'gain':'');
+        dv.className='hud-mid '+cls;
+        dv.innerHTML=sign+Math.abs(dd).toFixed(2)+'<span class="hud-delta-sub">here</span>';
+      } else { dv.className='hud-mid'; dv.innerHTML='—<span class="hud-delta-sub">here</span>'; }
+    }
+  } else {
+    _set('hud-speed-ref','');
+    _setTick('hud-thr-tick',null);_setTick('hud-brk-tick',null);
+    const sd=document.getElementById('hud-speed-delta');if(sd)sd.innerHTML='';
+    const dv=document.getElementById('hud-delta-val');
+    if(dv){dv.className='hud-mid';dv.innerHTML='—<span class="hud-delta-sub">here</span>';}
+  }
 }
 function resetZoom(){_zoom=[0,1];renderAll();}
 function stepZoom(dir){

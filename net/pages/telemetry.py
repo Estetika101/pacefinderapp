@@ -24,6 +24,41 @@ a{color:inherit;text-decoration:none}
 .subnav-item.active{color:var(--color-text-primary);background:var(--color-surface);box-shadow:inset 0 -2px 0 var(--color-accent)}
 .tele-layout{display:flex;min-height:calc(100vh - 90px);gap:8px;padding:8px}
 .ctrl-col{width:220px;flex-shrink:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--sp-3) var(--sp-4);overflow-y:auto;position:sticky;top:58px;max-height:calc(100vh - 66px);align-self:flex-start}
+/* Right-side HUD column — cockpit-style live readouts driven by paintCursor.
+   Hidden until at least one lap is selected, hidden on narrow viewports. */
+.hud-col{width:264px;flex-shrink:0;position:sticky;top:58px;max-height:calc(100vh - 66px);align-self:flex-start;
+  display:flex;flex-direction:column;gap:10px;font-family:var(--font-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums}
+html.embed .hud-col{top:0;max-height:100vh}
+.hud-head{display:flex;align-items:center;justify-content:space-between;padding:0 4px}
+.hud-eyebrow{font-size:10px;color:var(--color-text-quaternary);text-transform:uppercase;letter-spacing:0.08em}
+.hud-pos{font-size:10px;color:var(--color-text-quaternary)}
+.hud-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;padding:12px 14px}
+.hud-card-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+.hud-lbl{font-size:10px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em}
+.hud-ref{font-size:10px;color:var(--color-text-quaternary)}
+.hud-big{font-size:42px;font-weight:500;line-height:1;letter-spacing:-1px;color:var(--color-text-primary)}
+.hud-unit{font-size:13px;color:var(--color-text-quaternary);margin-left:6px;letter-spacing:0}
+.hud-delta{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--color-text-quaternary);min-height:14px}
+.hud-delta .v{font-variant-numeric:tabular-nums}
+.hud-delta .v.gain{color:var(--color-green,#4ade80)}
+.hud-delta .v.lost{color:var(--color-red,#f87171)}
+.hud-bar-row{display:grid;grid-template-columns:36px 1fr 40px;gap:8px;align-items:center;margin-top:8px}
+.hud-bar-row:first-of-type{margin-top:4px}
+.hud-bar-lbl{font-size:10px;color:var(--color-text-tertiary)}
+.hud-bar{position:relative;height:10px;background:var(--color-surface-2);border-radius:2px;overflow:hidden}
+.hud-bar-fill{position:absolute;left:0;top:0;bottom:0;width:0;transition:width 60ms linear}
+.hud-bar-fill.thr{background:linear-gradient(90deg,rgba(74,222,128,.33),#4ade80)}
+.hud-bar-fill.brk{background:linear-gradient(90deg,rgba(248,113,113,.33),#f87171)}
+.hud-bar-tick{position:absolute;top:-1px;bottom:-1px;width:1px;background:rgba(255,255,255,.55);display:none}
+.hud-bar-val{font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.hud-bar-val.thr{color:var(--color-green,#4ade80)}
+.hud-bar-val.brk{color:var(--color-red,#f87171)}
+.hud-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hud-row2 .hud-card{padding:10px 12px}
+.hud-mid{font-size:28px;font-weight:500;line-height:1;margin-top:4px}
+.hud-mid.gain{color:var(--color-green,#4ade80)}.hud-mid.lost{color:var(--color-red,#f87171)}
+.hud-delta-sub{font-size:10px;color:var(--color-text-quaternary);margin-left:4px}
+@media(max-width:1180px){.hud-col{display:none}}
 /* In embed mode the iframe's own .tb is hidden, so anchor sticky to 0 and
    give the iframe body min-height:0 so it doesn't double-scroll the parent. */
 html.embed body{min-height:0}
@@ -248,6 +283,46 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
     <div class="x-lbl-row"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
   </div>
 </div>
+<aside class="hud-col" id="hud-col" style="display:none">
+  <div class="hud-head">
+    <span class="hud-eyebrow">Cursor</span>
+    <span class="hud-pos" id="hud-pos">— %</span>
+  </div>
+  <div class="hud-card">
+    <div class="hud-card-head">
+      <span class="hud-lbl">Speed</span>
+      <span class="hud-ref" id="hud-speed-ref"></span>
+    </div>
+    <div class="hud-big"><span id="hud-speed-val">—</span><span class="hud-unit">mph</span></div>
+    <div class="hud-delta" id="hud-speed-delta"></div>
+  </div>
+  <div class="hud-card">
+    <div class="hud-card-head">
+      <span class="hud-lbl">Inputs</span>
+      <span class="hud-ref" id="hud-inputs-ref">vs ref ghost</span>
+    </div>
+    <div class="hud-bar-row">
+      <span class="hud-bar-lbl">THR</span>
+      <div class="hud-bar"><div class="hud-bar-fill thr" id="hud-thr-fill"></div><div class="hud-bar-tick" id="hud-thr-tick"></div></div>
+      <span class="hud-bar-val thr" id="hud-thr-val">—</span>
+    </div>
+    <div class="hud-bar-row">
+      <span class="hud-bar-lbl">BRK</span>
+      <div class="hud-bar"><div class="hud-bar-fill brk" id="hud-brk-fill"></div><div class="hud-bar-tick" id="hud-brk-tick"></div></div>
+      <span class="hud-bar-val brk" id="hud-brk-val">—</span>
+    </div>
+  </div>
+  <div class="hud-row2">
+    <div class="hud-card">
+      <span class="hud-lbl">Gear</span>
+      <div class="hud-mid" id="hud-gear-val">—</div>
+    </div>
+    <div class="hud-card">
+      <span class="hud-lbl">Δ vs ref</span>
+      <div class="hud-mid" id="hud-delta-val">—<span class="hud-delta-sub">here</span></div>
+    </div>
+  </div>
+</aside>
 </div>
 <div id="tele-tip"></div>
 <script src="/static/js/perf.js"></script>
