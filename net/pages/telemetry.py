@@ -29,9 +29,16 @@ a{color:inherit;text-decoration:none}
 .hud-col{width:264px;flex-shrink:0;position:sticky;top:58px;max-height:calc(100vh - 66px);align-self:flex-start;
   display:flex;flex-direction:column;gap:10px;font-family:var(--font-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums}
 html.embed .hud-col{top:0;max-height:100vh}
-.hud-head{display:flex;align-items:center;justify-content:space-between;padding:0 4px}
-.hud-eyebrow{font-size:10px;color:var(--color-text-quaternary);text-transform:uppercase;letter-spacing:0.08em}
-.hud-pos{font-size:10px;color:var(--color-text-quaternary)}
+.hud-head{display:flex;align-items:center;justify-content:space-between;padding:0 4px;gap:8px}
+.hud-head-l{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden}
+.hud-lap-chip{width:9px;height:9px;border-radius:50%;background:var(--color-text-quaternary);flex-shrink:0;
+  box-shadow:0 0 0 1px rgba(0,0,0,.6) inset}
+.hud-lap-label{font-size:11px;color:var(--color-text-primary);text-transform:uppercase;letter-spacing:0.08em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-pos{font-size:10px;color:var(--color-text-quaternary);flex-shrink:0}
+.hud-refrow{padding:0 4px;font-size:10px;color:var(--color-text-quaternary);text-transform:uppercase;
+  letter-spacing:0.06em;margin-top:-4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-refrow #hud-ref-name{color:var(--color-text-tertiary)}
 .hud-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;padding:12px 14px}
 .hud-card-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
 .hud-lbl{font-size:10px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em}
@@ -292,8 +299,14 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
     <div id="track-map-inner"></div>
   </div>
   <div class="hud-head">
-    <span class="hud-eyebrow">Cursor</span>
+    <span class="hud-head-l">
+      <span class="hud-lap-chip" id="hud-lap-chip"></span>
+      <span class="hud-lap-label" id="hud-lap-label">—</span>
+    </span>
     <span class="hud-pos" id="hud-pos">— %</span>
+  </div>
+  <div class="hud-refrow" id="hud-refrow" style="display:none">
+    vs <span id="hud-ref-name">—</span>
   </div>
   <div class="hud-card">
     <div class="hud-card-head">

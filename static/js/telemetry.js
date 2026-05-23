@@ -693,15 +693,45 @@ function showHud(){const c=document.getElementById('hud-col');if(c)c.style.displ
 function hideHud(){const c=document.getElementById('hud-col');if(c)c.style.display='none';}
 function resetHud(){
   // Cursor not active — clear the cards back to em-dashes so a stale read
-  // doesn't look live. The column itself stays visible (it's tied to lap
-  // selection, not cursor presence).
-  _set('hud-pos','— %');_set('hud-speed-val','—');_set('hud-speed-ref','');
+  // doesn't look live. Lap identity stays in the header because that
+  // sticks regardless of cursor (it tells you whose values you'll see
+  // when you DO scrub).
+  _set('hud-pos','— %');
+  _setHudLapHeader();
+  _set('hud-speed-val','—');_set('hud-speed-ref','');
   const sd=document.getElementById('hud-speed-delta');if(sd)sd.innerHTML='';
   _setFill('hud-thr-fill',0);_setFill('hud-brk-fill',0);
   _setTick('hud-thr-tick',null);_setTick('hud-brk-tick',null);
   _set('hud-thr-val','—');_set('hud-brk-val','—');
   _set('hud-gear-val','—');
   const dv=document.getElementById('hud-delta-val');if(dv){dv.className='hud-mid';dv.innerHTML='—<span class="hud-delta-sub">here</span>';}
+}
+// Header line: colored dot matching the primary lap's chart trace + the
+// lap label (L5 etc.). The dot makes it instantly clear which trace the
+// HUD numbers belong to when multiple laps are overlaid.
+function _setHudLapHeader(){
+  const chip=document.getElementById('hud-lap-chip');
+  const lbl=document.getElementById('hud-lap-label');
+  const refRow=document.getElementById('hud-refrow');
+  const refName=document.getElementById('hud-ref-name');
+  if(!chip||!lbl) return;
+  if(_primaryLap==null){
+    chip.style.background='var(--color-text-quaternary)';
+    lbl.textContent='—';
+    if(refRow) refRow.style.display='none';
+    return;
+  }
+  const ci=_selectedLaps.indexOf(_primaryLap);
+  chip.style.background = ci >= 0 ? LAP_COLORS[ci] : 'var(--color-text-quaternary)';
+  lbl.textContent='Lap '+(_primaryLap+1);
+  if(refRow && refName){
+    if(_refSamples && !isRefLap(_primaryLap)){
+      refName.textContent=refLabel();
+      refRow.style.display='';
+    } else {
+      refRow.style.display='none';
+    }
+  }
 }
 function updateHud(pos){
   if(!_primaryLap||!_lapSamples[_primaryLap])return;
