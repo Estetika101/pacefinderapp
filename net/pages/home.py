@@ -52,6 +52,18 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     <a class="hl-cta primary" href="/dashboard">Open live dashboard &rarr;</a>
   </div>
 
+  <!-- Regression watchlist — (track, car) combos where the user's recent
+       3 sessions are slower than the prior 3. The "what should I work
+       on?" answer. Hidden when nothing's regressing — no "all good"
+       confetti. See /home/regression-watchlist. -->
+  <div class="watchlist" id="watchlist" style="display:none">
+    <div class="watchlist-head">
+      <h2>Where you're slipping</h2>
+      <span class="watchlist-sub">Recent sessions slower than your usual pace</span>
+    </div>
+    <div class="watchlist-grid" id="watchlist-grid"></div>
+  </div>
+
   <!-- Career stats (improvement-first; results gated; see docs/specs/home-stats.md) -->
   <div class="career-strip" id="career-strip" style="display:none">
     <div class="cs-stats">

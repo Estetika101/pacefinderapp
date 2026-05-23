@@ -49,6 +49,58 @@ a{color:inherit;text-decoration:none}
 .top-nav a#nav-live{color:var(--color-accent)}
 .top-nav a#nav-live:hover{background:rgba(232,184,75,0.08)}
 
+/* ── Regression watchlist — "where you're slipping" ─────────────── */
+.watchlist{margin:var(--space-4) 0}
+.watchlist-head{
+  display:flex;align-items:baseline;justify-content:space-between;
+  margin-bottom:var(--space-3);gap:var(--space-3);flex-wrap:wrap;
+}
+.watchlist-head h2{
+  font-size:var(--text-sm);font-weight:500;
+  color:var(--color-text-tertiary);
+  text-transform:uppercase;letter-spacing:0.08em;margin:0;
+}
+.watchlist-sub{font-size:11px;color:var(--color-text-quaternary)}
+.watchlist-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:var(--space-3);
+}
+@media(max-width:900px){.watchlist-grid{grid-template-columns:1fr}}
+.wl-card{
+  display:grid;grid-template-columns:80px 1fr auto;
+  gap:var(--space-3);align-items:center;
+  padding:var(--space-3);
+  background:var(--color-surface);
+  border:1px solid var(--color-border);
+  border-left:2px solid var(--color-red,#ef4444);
+  border-radius:var(--radius-md);
+  text-decoration:none;color:inherit;
+  transition:border-color 120ms,background 120ms;
+}
+.wl-card:hover{background:var(--color-surface-2);border-color:var(--color-red,#ef4444)}
+.wl-outline{width:80px;height:60px;display:flex;align-items:center;justify-content:center}
+.wl-outline svg{width:100%;height:100%;overflow:visible}
+.wl-outline .tm-line line{stroke-width:1.6;stroke-linecap:round}
+.wl-body{min-width:0;display:flex;flex-direction:column;gap:4px}
+.wl-name{
+  font-size:var(--text-md);font-weight:600;color:var(--color-text-primary);
+  line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.wl-meta{font-size:11px;color:var(--color-text-tertiary);display:flex;align-items:center;gap:6px}
+.wl-meta .class-badge{
+  display:inline-block;padding:1px 6px;
+  background:var(--color-accent);color:#000;
+  border-radius:3px;font-size:10px;font-weight:700;letter-spacing:0.05em;
+}
+.wl-spark{display:block;width:100%;max-width:120px;height:26px}
+.wl-spark-empty{height:26px}
+.wl-delta{
+  font-size:var(--text-sm);font-weight:600;
+  color:var(--color-red,#ef4444);font-variant-numeric:tabular-nums;
+}
+.wl-arrow{color:var(--color-text-quaternary);font-size:18px;align-self:center}
+.wl-card:hover .wl-arrow{color:var(--color-text-primary)}
+
 /* ── Last-session hero (the page's lede) ────────────────────────── */
 .hero-last{
   display:grid;

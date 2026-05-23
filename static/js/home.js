@@ -50,6 +50,7 @@ async function init(){
   catch(e){ return; }  // nav.js owns the live status pill
   _tf = d.time_format || '24h';
   renderHeroLast(d.last_session, d.pb_at_track_s, d.stats);
+  loadWatchlist();
   loadCareer();
   renderTopCircuits(d.top_circuits || []);
   renderTopCars(d.top_cars || []);
@@ -195,6 +196,57 @@ function renderRecent(recents){
       <span class="recent-arrow">→</span>
     </a>`;
   }).join('');
+}
+
+// ── Regression watchlist ─────────────────────────────────────────
+// "Where you're slipping" — async because it shouldn't block the
+// initial paint. Hides the whole section when nothing's regressing
+// (no fake "all good" card; that's gamification, not coaching).
+async function loadWatchlist(){
+  let rows;
+  try{ rows = await fetch('/home/regression-watchlist').then(r => r.json()); }
+  catch(e){ return; }
+  if(!Array.isArray(rows) || rows.length === 0) return;
+  const wrap = document.getElementById('watchlist');
+  const grid = document.getElementById('watchlist-grid');
+  grid.innerHTML = rows.map(r => {
+    const carDisplay = r.car_nickname || r.car_name || ('Car #' + r.car_ordinal);
+    const cc = pfCarClass(r.car_pi, r.car_class);
+    const cls = cc ? `<span class="class-badge">${cc}</span>` : '';
+    const outAttr = (r.pb_session_id && r.pb_lap_number != null)
+      ? ` data-sid="${escapeHtml(r.pb_session_id)}" data-lap="${r.pb_lap_number}"` : '';
+    const href = '/sessions/telemetry?id=' + encodeURIComponent(r.last_session_id);
+    return `<a href="${href}" class="wl-card">
+      <div class="wl-outline track-outline"${outAttr}></div>
+      <div class="wl-body">
+        <div class="wl-name">${escapeHtml(r.track)}</div>
+        <div class="wl-meta">${escapeHtml(carDisplay)} ${cls}</div>
+        ${renderSpark(r.sparkline)}
+        <div class="wl-delta">+${r.delta_s.toFixed(2)}s vs your earlier pace</div>
+      </div>
+      <div class="wl-arrow">→</div>
+    </a>`;
+  }).join('');
+  wrap.style.display = '';
+  if(window.pfLoadMinis) window.pfLoadMinis(grid);
+}
+// Compact red sparkline of last 6 best-lap times. Y inverted (lower
+// = faster = up), so a downward slope = improving, upward = the
+// regression we're flagging.
+function renderSpark(vals){
+  if(!vals || vals.length < 2) return '<div class="wl-spark-empty"></div>';
+  const w = 100, h = 26;
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  const rng = Math.max(mx - mn, 0.1);
+  const xs = vals.map((_, i) => (i / (vals.length - 1)) * w);
+  const ys = vals.map(v => h - ((v - mn) / rng) * (h - 4) - 2);
+  const pts = xs.map((x, i) => x.toFixed(1) + ',' + ys[i].toFixed(1)).join(' ');
+  const lastX = xs[xs.length - 1].toFixed(1);
+  const lastY = ys[ys.length - 1].toFixed(1);
+  return `<svg class="wl-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="var(--color-red,#ef4444)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>
+    <circle cx="${lastX}" cy="${lastY}" r="2.4" fill="var(--color-red,#ef4444)"/>
+  </svg>`;
 }
 
 // ── Career strip ──────────────────────────────────────────────────
