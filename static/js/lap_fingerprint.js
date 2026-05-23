@@ -24,8 +24,11 @@
     const key = sid + ':' + lap;
     if(_cache.has(key)) return _cache.get(key);
     try{
+      // ?outline=1 — server-side decimation to ≤80 points + drops every
+      // field except the ones this renderer reads. Same flag as
+      // track_mini.js; shared slim format.
       const s = await fetch('/sessions/lap-samples?session_id=' + encodeURIComponent(sid)
-        + '&lap=' + encodeURIComponent(lap)).then(r => r.json());
+        + '&lap=' + encodeURIComponent(lap) + '&outline=1').then(r => r.json());
       const ok = Array.isArray(s) && s.length >= 20;
       _cache.set(key, ok ? s : null);
       return ok ? s : null;
