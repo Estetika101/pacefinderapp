@@ -59,6 +59,12 @@ html.embed .hud-col{top:0;max-height:100vh}
 .hud-mid.gain{color:var(--color-green,#4ade80)}.hud-mid.lost{color:var(--color-red,#f87171)}
 .hud-delta-sub{font-size:10px;color:var(--color-text-quaternary);margin-left:4px}
 @media(max-width:1180px){.hud-col{display:none}}
+/* Track map lives inside the HUD column now. Strip the wide-layout
+   sticky/shadow that was needed when it sat above the charts; the
+   HUD column is already sticky. Slim the SVG height for the narrow rail. */
+.hud-map{position:static;top:auto;box-shadow:none;background:var(--color-surface);margin:0}
+.hud-map .tm-lbl{padding:8px 12px;border-bottom:1px solid var(--color-border-subtle)}
+.hud-map #track-map-inner svg{max-height:140px !important}
 /* In embed mode the iframe's own .tb is hidden, so anchor sticky to 0 and
    give the iframe body min-height:0 so it doesn't double-scroll the parent. */
 html.embed body{min-height:0}
@@ -246,10 +252,6 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
 <div class="panels-col">
   <div id="tele-loading">Loading telemetry data&hellip;</div>
   <div id="panels-inner" style="display:none">
-    <div class="track-map-wrap" id="track-map-wrap" style="display:none">
-      <div class="tm-lbl">Track map &mdash; colour = speed (blue slow &rarr; red fast)</div>
-      <div id="track-map-inner"></div>
-    </div>
     <div id="sector-hdr" class="sector-hdr"></div>
     <div id="lap-summaries" class="lap-summaries"></div>
     <div class="tele-help" id="tele-help">
@@ -284,6 +286,10 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
   </div>
 </div>
 <aside class="hud-col" id="hud-col" style="display:none">
+  <div class="track-map-wrap hud-map" id="track-map-wrap" style="display:none">
+    <div class="tm-lbl">Track map &mdash; colour = speed</div>
+    <div id="track-map-inner"></div>
+  </div>
   <div class="hud-head">
     <span class="hud-eyebrow">Cursor</span>
     <span class="hud-pos" id="hud-pos">— %</span>
