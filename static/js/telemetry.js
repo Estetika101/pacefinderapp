@@ -603,27 +603,42 @@ function setupInteraction(){
     const nLo=lo+Math.min(f0,f1)*range,nHi=lo+Math.max(f0,f1)*range;
     if(nHi-nLo>0.01){_zoom=[nLo,nHi];renderAll();}
   };
-  document.addEventListener('keydown',e=>{
-    if(e.target.matches('input,textarea,select'))return;
-    if(e.code==='Space'){
-      e.preventDefault();_spaceDown=true;
-      area.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.add('panning'));
-    } else if(e.code==='Escape' && _cursorLocked){
-      unlockCursor();
-    } else if(_cursorLocked && (e.code==='ArrowLeft' || e.code==='ArrowRight')){
-      // Nudge locked cursor: ±1% of zoom window per arrow, ±10% with Shift
-      e.preventDefault();
-      const step=(e.shiftKey?0.10:0.01)*(e.code==='ArrowRight'?1:-1);
-      _cursorXFrac=Math.max(0,Math.min(1, _cursorXFrac+step));
-      paintCursor(_cursorXFrac, null);
-    }
-  });
-  document.addEventListener('keyup',e=>{
-    if(e.code==='Space'){
-      _spaceDown=false;
-      if(!_panning)area.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.remove('panning'));
-    }
-  });
+  // Bind document-level keydown ONCE — setupInteraction is called from
+  // renderAll on every re-render, which used to add a fresh listener each
+  // time. After N renders ArrowRight fired the handler N times and the
+  // cursor jumped by N% per press.
+  if(!window._teleKeysBound){
+    window._teleKeysBound=true;
+    document.addEventListener('keydown',e=>{
+      if(e.target.matches('input,textarea,select'))return;
+      if(e.code==='Space'){
+        e.preventDefault();_spaceDown=true;
+        const a=$('charts-area'); if(a) a.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.add('panning'));
+      } else if(e.code==='Escape' && _cursorLocked){
+        unlockCursor();
+      } else if(_cursorLocked && (e.code==='ArrowLeft' || e.code==='ArrowRight')){
+        // Nudge locked cursor: ±1% of zoom window per arrow, ±10% with Shift
+        e.preventDefault();
+        const step=(e.shiftKey?0.10:0.01)*(e.code==='ArrowRight'?1:-1);
+        _cursorXFrac=Math.max(0,Math.min(1, _cursorXFrac+step));
+        paintCursor(_cursorXFrac, null);
+      }
+    });
+  }
+  // Embedded inside the Session detail iframe? Clicks on inner SVG paths
+  // don't reliably give the iframe focus, so arrow keys never reach our
+  // document keydown. Pull focus on any mousedown inside the chart area.
+  area.addEventListener('mousedown',()=>{try{window.focus();}catch(_){} });
+  if(!window._teleKeyupBound){
+    window._teleKeyupBound=true;
+    document.addEventListener('keyup',e=>{
+      if(e.code==='Space'){
+        _spaceDown=false;
+        const a=$('charts-area');
+        if(!_panning && a) a.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.remove('panning'));
+      }
+    });
+  }
 
   // Click on the track map → lock cursor at the corresponding lap distance.
   // Finds the sample whose px/py is closest to the click point and uses its
