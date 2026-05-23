@@ -108,7 +108,6 @@ input[type=checkbox]{accent-color:var(--color-accent);width:12px;height:12px;fle
 #track-map-inner{background:var(--color-bg)}
 #track-map-inner svg{
   background:var(--color-bg);
-  max-height:180px !important;
   width:100%;display:block;
 }
 html.embed .track-map-wrap{top:0}

@@ -385,8 +385,16 @@ function renderTrackMap(){
   const mnX=Math.min(...xs),mxX=Math.max(...xs);
   const mnZ=Math.min(...zs2),mxZ=Math.max(...zs2);
   const mnS=Math.min(...spds),mxS=Math.max(...spds);
-  const TW=900,TH=260,pd=24;
+  // viewBox sized to the track's own aspect ratio so the SVG fills its
+  // container with the shape (vs. letterboxing inside a fixed 900×260
+  // rectangle). Cap aspect so a long thin track like Le Mans doesn't
+  // collapse the column to a sliver. pd is padding inside the viewBox.
+  const pd=24;
   const scX=(mxX-mnX)||1,scZ=(mxZ-mnZ)||1;
+  const trackAspect=Math.max(0.5,Math.min(2.5,scX/scZ));
+  const TW=trackAspect>=1?600:Math.round(600*trackAspect);
+  const TH=trackAspect>=1?Math.round(600/trackAspect):600;
+  _tmTW=TW;_tmTH=TH;
   const sc=Math.min((TW-pd*2)/scX,(TH-pd*2)/scZ);
   const offX=(TW-(mxX-mnX)*sc)/2,offZ=(TH-(mxZ-mnZ)*sc)/2;
   const cx=x=>offX+(x-mnX)*sc;
@@ -399,12 +407,12 @@ function renderTrackMap(){
     segs+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${spdRgb(spds[i],mnS,mxS)}" stroke-width="3" stroke-linecap="round"/>`;
   }
   const ix=cx(s[0].px).toFixed(1),iy=cy(xz(s[0])).toFixed(1);
-  $('track-map-inner').innerHTML=`<svg viewBox="0 0 ${TW} ${TH}" width="100%" style="max-height:260px;display:block">
+  $('track-map-inner').innerHTML=`<svg viewBox="0 0 ${TW} ${TH}" width="100%" style="display:block">
     ${segs}
     <circle id="tmap-dot" cx="${ix}" cy="${iy}" r="7" fill="#fff" stroke="rgba(0,0,0,.6)" stroke-width="1.5" opacity=".9"/>
   </svg>`;
 }
-let _tmHasPz=false,_tmSamples=null;
+let _tmHasPz=false,_tmSamples=null,_tmTW=600,_tmTH=600;
 function updateTrackDot(pos){
   const dot=$('tmap-dot');
   if(!dot||!_tmCx||!_tmSamples)return;
@@ -627,8 +635,9 @@ function setupInteraction(){
       const svg=mapInner.querySelector('svg');
       if(!svg) return;
       const rect=svg.getBoundingClientRect();
-      // Convert click to SVG user coords (the map uses viewBox, so scale)
-      const vbW=900, vbH=260;  // matches renderTrackMap TW/TH
+      // Convert click to SVG user coords (the map uses viewBox, so scale).
+      // TW/TH are now dynamic per-track; read what renderTrackMap stashed.
+      const vbW=_tmTW, vbH=_tmTH;
       const sx=(e.clientX-rect.left)*(vbW/rect.width);
       const sy=(e.clientY-rect.top )*(vbH/rect.height);
       const hasPz=_tmHasPz;
