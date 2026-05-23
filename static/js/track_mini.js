@@ -19,8 +19,11 @@
     const key = sid + ':' + lap;
     if(_cache.has(key)) return _cache.get(key);
     try{
+      // ?outline=1 — server decimates to ≤80 points and strips to the 6
+      // fields this renderer + the fingerprint glyph need. Cuts the
+      // wire payload + JSON parse by ~95% vs the full sample stream.
       const s = await fetch('/sessions/lap-samples?session_id=' + encodeURIComponent(sid)
-        + '&lap=' + encodeURIComponent(lap)).then(r => r.json());
+        + '&lap=' + encodeURIComponent(lap) + '&outline=1').then(r => r.json());
       const ok = Array.isArray(s) && s.length >= 8 && !s.some(p => p.px == null);
       _cache.set(key, ok ? s : null);
       return ok ? s : null;

@@ -255,44 +255,76 @@ function renderTable(){
     renderPager(0);
     return;
   }
+  // Day separators — only meaningful when rows are in chronological
+  // order (sort by date). Under any other sort the dates jump around
+  // and a separator before every row reads like noise.
+  const showDaySeps = (SORT.key === 'date');
+  const dayHeader = (iso) => {
+    if(!iso) return 'Unknown date';
+    return new Date(iso).toLocaleDateString([], {weekday:'long', month:'short', day:'numeric', year:'numeric'});
+  };
+  let prevDay = null;
   list.innerHTML = pageRows.map(s=>{
-    const href = '/sessions/session?id='+encodeURIComponent(s.session_id)
-      + (s.game?'&game='+encodeURIComponent(s.game):'')
-      + (s.track?'&track='+encodeURIComponent(s.track):'');
-    const cc = pfCarClass(s.car_pi, s.car_class);
-    const badge = cc ? ` <span class="class-badge">${cc}</span>` : '';
-    const cond = [s.weather_condition, s.tyre_compound].filter(Boolean).join(' · ');
-    // Race-type chip prefixes the sub-text instead of being a text
-    // label. Replaces the old "Race · Wet" with "[R] Wet".
-    const ch = rtChip(s);
-    const chipHtml = ch ? `<span class="rt-chip" title="${TYPE_LABELS[typeOf(s)]||''}">${ch}</span>` : '';
-    const sub = chipHtml + esc(cond);
-    // Mini track outline — reuses each track's PB lap (cached, so many
-    // sessions of the same track share one fetch). Skip if no PB on file
-    // yet (new tracks); the cell collapses to a transparent placeholder.
-    const tx = _tix.get(s.track);
-    const outAttr = (tx && tx.pb_session_id && tx.pb_lap_number != null)
-      ? ` data-sid="${esc(tx.pb_session_id)}" data-lap="${tx.pb_lap_number}"` : '';
-    // Lap-time colour vs track PB (see blClass) + lap-count pill in the
-    // date cell. The race-type chip lives in the sub line — see `sub`.
-    const blCls = blClass(s);
-    const blStar = blCls === 'pb' ? '<span class="bl-pb-star">★</span>' : '';
-    const lapCountHtml = (s.lap_count && s.lap_count > 0)
-      ? `<span class="lap-count">${s.lap_count} lap${s.lap_count===1?'':'s'}</span>` : '';
-    const hasSub = ch || cond;
-    return `<tr onclick="location.href='${href}'">`+
-      `<td><div class="c-cell">`+
-        `<div class="track-outline"${outAttr}></div>`+
-        `<div><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
-        `${hasSub?`<div class="c-sub">${sub}</div>`:''}</div>`+
-      `</div></td>`+
-      `<td>${esc(carName(s))}${badge}</td>`+
-      `<td class="num"><span class="bl bl-${blCls}">${blStar}${fmtLap(s.best_lap_time_s)}</span></td>`+
-      `<td class="num">${fmtD(s.started_at)} <span style="opacity:.6">${fmtT(s.started_at)}</span>${lapCountHtml}</td>`+
-      `</tr>`;
+    let prefix = '';
+    if(showDaySeps){
+      const day = (s.started_at || '').slice(0, 10);
+      if(day !== prevDay){
+        prefix = `<tr class="day-sep"><td colspan="4"><div class="day-sep-row">`+
+                 `<span>${esc(dayHeader(s.started_at))}</span>`+
+                 `</div></td></tr>`;
+        prevDay = day;
+      }
+    }
+    return prefix + _renderRow(s);
   }).join('');
   if(window.pfLoadMinis) window.pfLoadMinis(list);
+  if(window.pfLoadFingerprints) window.pfLoadFingerprints(list);
   renderPager(rows.length);
+}
+
+// Extracted so day-separator wrapping is readable. Returns the raw
+// <tr>…</tr> HTML for one session row.
+function _renderRow(s){
+  const href = '/sessions/session?id='+encodeURIComponent(s.session_id)
+    + (s.game?'&game='+encodeURIComponent(s.game):'')
+    + (s.track?'&track='+encodeURIComponent(s.track):'');
+  const cc = pfCarClass(s.car_pi, s.car_class);
+  const badge = cc ? ` <span class="class-badge">${cc}</span>` : '';
+  const cond = [s.weather_condition, s.tyre_compound].filter(Boolean).join(' · ');
+  // Race-type chip prefixes the sub-text instead of being a text
+  // label. Replaces the old "Race · Wet" with "[R] Wet".
+  const ch = rtChip(s);
+  const chipHtml = ch ? `<span class="rt-chip" title="${TYPE_LABELS[typeOf(s)]||''}">${ch}</span>` : '';
+  const sub = chipHtml + esc(cond);
+  // Mini track outline — reuses each track's PB lap (cached, so many
+  // sessions of the same track share one fetch). Skip if no PB on file
+  // yet (new tracks); the cell collapses to a transparent placeholder.
+  const tx = _tix.get(s.track);
+  const outAttr = (tx && tx.pb_session_id && tx.pb_lap_number != null)
+    ? ` data-sid="${esc(tx.pb_session_id)}" data-lap="${tx.pb_lap_number}"` : '';
+  // Best-lap fingerprint — needs s.best_lap_number which the backend
+  // joined in from the laps table. Empty if the session has no
+  // recorded best lap (no completed timed laps).
+  const fpAttr = (s.session_id && s.best_lap_number != null)
+    ? ` data-sid="${esc(s.session_id)}" data-lap="${s.best_lap_number}"` : '';
+  // Lap-time colour vs track PB (see blClass) + lap-count pill in the
+  // date cell. The race-type chip lives in the sub line — see `sub`.
+  const blCls = blClass(s);
+  const blStar = blCls === 'pb' ? '<span class="bl-pb-star">★</span>' : '';
+  const lapCountHtml = (s.lap_count && s.lap_count > 0)
+    ? `<span class="lap-count">${s.lap_count} lap${s.lap_count===1?'':'s'}</span>` : '';
+  const hasSub = ch || cond;
+  return `<tr onclick="location.href='${href}'">`+
+    `<td><div class="c-cell">`+
+      `<div class="track-outline"${outAttr}></div>`+
+      `<div class="lap-fp"${fpAttr}></div>`+
+      `<div><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
+      `${hasSub?`<div class="c-sub">${sub}</div>`:''}</div>`+
+    `</div></td>`+
+    `<td>${esc(carName(s))}${badge}</td>`+
+    `<td class="num"><span class="bl bl-${blCls}">${blStar}${fmtLap(s.best_lap_time_s)}</span></td>`+
+    `<td class="num">${fmtD(s.started_at)} <span style="opacity:.6">${fmtT(s.started_at)}</span>${lapCountHtml}</td>`+
+    `</tr>`;
 }
 
 // Pagination control — page number row + prev/next. Hides itself when

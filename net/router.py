@@ -1515,8 +1515,28 @@ def make_handler(ctx: dict):
                 else:
                     data = db_get_lap_samples(sid, lap_n)
                     if data:
-                        writer.write(_http_response("200 OK", "application/json",
-                                                    json.dumps(data["samples"]).encode()))
+                        samples = data["samples"]
+                        # ?outline=1 — slim payload for the per-row mini
+                        # outline + fingerprint glyphs on /sessions. Decimates
+                        # to ≤80 points server-side and drops all fields
+                        # except the six the renderers actually read. Cuts
+                        # the wire payload (and JSON parse cost) by ~95% vs
+                        # the full sample stream.
+                        if qs.get("outline") == "1" and samples:
+                            _OUTLINE_FIELDS = ("px", "py", "pz", "speed_mph",
+                                               "throttle_pct", "brake_pct")
+                            n_in = len(samples)
+                            n_out = min(80, n_in)
+                            step = n_in / n_out
+                            slim = []
+                            for i in range(n_out):
+                                s = samples[int(i * step)]
+                                slim.append({k: s[k] for k in _OUTLINE_FIELDS if k in s})
+                            writer.write(_http_response("200 OK", "application/json",
+                                                        json.dumps(slim).encode()))
+                        else:
+                            writer.write(_http_response("200 OK", "application/json",
+                                                        json.dumps(samples).encode()))
                     else:
                         # Lap with no stored samples is normal for older sessions
                         # that pre-date the lap_samples migration — return an
