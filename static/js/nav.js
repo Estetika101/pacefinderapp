@@ -130,6 +130,97 @@
       live.className = 'pf-live'; lt.textContent = 'Idle · no session';
       to.classList.remove('show'); shown = false; // re-arm for next race
     }
+    // Perf HUD lifecycle — mount on first /status saying debug_mode=true,
+    // tear down if the toggle gets flipped off. Embed mode never gets it
+    // (the parent page is the one showing chrome).
+    if(s && s.debug_mode) mountPerfHud(); else unmountPerfHud();
+  }
+
+  // ── Perf overlay (debug mode) ───────────────────────────────────
+  // Floating bottom-right card showing median + p95 + last request from
+  // /debug/perf. Data is already collected by net/perf.py for every
+  // request; this just surfaces it so you spot regressions live without
+  // re-running bench_perf.py or grepping logs. See docs/specs/...
+  var _perfTimer = null, _perfHud = null;
+  function mountPerfHud(){
+    if(_perfHud) return;
+    _perfHud = document.createElement('div');
+    _perfHud.className = 'pf-perf-hud';
+    _perfHud.innerHTML =
+      '<div class="pf-perf-head">' +
+        '<span class="pf-perf-eyebrow">Perf · debug</span>' +
+        '<button class="pf-perf-toggle" id="pf-perf-toggle">expand</button>' +
+      '</div>' +
+      '<div class="pf-perf-grid">' +
+        '<span class="k">median</span><span class="v" id="pf-perf-med">—</span>' +
+        '<span class="k">p95</span><span class="v" id="pf-perf-p95">—</span>' +
+        '<span class="k">db share</span><span class="v" id="pf-perf-db">—</span>' +
+        '<span class="k">samples</span><span class="v" id="pf-perf-n">—</span>' +
+      '</div>' +
+      '<div class="pf-perf-last" id="pf-perf-last">no requests yet</div>' +
+      '<div class="pf-perf-list" id="pf-perf-list"></div>';
+    document.body.appendChild(_perfHud);
+    document.getElementById('pf-perf-toggle').addEventListener('click', function(){
+      var expanded = _perfHud.classList.toggle('expanded');
+      this.textContent = expanded ? 'collapse' : 'expand';
+    });
+    pollPerf();
+    _perfTimer = setInterval(pollPerf, 3000);
+  }
+  function unmountPerfHud(){
+    if(!_perfHud) return;
+    clearInterval(_perfTimer); _perfTimer = null;
+    _perfHud.remove(); _perfHud = null;
+  }
+  function _cls(ms){ return ms > 500 ? 'bad' : ms > 150 ? 'warn' : ''; }
+  function _short(p){ return p.length > 38 ? p.slice(0,36) + '…' : p; }
+  async function pollPerf(){
+    var d;
+    try{ d = await fetch('/debug/perf?json=1').then(function(r){return r.json();}); }
+    catch(e){ return; }
+    var rows = (d && d.server) || [];
+    if(!rows.length){
+      _setText('pf-perf-med','—'); _setText('pf-perf-p95','—');
+      _setText('pf-perf-db','—'); _setText('pf-perf-n','0');
+      _setText('pf-perf-last','no requests yet');
+      var list = document.getElementById('pf-perf-list'); if(list) list.innerHTML = '';
+      return;
+    }
+    var times = rows.map(function(r){return r.total_ms;}).sort(function(a,b){return a-b;});
+    var med = times[Math.floor(times.length/2)];
+    var p95 = times[Math.max(0, Math.floor(times.length*0.95)-1)];
+    var dbSum = rows.reduce(function(a,r){return a + (r.db_ms||0);}, 0);
+    var totSum = rows.reduce(function(a,r){return a + r.total_ms;}, 0);
+    var dbPct = totSum > 0 ? Math.round(dbSum/totSum*100) : 0;
+    _setText('pf-perf-med', med.toFixed(1)+'ms', _cls(med));
+    _setText('pf-perf-p95', p95.toFixed(1)+'ms', _cls(p95));
+    _setText('pf-perf-db', dbPct + '%');
+    _setText('pf-perf-n', rows.length);
+    var last = rows[rows.length-1];
+    var lastEl = document.getElementById('pf-perf-last');
+    if(lastEl){
+      var cls = _cls(last.total_ms);
+      lastEl.innerHTML = '<span style="color:var(--color-text-quaternary)">last</span> '+
+        '<span class="'+cls+'" style="color:'+(cls==='bad'?'var(--color-red,#f87171)':cls==='warn'?'var(--color-amber,#fbbf24)':'inherit')+'">'+
+        last.total_ms.toFixed(1)+'ms</span> '+_short(last.path);
+    }
+    var list = document.getElementById('pf-perf-list');
+    if(list){
+      // Tail of the ring, newest at the bottom. Aligns with how journalctl
+      // reads — last-line-is-now is the muscle memory we're matching.
+      list.innerHTML = rows.slice(-20).map(function(r){
+        return '<div class="r">'+
+          '<span class="p">'+r.method+' '+_short(r.path)+'</span>'+
+          '<span class="t '+_cls(r.total_ms)+'">'+r.total_ms.toFixed(1)+'ms</span>'+
+          '<span class="d">db '+(r.db_ms||0).toFixed(0)+'</span>'+
+        '</div>';
+      }).join('');
+      list.scrollTop = list.scrollHeight;
+    }
+  }
+  function _setText(id, txt, cls){
+    var el = document.getElementById(id); if(!el) return;
+    el.textContent = txt; el.className = 'v' + (cls ? ' '+cls : '');
   }
   async function poll(){
     try{ paint(await fetch('/status').then(function(r){return r.json();})); }
