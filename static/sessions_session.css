@@ -255,11 +255,21 @@ table.lap-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular
 .lap-table .tag.tag-in{background:#0a1a2a;color:var(--color-blue)}
 
 /* ── Three cards ────────────────────────────────────────────────── */
+/* Two cards on top, Coaching gets full width below. Stops the
+   "where lost time" + "car context" from stretching to match
+   Coaching's height while the coaching prose overflows its column. */
 .cards{
-  display:grid;grid-template-columns:repeat(3,1fr);
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  grid-template-areas:
+    "loss car"
+    "ai   ai";
   gap:var(--space-3);
   padding:var(--space-4) 0 var(--space-6);
 }
+#card-loss{grid-area:loss}
+#card-car{grid-area:car}
+#card-ai{grid-area:ai}
 .card{
   background:var(--color-surface);
   border:1px solid var(--color-border);
@@ -299,21 +309,33 @@ table.lap-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular
    their own block layout so scope the pre-wrap to direct text only. */
 #card-ai-body:not(:has(.ai-finding)){white-space:pre-wrap}
 .ai-summary{
-  font-size:var(--text-sm);color:var(--color-text-primary);
-  line-height:1.5;margin-bottom:var(--space-3);
+  font-size:var(--text-md);color:var(--color-text-primary);font-weight:500;
+  line-height:1.4;margin-bottom:var(--space-3);
 }
+/* Findings as a 2-up grid of self-contained mini-cards. Each card has
+   a punchline area title, the short diagnosis (issue), and an
+   imperative-voice fix. No more one-long-column wall of prose. */
+.ai-findings{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:var(--space-3);
+}
+@media(max-width:768px){.ai-findings{grid-template-columns:1fr}}
 .ai-finding{
-  padding:10px 0;border-top:1px solid var(--color-border-subtle);
+  background:var(--color-surface-2);
+  border:1px solid var(--color-border);
+  border-left:2px solid var(--color-red);
+  border-radius:var(--radius-md);
+  padding:12px 14px;
+  display:flex;flex-direction:column;gap:6px;
 }
-.ai-finding:first-of-type{border-top:none;padding-top:0}
 .ai-finding-area{
-  font-size:10px;color:var(--color-text-tertiary);
-  text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;
+  font-size:11px;color:var(--color-text-primary);
+  text-transform:uppercase;letter-spacing:0.06em;font-weight:600;
 }
-.ai-finding-issue{font-size:var(--text-sm);color:var(--color-text-primary);line-height:1.45}
+.ai-finding-issue{font-size:var(--text-sm);color:var(--color-text-secondary);line-height:1.45}
 .ai-finding-fix{
   font-size:var(--text-sm);color:var(--color-accent);
-  margin-top:4px;line-height:1.45;
+  line-height:1.45;margin-top:2px;
 }
 .ai-strengths{
   margin-top:var(--space-3);padding-top:var(--space-3);
@@ -377,7 +399,7 @@ table.lap-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular
   .hero{grid-template-columns:1fr}
   .page-head{grid-template-columns:1fr}
   .page-head-result{text-align:left}
-  .cards{grid-template-columns:1fr}
+  .cards{grid-template-columns:1fr;grid-template-areas:"loss" "car" "ai"}
   .profile{grid-template-columns:repeat(2,1fr)}
   .lap-table th:nth-child(5),
   .lap-table td:nth-child(5){display:none}
