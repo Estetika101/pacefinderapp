@@ -706,32 +706,45 @@ function resetHud(){
   _set('hud-gear-val','—');
   const dv=document.getElementById('hud-delta-val');if(dv){dv.className='hud-mid';dv.innerHTML='—<span class="hud-delta-sub">here</span>';}
 }
-// Header line: colored dot matching the primary lap's chart trace + the
-// lap label (L5 etc.). The dot makes it instantly clear which trace the
-// HUD numbers belong to when multiple laps are overlaid.
+// Header line: one chip per selected lap. Primary is filled and shows
+// the HUD numbers; clicking a non-primary chip swaps focus without
+// reaching back to the left ctrl-col lap list.
 function _setHudLapHeader(){
-  const chip=document.getElementById('hud-lap-chip');
-  const lbl=document.getElementById('hud-lap-label');
+  const sel=document.getElementById('hud-lapsel');
   const refRow=document.getElementById('hud-refrow');
   const refName=document.getElementById('hud-ref-name');
-  if(!chip||!lbl) return;
-  if(_primaryLap==null){
-    chip.style.background='var(--color-text-quaternary)';
-    lbl.textContent='—';
+  if(!sel) return;
+  if(!_selectedLaps.length){
+    sel.innerHTML='<span style="font-size:10px;color:var(--color-text-quaternary);letter-spacing:.06em;text-transform:uppercase">No lap selected</span>';
     if(refRow) refRow.style.display='none';
     return;
   }
-  const ci=_selectedLaps.indexOf(_primaryLap);
-  chip.style.background = ci >= 0 ? LAP_COLORS[ci] : 'var(--color-text-quaternary)';
-  lbl.textContent='Lap '+(_primaryLap+1);
+  sel.innerHTML=_selectedLaps.map((ln,ci)=>{
+    const isPrim=ln===_primaryLap;
+    return `<button type="button" class="hud-lapsel-btn${isPrim?' is-primary':''}" `+
+      `style="--c:${LAP_COLORS[ci]}" data-lap="${ln}" `+
+      `onclick="setPrimaryLap(${ln})" `+
+      `aria-pressed="${isPrim?'true':'false'}">L${ln+1}</button>`;
+  }).join('');
   if(refRow && refName){
-    if(_refSamples && !isRefLap(_primaryLap)){
+    if(_refSamples && _primaryLap!=null && !isRefLap(_primaryLap)){
       refName.textContent=refLabel();
       refRow.style.display='';
     } else {
       refRow.style.display='none';
     }
   }
+}
+// Public: switch which selected lap the HUD reflects (and which trace
+// renders at full opacity on the charts). No-op if the lap isn't in the
+// selection set — chips are only emitted for selected laps so this
+// should never be called with an invalid value.
+function setPrimaryLap(lapN){
+  if(_selectedLaps.indexOf(lapN) < 0) return;
+  if(_primaryLap === lapN) return;
+  _primaryLap = lapN;
+  renderAll();
+  if(_cursorLocked && _cursorXFrac != null) paintCursor(_cursorXFrac, null);
 }
 function updateHud(pos){
   if(!_primaryLap||!_lapSamples[_primaryLap])return;
@@ -835,7 +848,12 @@ async function onLapToggle(lapN,checked){
   }else{
     _selectedLaps=_selectedLaps.filter(n=>n!==lapN);
   }
-  _primaryLap=_selectedLaps[0]||null;
+  // Preserve user's HUD lap choice if it's still selected; otherwise
+  // fall back to the first. Without this, toggling any other lap in the
+  // left rail would silently snap focus back to _selectedLaps[0].
+  if(_primaryLap==null || _selectedLaps.indexOf(_primaryLap)<0){
+    _primaryLap = _selectedLaps[0] || null;
+  }
   updateMaxT();renderLapList();renderAll();
 }
 async function onRefChange(){

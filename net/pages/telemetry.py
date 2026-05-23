@@ -30,12 +30,23 @@ a{color:inherit;text-decoration:none}
   display:flex;flex-direction:column;gap:10px;font-family:var(--font-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums}
 html.embed .hud-col{top:0;max-height:100vh}
 .hud-head{display:flex;align-items:center;justify-content:space-between;padding:0 4px;gap:8px}
-.hud-head-l{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden}
-.hud-lap-chip{width:9px;height:9px;border-radius:50%;background:var(--color-text-quaternary);flex-shrink:0;
-  box-shadow:0 0 0 1px rgba(0,0,0,.6) inset}
-.hud-lap-label{font-size:11px;color:var(--color-text-primary);text-transform:uppercase;letter-spacing:0.08em;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hud-pos{font-size:10px;color:var(--color-text-quaternary);flex-shrink:0}
+/* Lap selector — one chip per selected lap. Primary is filled, others
+   are outlined; clicking a non-primary chip swaps focus. Keeps the HUD
+   driven from inside the rail so you don't have to reach back to the
+   left ctrl-col to switch which lap the numbers represent. */
+.hud-lapsel{display:flex;flex-wrap:wrap;gap:4px;min-width:0;flex:1}
+.hud-lapsel-btn{display:inline-flex;align-items:center;gap:5px;
+  padding:3px 8px 3px 5px;background:transparent;cursor:pointer;
+  border:1px solid var(--c,var(--color-border));border-radius:999px;
+  font:inherit;font-size:11px;color:var(--color-text-tertiary);
+  letter-spacing:0.04em;line-height:1;transition:background .12s,color .12s}
+.hud-lapsel-btn::before{content:"";width:8px;height:8px;border-radius:50%;
+  background:var(--c,var(--color-text-quaternary));flex-shrink:0;
+  box-shadow:0 0 0 1px rgba(0,0,0,.5) inset}
+.hud-lapsel-btn:hover{color:var(--color-text-primary)}
+.hud-lapsel-btn.is-primary{background:color-mix(in srgb,var(--c) 18%,transparent);
+  color:var(--color-text-primary);cursor:default}
+.hud-pos{font-size:10px;color:var(--color-text-quaternary);flex-shrink:0;align-self:center}
 .hud-refrow{padding:0 4px;font-size:10px;color:var(--color-text-quaternary);text-transform:uppercase;
   letter-spacing:0.06em;margin-top:-4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hud-refrow #hud-ref-name{color:var(--color-text-tertiary)}
@@ -299,10 +310,7 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
     <div id="track-map-inner"></div>
   </div>
   <div class="hud-head">
-    <span class="hud-head-l">
-      <span class="hud-lap-chip" id="hud-lap-chip"></span>
-      <span class="hud-lap-label" id="hud-lap-label">—</span>
-    </span>
+    <div class="hud-lapsel" id="hud-lapsel" title="Click a lap to focus the HUD on it"></div>
     <span class="hud-pos" id="hud-pos">— %</span>
   </div>
   <div class="hud-refrow" id="hud-refrow" style="display:none">
