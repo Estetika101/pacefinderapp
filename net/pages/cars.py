@@ -80,7 +80,7 @@ CAR_DETAIL_HTML_PRE = """<!DOCTYPE html>
     </div>
     <div class="stat-grid">
       <div class="stat">
-        <div class="stat-label">Tracks driven</div>
+        <div class="stat-label">Circuits driven</div>
         <div class="stat-value" id="stat-tracks">&mdash;</div>
       </div>
       <div class="stat">
@@ -101,7 +101,7 @@ CAR_DETAIL_HTML_PRE = """<!DOCTYPE html>
   <!-- Tracks-in-this-car table -->
   <div class="section">
     <div class="section-head">
-      <h2>Tracks in this car</h2>
+      <h2>Circuits in this car</h2>
       <span class="count" id="tracks-count">&mdash;</span>
     </div>
     <div class="track-list" id="track-list"></div>

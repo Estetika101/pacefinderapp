@@ -51,7 +51,7 @@
     '<div class="pf-items">' +
       item('home','/','⌂','Home') +
       item('sessions','/sessions','≣','Sessions') +
-      item('tracks','/circuits','⌖','Tracks') +
+      item('tracks','/circuits','⌖','Circuits') +
       item('cars','/cars','⚙','Cars') +
       item('settings','/setup','⚙','Settings', true) +
     '</div>';

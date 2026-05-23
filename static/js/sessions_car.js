@@ -121,7 +121,7 @@ function renderTracks(tracks){
     tracks.length + ' circuit' + (tracks.length === 1 ? '' : 's');
   const list = document.getElementById('track-list');
   if(!tracks.length){
-    list.innerHTML = '<div class="empty">No tracks driven yet in this car.</div>';
+    list.innerHTML = '<div class="empty">No circuits driven yet in this car.</div>';
     return;
   }
   list.innerHTML = tracks.map(t => {
