@@ -852,10 +852,14 @@ async function openCrossSessionPicker(){
   let sessions=[];
   try{
     const url='/sessions/track/data?name='+encodeURIComponent(track)+(game?'&game='+encodeURIComponent(game):'');
-    sessions=await fetch(url).then(r=>r.json());
+    // /sessions/track/data returns {sessions:[...], pb:..., progress:...} —
+    // a dict, not an array. The shape changed when Circuits added PB /
+    // progress fields; old `.filter(...)` on the dict threw silently.
+    const resp=await fetch(url).then(r=>r.json());
+    sessions=Array.isArray(resp)?resp:(resp&&Array.isArray(resp.sessions)?resp.sessions:[]);
   }catch(e){sessions=[];}
   // Exclude the current session — comparing against yourself defeats the purpose
-  const others=(sessions||[]).filter(s=>s.session_id!==_id);
+  const others=sessions.filter(s=>s.session_id!==_id);
   if(!others.length){list.innerHTML='<div class="cs-empty">No other sessions at this track yet.</div>';return;}
   list.innerHTML=others.map(s=>{
     const dt=fmtDt(s.started_at);
