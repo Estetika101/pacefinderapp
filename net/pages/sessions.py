@@ -498,6 +498,36 @@ SESSIONS_HTML = """<!DOCTYPE html>
     border-top-color:var(--color-border)}
   .swt-help:hover .swt-help-tip,
   .swt-help:focus .swt-help-tip{opacity:1;visibility:visible}
+  /* Best-lap fingerprint glyph — sits next to the track outline. Same
+     row cell, side-by-side. Speed line on top, throttle band middle,
+     brake spikes bottom. Lazy-loaded via lap_fingerprint.js. Hidden
+     (but preserves width) when no best lap exists for the session, so
+     rows stay aligned. */
+  .stbl .lap-fp{width:70px;height:42px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .stbl .lap-fp:not([data-sid]){visibility:hidden}
+  .stbl .lap-fp svg{width:100%;height:100%;display:block}
+  .stbl .lap-fp .fp-speed{stroke:var(--color-text-secondary);stroke-width:1;opacity:.85}
+  .stbl .lap-fp .fp-thr line{stroke:var(--color-green,#22c55e);stroke-width:1;opacity:.55}
+  .stbl .lap-fp .fp-brk line{stroke:var(--color-red,#f87171);stroke-width:1;opacity:.8}
+  @media(max-width:900px){.stbl .lap-fp{display:none}}
+  /* Day separator — quiet banner between sessions of different days.
+     Inserted as a <tr class="day-sep"> by sessions_list.js renderTable.
+     Makes the page read like a journal (Sat: 5 sessions, Sun: 0…). */
+  .stbl tr.day-sep td{
+    background:transparent;border-top:1px solid var(--color-border);
+    padding:18px 0 8px;
+    color:var(--color-text-quaternary);
+    font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.08em;
+    cursor:default;
+  }
+  .stbl tr.day-sep:first-child td{border-top:none}
+  .stbl tr.day-sep:hover td{background:transparent}
+  .stbl tr.day-sep .day-sep-wkd{color:var(--color-text-tertiary);margin-left:6px}
+  .stbl tr.day-sep .day-sep-cnt{margin-left:auto;color:var(--color-text-quaternary);
+    text-transform:none;letter-spacing:0;font-size:11px}
+  .stbl tr.day-sep td .day-sep-row{display:flex;align-items:baseline;gap:6px}
+
   /* Session-type chip — neutral letter badge that prefixes the row's
      sub-text (e.g. [R] Wet · Soft). Colour-neutral by design: the
      lap-time column already uses red/amber/green for the PB gap, so
@@ -585,6 +615,7 @@ SESSIONS_HTML = """<!DOCTYPE html>
 
 <script src="/static/js/class.js"></script>
 <script src="/static/js/track_mini.js"></script>
+<script src="/static/js/lap_fingerprint.js"></script>
 <script src="/static/js/sessions_list.js"></script>
 </body>
 </html>

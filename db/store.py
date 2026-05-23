@@ -659,16 +659,27 @@ def _db_needs_review_count() -> int:
 
 
 def _db_sessions_list(limit: int = 100) -> list:
-    """Return sessions newest-first — summary stats only, no sample data."""
+    """Return sessions newest-first — summary stats only, no sample data.
+
+    Includes best_lap_number per session (the lap_number whose lap_time_s
+    matches the session's best). Powers the per-row best-lap fingerprint
+    glyph on /sessions; MIN() picks the lowest lap_number on the rare
+    occasion two laps tie at the best time.
+    """
     with _db_lock:
         conn = _db_connect()
         try:
             rows = conn.execute(
-                "SELECT session_id,game,track,car,car_ordinal,car_class,car_pi,"
-                "session_type,race_type,started_at,ended_at,packet_count,"
-                "best_lap_time_s,lap_count,finish_pos,grid_pos,"
-                "weather_condition,tyre_compound,track_temp_c "
-                "FROM sessions ORDER BY started_at DESC LIMIT ?", (limit,)
+                "SELECT s.session_id,s.game,s.track,s.car,s.car_ordinal,s.car_class,s.car_pi,"
+                "s.session_type,s.race_type,s.started_at,s.ended_at,s.packet_count,"
+                "s.best_lap_time_s,s.lap_count,s.finish_pos,s.grid_pos,"
+                "s.weather_condition,s.tyre_compound,s.track_temp_c, "
+                "MIN(l.lap_number) AS best_lap_number "
+                "FROM sessions s "
+                "LEFT JOIN laps l ON l.session_id = s.session_id "
+                "  AND l.lap_time_s = s.best_lap_time_s "
+                "GROUP BY s.session_id "
+                "ORDER BY s.started_at DESC LIMIT ?", (limit,)
             ).fetchall()
             return [dict(r) for r in rows]
         finally:
