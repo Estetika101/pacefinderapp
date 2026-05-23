@@ -457,6 +457,14 @@ SESSIONS_HTML = """<!DOCTYPE html>
   .stbl .c-name{color:var(--color-text-primary);font-weight:500}
   .stbl .c-sub{color:var(--color-text-quaternary);font-size:12px;margin-top:2px}
   .stbl .c-empty{padding:26px;text-align:center;color:var(--color-text-quaternary);font-style:italic}
+  /* Tiny track outline next to the circuit name — speed-colored, shape
+     recognizable at a glance. Empty before lazy-loaded; no border. */
+  .stbl .c-cell{display:flex;align-items:center;gap:12px}
+  .stbl .track-outline{width:56px;height:42px;flex-shrink:0;display:flex;
+    align-items:center;justify-content:center}
+  .stbl .track-outline svg{width:100%;height:100%;overflow:visible}
+  .stbl .track-outline .tm-line line{stroke-width:1.6;stroke-linecap:round}
+  @media(max-width:700px){.stbl .track-outline{display:none}}
   .swt{display:inline-flex;align-items:center;gap:9px;cursor:pointer;color:var(--color-text-secondary);font-size:14px;user-select:none}
   .swt input{position:absolute;opacity:0;width:0;height:0}
   .swt .tr{width:34px;height:19px;border-radius:999px;background:var(--color-surface-2);
@@ -501,6 +509,7 @@ SESSIONS_HTML = """<!DOCTYPE html>
 </div>
 
 <script src="/static/js/class.js"></script>
+<script src="/static/js/track_mini.js"></script>
 <script src="/static/js/sessions_list.js"></script>
 </body>
 </html>

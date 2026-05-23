@@ -193,14 +193,24 @@ function renderTable(){
     const t = typeOf(s); const tl = t ? (TYPE_LABELS[t]||t) : '';
     const cond = [s.weather_condition, s.tyre_compound].filter(Boolean).join(' · ');
     const sub = [tl, cond].filter(Boolean).join(' &middot; ');
+    // Mini track outline — reuses each track's PB lap (cached, so many
+    // sessions of the same track share one fetch). Skip if no PB on file
+    // yet (new tracks); the cell collapses to a transparent placeholder.
+    const tx = _tix.get(s.track);
+    const outAttr = (tx && tx.pb_session_id && tx.pb_lap_number != null)
+      ? ` data-sid="${esc(tx.pb_session_id)}" data-lap="${tx.pb_lap_number}"` : '';
     return `<tr onclick="location.href='${href}'">`+
-      `<td><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
-      `${sub?`<div class="c-sub">${sub}</div>`:''}</td>`+
+      `<td><div class="c-cell">`+
+        `<div class="track-outline"${outAttr}></div>`+
+        `<div><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
+        `${sub?`<div class="c-sub">${sub}</div>`:''}</div>`+
+      `</div></td>`+
       `<td>${esc(carName(s))}${badge}</td>`+
       `<td class="num">${fmtLap(s.best_lap_time_s)}</td>`+
       `<td class="num">${fmtD(s.started_at)} <span style="opacity:.6">${fmtT(s.started_at)}</span></td>`+
       `</tr>`;
   }).join('');
+  if(window.pfLoadMinis) window.pfLoadMinis(list);
 }
 
 // In-place sync so an option/clear click never rebuilds #filters —

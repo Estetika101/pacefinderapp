@@ -57,47 +57,9 @@ function render(tracks){
       <div class="track-arrow">→</div>
     </a>`;
   }).join('');
-  loadOutlines();
-}
-
-// Lazy-load the PB lap polyline per row — IntersectionObserver keeps
-// fetches off-screen rows quiet until the user scrolls.
-async function drawOutline(el){
-  const sid = el.dataset.sid, lap = el.dataset.lap;
-  if(!sid || lap == null) return;
-  let s;
-  try{
-    s = await fetch('/sessions/lap-samples?session_id=' + encodeURIComponent(sid)
-      + '&lap=' + encodeURIComponent(lap)).then(r => r.json());
-  }catch(e){ return; }
-  if(!s || s.length < 8 || s.some(p => p.px == null)) return;
-  const hasPz = s.some(p => p.pz != null);
-  const zf = hasPz ? p => p.pz : p => (p.py ?? 0);
-  const xs = s.map(p => p.px), zs = s.map(zf);
-  const mnX = Math.min(...xs), mxX = Math.max(...xs);
-  const mnZ = Math.min(...zs), mxZ = Math.max(...zs);
-  const W = 100, H = 75, pd = 4;
-  const sc = Math.min((W - pd*2)/((mxX - mnX) || 1), (H - pd*2)/((mxZ - mnZ) || 1));
-  const ox = (W - (mxX - mnX) * sc) / 2;
-  const oz = (H - (mxZ - mnZ) * sc) / 2;
-  const cx = x => (ox + (x - mnX) * sc).toFixed(1);
-  const cy = z => (H - oz - (z - mnZ) * sc).toFixed(1);
-  const step = Math.max(1, Math.floor(s.length / 80));
-  const pts = [];
-  for(let i = 0; i < s.length; i += step) pts.push(cx(s[i].px) + ',' + cy(zf(s[i])));
-  pts.push(cx(s[0].px) + ',' + cy(zf(s[0])));
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Track outline">`+
-    `<polyline class="tm-line" points="${pts.join(' ')}"/></svg>`;
-}
-function loadOutlines(){
-  const els = document.querySelectorAll('.track-outline[data-sid]');
-  if(!('IntersectionObserver' in window)){ els.forEach(drawOutline); return; }
-  const io = new IntersectionObserver((entries, obs) => {
-    entries.forEach(e => {
-      if(e.isIntersecting){ obs.unobserve(e.target); drawOutline(e.target); }
-    });
-  }, {rootMargin: '200px 0px'});
-  els.forEach(el => io.observe(el));
+  // Outline rendering lives in /static/js/track_mini.js — shared with
+  // the Sessions list. Lazy-loads via IntersectionObserver.
+  if(window.pfLoadMinis) window.pfLoadMinis();
 }
 
 init();
