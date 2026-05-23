@@ -51,6 +51,7 @@ async function init(){
   _tf = d.time_format || '24h';
   renderHeroLast(d.last_session, d.pb_at_track_s, d.stats);
   loadWatchlist();
+  loadWorstSector();
   loadCareer();
   renderTopCircuits(d.top_circuits || []);
   renderTopCars(d.top_cars || []);
@@ -247,6 +248,37 @@ function renderSpark(vals){
     <polyline points="${pts}" fill="none" stroke="var(--color-red,#ef4444)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>
     <circle cx="${lastX}" cy="${lastY}" r="2.4" fill="var(--color-red,#ef4444)"/>
   </svg>`;
+}
+
+// ── Worst sector card — single biggest leak ─────────────────────
+// Async; hidden when no sector exceeds the server's 0.3s threshold.
+// Deep-links into the track detail page so the user can scrub any
+// session there.
+async function loadWorstSector(){
+  let w;
+  try{ w = await fetch('/home/worst-sector').then(r => r.json()); }
+  catch(e){ return; }
+  if(!w || !w.track || !w.sector) return;
+  const card = document.getElementById('leak-card');
+  document.getElementById('leak-sector').textContent = w.sector;
+  document.getElementById('leak-track').textContent = w.track;
+  document.getElementById('leak-gap').textContent = '+' + w.avg_gap_s.toFixed(2) + 's';
+  document.getElementById('leak-sub').textContent =
+    'on average across ' + w.session_count + ' session' + (w.session_count === 1 ? '' : 's');
+  // Outline: the track's PB lap (any car, any session) — same target
+  // the watchlist + circuits page use. Speed-coloured via track_mini.
+  if(w.pb_session_id && w.pb_lap_number != null){
+    const out = document.getElementById('leak-outline');
+    out.dataset.sid = w.pb_session_id;
+    out.dataset.lap = w.pb_lap_number;
+  }
+  // CTA: land on the circuit detail. From there the user picks any
+  // session to scrub. Trying to deep-link a specific session was
+  // tempting but the choice "which session?" is genuinely the
+  // driver's — the leak is across all of them.
+  card.href = '/sessions/track?name=' + encodeURIComponent(w.track);
+  card.style.display = '';
+  if(window.pfLoadMinis) window.pfLoadMinis(card);
 }
 
 // ── Career strip ──────────────────────────────────────────────────

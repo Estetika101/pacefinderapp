@@ -64,6 +64,25 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     <div class="watchlist-grid" id="watchlist-grid"></div>
   </div>
 
+  <!-- Worst sector card — single biggest leak surfaced from the
+       theoretical-best aggregate across all sessions at a track.
+       Hidden when nothing exceeds the 0.3s threshold. See
+       /home/worst-sector. -->
+  <a class="leak-card" id="leak-card" href="#" style="display:none">
+    <div class="leak-outline track-outline" id="leak-outline"></div>
+    <div class="leak-body">
+      <div class="leak-eyebrow">Your biggest leak</div>
+      <div class="leak-title">
+        S<span id="leak-sector">—</span> at <span id="leak-track">—</span>
+      </div>
+      <div class="leak-stats">
+        <span class="leak-gap" id="leak-gap">+—</span>
+        <span class="leak-sub" id="leak-sub">on average across — sessions</span>
+      </div>
+    </div>
+    <div class="leak-arrow">→</div>
+  </a>
+
   <!-- Career stats (improvement-first; results gated; see docs/specs/home-stats.md) -->
   <div class="career-strip" id="career-strip" style="display:none">
     <div class="cs-stats">

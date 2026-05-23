@@ -329,6 +329,96 @@ def make_handler(ctx: dict):
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps(payload).encode()))
 
+            elif path == "/home/worst-sector":
+                # Answers "what's your biggest single leak?" — the
+                # (track, sector) combo with the largest average gap
+                # between your best sector and the theoretical best at
+                # that track. Surfaces ONE focus card on Home; cheaper
+                # than the watchlist (one SQL aggregation).
+                # See docs/specs/home-worst-sector.md (brainstorm).
+                with db_lock:
+                    conn = db_connect()
+                    try:
+                        # Per session, the BEST sector achieved (across all
+                        # laps in that session). Then average that across
+                        # sessions and compare to track theoretical.
+                        agg_rows = [dict(r) for r in conn.execute(
+                            "WITH session_best AS ( "
+                            "  SELECT s.track AS track, s.session_id AS session_id, "
+                            "         MIN(l.s1_time_s) AS bs1, "
+                            "         MIN(l.s2_time_s) AS bs2, "
+                            "         MIN(l.s3_time_s) AS bs3 "
+                            "  FROM sessions s "
+                            "  JOIN laps l ON l.session_id = s.session_id "
+                            "  WHERE s.track IS NOT NULL AND s.track != '' AND s.track != 'unknown' "
+                            "    AND l.s1_time_s IS NOT NULL "
+                            "    AND l.s2_time_s IS NOT NULL "
+                            "    AND l.s3_time_s IS NOT NULL "
+                            "  GROUP BY s.track, s.session_id "
+                            ") "
+                            "SELECT sb.track, "
+                            "       AVG(sb.bs1) AS avg_bs1, "
+                            "       AVG(sb.bs2) AS avg_bs2, "
+                            "       AVG(sb.bs3) AS avg_bs3, "
+                            "       COUNT(*)    AS session_count, "
+                            "       tr.theoretical_s1_s AS th1, "
+                            "       tr.theoretical_s2_s AS th2, "
+                            "       tr.theoretical_s3_s AS th3 "
+                            "FROM session_best sb "
+                            "JOIN track_references tr "
+                            "  ON tr.track = sb.track AND tr.reference_type = 'theoretical' "
+                            "WHERE tr.theoretical_s1_s IS NOT NULL "
+                            "  AND tr.theoretical_s2_s IS NOT NULL "
+                            "  AND tr.theoretical_s3_s IS NOT NULL "
+                            "GROUP BY sb.track "
+                            "HAVING session_count >= 3"
+                        ).fetchall()]
+                    finally:
+                        conn.close()
+
+                # Find the (track, sector) with the largest avg gap.
+                worst = None
+                for r in agg_rows:
+                    for n, avg_field, th_field in ((1, "avg_bs1", "th1"),
+                                                   (2, "avg_bs2", "th2"),
+                                                   (3, "avg_bs3", "th3")):
+                        gap = r[avg_field] - r[th_field]
+                        if gap <= 0.30:  # don't surface trivia
+                            continue
+                        if worst is None or gap > worst["avg_gap_s"]:
+                            worst = {
+                                "track": r["track"],
+                                "sector": n,
+                                "avg_gap_s": round(gap, 3),
+                                "avg_sector_s": round(r[avg_field], 3),
+                                "theoretical_sector_s": round(r[th_field], 3),
+                                "session_count": r["session_count"],
+                            }
+
+                # Enrich with the track's PB session for the outline +
+                # for a deep-link CTA.
+                if worst:
+                    with db_lock:
+                        conn = db_connect()
+                        try:
+                            pb_row = conn.execute(
+                                "SELECT s.session_id, l.lap_number "
+                                "FROM sessions s JOIN laps l ON l.session_id=s.session_id "
+                                "WHERE s.track = ? AND s.best_lap_time_s IS NOT NULL "
+                                "  AND l.lap_time_s IS NOT NULL "
+                                "  AND ABS(l.lap_time_s - s.best_lap_time_s) < 0.001 "
+                                "ORDER BY s.best_lap_time_s ASC LIMIT 1",
+                                (worst["track"],)
+                            ).fetchone()
+                        finally:
+                            conn.close()
+                    if pb_row:
+                        worst["pb_session_id"] = pb_row["session_id"]
+                        worst["pb_lap_number"] = pb_row["lap_number"]
+
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(worst).encode()))
+
             elif path == "/home/regression-watchlist":
                 # Surfaces (track, car) combos where the user's recent 3
                 # sessions are SLOWER than the prior 3 — i.e. they're
