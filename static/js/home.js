@@ -56,7 +56,6 @@ async function init(){
   renderTopCircuits(d.top_circuits || []);
   renderTopCars(d.top_cars || []);
   renderRecent(d.recent_sessions || []);
-  renderFooter(d.stats);
 }
 
 // Hero card at the top of Home — answers "what happened while I was
@@ -353,20 +352,5 @@ function renderCareerSpark(form){
   sparkEl.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/></svg>`;
 }
 
-function renderFooter(stats){
-  const el = document.getElementById('pi-stats');
-  if(!stats){el.innerHTML = '—'; return;}
-  const bits = [];
-  if(stats.udp_received_total != null){
-    bits.push(`UDP <strong>${stats.udp_received_total.toLocaleString()}</strong> pkts`);
-  }
-  if(stats.last_packet_at){
-    bits.push(`Last packet <strong>${fmtRelative(stats.last_packet_at)}</strong>`);
-  }
-  if(stats.storage_used_gb != null && stats.storage_total_gb != null){
-    bits.push(`Storage <strong>${fmtBytes(stats.storage_used_gb)} / ${fmtBytes(stats.storage_total_gb)}</strong>`);
-  }
-  el.innerHTML = bits.map(b => `<span>${b}</span>`).join('');
-}
 
 init();

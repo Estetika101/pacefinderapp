@@ -362,19 +362,6 @@ a.cs-form:hover{background:var(--color-surface)}
 .recent-row.lead .recent-track{font-size:var(--text-md);font-weight:600}
 .recent-row.lead .recent-time{font-size:var(--text-md);font-weight:700;color:var(--color-accent)}
 
-/* ── Footer Pi stats ────────────────────────────────────────────── */
-.footstrip{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:var(--space-4) 0;margin-top:var(--space-4);
-  border-top:1px solid var(--color-border);
-  font-size:11px;color:var(--color-text-quaternary);
-  flex-wrap:wrap;gap:var(--space-3);
-}
-.footstrip .links{display:inline-flex;gap:var(--space-3)}
-.footstrip a:hover{color:var(--color-text-primary)}
-.footstrip .pi-stats{display:inline-flex;gap:var(--space-4)}
-.footstrip strong{color:var(--color-text-secondary);font-weight:500}
-
 @media (max-width:760px){
   .home-cols{grid-template-columns:1fr}
   .recent-row{grid-template-columns:1fr auto;row-gap:4px}
