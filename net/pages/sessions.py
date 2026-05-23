@@ -457,6 +457,14 @@ SESSIONS_HTML = """<!DOCTYPE html>
   .stbl .c-name{color:var(--color-text-primary);font-weight:500}
   .stbl .c-sub{color:var(--color-text-quaternary);font-size:12px;margin-top:2px}
   .stbl .c-empty{padding:26px;text-align:center;color:var(--color-text-quaternary);font-style:italic}
+  /* Tiny track outline next to the circuit name — speed-colored, shape
+     recognizable at a glance. Empty before lazy-loaded; no border. */
+  .stbl .c-cell{display:flex;align-items:center;gap:12px}
+  .stbl .track-outline{width:56px;height:42px;flex-shrink:0;display:flex;
+    align-items:center;justify-content:center}
+  .stbl .track-outline svg{width:100%;height:100%;overflow:visible}
+  .stbl .track-outline .tm-line line{stroke-width:1.6;stroke-linecap:round}
+  @media(max-width:700px){.stbl .track-outline{display:none}}
   .swt{display:inline-flex;align-items:center;gap:9px;cursor:pointer;color:var(--color-text-secondary);font-size:14px;user-select:none}
   .swt input{position:absolute;opacity:0;width:0;height:0}
   .swt .tr{width:34px;height:19px;border-radius:999px;background:var(--color-surface-2);
@@ -466,6 +474,30 @@ SESSIONS_HTML = """<!DOCTYPE html>
   .swt input:checked + .tr{background:rgba(232,184,75,.25);border-color:var(--color-accent)}
   .swt input:checked + .tr::after{transform:translateX(15px);background:var(--color-accent)}
   .swt.on{color:var(--color-text-primary)}
+  .swt-help{position:relative;display:inline-flex;align-items:center;justify-content:center;
+    width:16px;height:16px;border-radius:50%;border:1px solid var(--color-border);
+    color:var(--color-text-quaternary);font-size:10px;font-weight:600;
+    cursor:help;margin-left:6px;user-select:none;vertical-align:middle;
+    background:var(--color-surface-2);transition:color .12s,border-color .12s}
+  .swt-help:hover,.swt-help:focus{color:var(--color-text-primary);
+    border-color:var(--color-accent);outline:none}
+  /* Real popover instead of native title — was rendering nothing on some
+     browsers / blocked by the click-to-close behaviour of the parent <label>. */
+  .swt-help-tip{
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(100% + 8px);width:240px;
+    padding:8px 10px;background:var(--color-surface-2);
+    border:1px solid var(--color-border);border-radius:6px;
+    color:var(--color-text-secondary);font-size:11px;font-weight:400;
+    text-transform:none;letter-spacing:0;line-height:1.45;text-align:left;
+    box-shadow:0 6px 14px -4px rgba(0,0,0,.6);
+    opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .12s,visibility .12s;z-index:30;cursor:default}
+  .swt-help-tip::after{content:"";position:absolute;left:50%;top:100%;
+    transform:translateX(-50%);border:5px solid transparent;
+    border-top-color:var(--color-border)}
+  .swt-help:hover .swt-help-tip,
+  .swt-help:focus .swt-help-tip{opacity:1;visibility:visible}
 </style>
 </head>
 <body>
@@ -494,6 +526,7 @@ SESSIONS_HTML = """<!DOCTYPE html>
 </div>
 
 <script src="/static/js/class.js"></script>
+<script src="/static/js/track_mini.js"></script>
 <script src="/static/js/sessions_list.js"></script>
 </body>
 </html>

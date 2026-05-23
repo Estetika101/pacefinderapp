@@ -91,7 +91,9 @@ a{color:inherit;text-decoration:none}
 .career-results .cs-cell{min-width:80px}
 .cs-results-sample{margin-left:auto;font-size:11px;color:var(--color-text-quaternary);
   text-transform:uppercase;letter-spacing:0.08em}
-.cs-form{display:flex;align-items:center;gap:12px;margin-left:auto}
+.cs-form{display:flex;align-items:center;gap:12px;margin-left:auto;text-decoration:none;color:inherit;
+  padding:4px 8px;margin-right:-8px;border-radius:6px;transition:background-color .12s ease}
+a.cs-form:hover{background:var(--color-surface)}
 .cs-trend{font-size:var(--text-sm);font-weight:600;white-space:nowrap}
 .cs-trend.up{color:var(--color-green)}
 .cs-trend.dn{color:var(--color-red)}
@@ -156,6 +158,9 @@ a{color:inherit;text-decoration:none}
   text-transform:uppercase;letter-spacing:0.08em;margin:0;
 }
 .section-head .count{font-size:11px;color:var(--color-text-quaternary)}
+.section-head .section-link{font-size:11px;color:var(--color-text-secondary);text-decoration:none;
+  text-transform:uppercase;letter-spacing:0.08em}
+.section-head .section-link:hover{color:var(--color-accent)}
 
 .recent-row{
   display:grid;grid-template-columns:90px 1fr 1fr 160px 90px 30px;

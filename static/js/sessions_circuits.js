@@ -44,7 +44,10 @@ function render(tracks){
     const sc = t.session_count || 0;
     const meta = sc + ' session' + (sc === 1 ? '' : 's')
       + (t.best_car ? ' · best in ' + escapeHtml(t.best_car) : '');
+    const outAttr = (t.pb_session_id && t.pb_lap_number != null)
+      ? ` data-sid="${escapeHtml(t.pb_session_id)}" data-lap="${t.pb_lap_number}"` : '';
     return `<a href="${href}" class="track-row">
+      <div class="track-outline"${outAttr}></div>
       <div>
         <div class="track-name">${escapeHtml(name)}</div>
         <div class="track-meta">${meta}</div>
@@ -54,6 +57,9 @@ function render(tracks){
       <div class="track-arrow">→</div>
     </a>`;
   }).join('');
+  // Outline rendering lives in /static/js/track_mini.js — shared with
+  // the Sessions list. Lazy-loads via IntersectionObserver.
+  if(window.pfLoadMinis) window.pfLoadMinis();
 }
 
 init();

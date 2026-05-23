@@ -853,12 +853,26 @@ def _db_tracks_index(game: Optional[str] = None) -> list:
                 avg_g = gained_row[0] if gained_row else None
                 r["avg_gained"] = round(avg_g, 1) if avg_g is not None else None
                 best_car_row = conn.execute(
-                    f"SELECT car, car_class, car_pi FROM sessions WHERE track=? AND best_lap_time_s=?{extra_where} ORDER BY started_at DESC LIMIT 1",
+                    f"SELECT session_id, car, car_class, car_pi FROM sessions WHERE track=? AND best_lap_time_s=?{extra_where} ORDER BY started_at DESC LIMIT 1",
                     [r["track"], r["best_lap_time_s"]] + (([game]) if game else []),
                 ).fetchone()
                 r["best_car"] = best_car_row["car"] if best_car_row else None
                 r["best_car_class"] = best_car_row["car_class"] if best_car_row else None
                 r["best_car_pi"] = best_car_row["car_pi"] if best_car_row else None
+                # Outline source: the PB lap of the PB session — the row UI
+                # uses these to lazy-load /sessions/lap-samples and draw the
+                # racing line as a faint thumbnail.
+                if best_car_row:
+                    pb_lap = conn.execute(
+                        "SELECT lap_number FROM laps WHERE session_id=? "
+                        "AND lap_time_s IS NOT NULL ORDER BY lap_time_s ASC LIMIT 1",
+                        (best_car_row["session_id"],),
+                    ).fetchone()
+                    r["pb_session_id"] = best_car_row["session_id"]
+                    r["pb_lap_number"] = pb_lap["lap_number"] if pb_lap else None
+                else:
+                    r["pb_session_id"] = None
+                    r["pb_lap_number"] = None
                 result.append(r)
             return result
         finally:

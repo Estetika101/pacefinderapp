@@ -40,10 +40,10 @@ HOME_HTML_PRE = """<!DOCTYPE html>
         <span class="cs-l">Circuit progression</span>
       </div>
     </div>
-    <div class="cs-form">
+    <a class="cs-form" id="cs-form-link" href="/sessions?type=race,race_ai,race_online" title="See the races behind this trend">
       <span class="cs-trend fl" id="cs-trend">&mdash;</span>
       <span class="cs-spark" id="cs-spark"></span>
-    </div>
+    </a>
   </div>
 
   <!-- Results tier — hidden unless there are real races (spec gate) -->
@@ -59,7 +59,7 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     <div class="home-main">
       <div class="section-head">
         <h2>Recent sessions</h2>
-        <span class="count" id="recent-count">&mdash;</span>
+        <a href="/sessions" class="section-link">All sessions &rarr;</a>
       </div>
       <div id="recent-list"></div>
     </div>

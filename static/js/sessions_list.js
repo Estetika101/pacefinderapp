@@ -14,7 +14,15 @@ function carName(s){
   if(s.car_ordinal!=null) return 'Car #'+s.car_ordinal;
   return 'Unknown Car';
 }
-function typeOf(s){ return s.race_type || (s.session_type && s.session_type!=='unknown' ? s.session_type : null); }
+// Normalize Forza's race_type aliases so the Type facet doesn't show two
+// "AI Race" entries (legacy `ai` vs newer `race_ai`) or two "Race" entries
+// (`real` vs `race`). Same labels were already mapped in TYPE_LABELS — but
+// uniq() dedupes by raw value, so the dupes survived into the dropdown.
+const _RT_ALIAS = {ai:'race_ai', real:'race'};
+function typeOf(s){
+  const raw = s.race_type || (s.session_type && s.session_type!=='unknown' ? s.session_type : null);
+  return raw ? (_RT_ALIAS[raw] || raw) : null;
+}
 
 let _all = [];
 let _tix = new Map();          // track name → {best_lap_time_s, spark_laps, trend}
@@ -154,7 +162,10 @@ function renderFilters(){
   const swtOn = F.review === '1';
   const toggle = revN ? `<label class="swt${swtOn?' on':''}">`+
     `<input type="checkbox" id="rev-t"${swtOn?' checked':''}>`+
-    `<span class="tr"></span>Needs review (${revN})</label>` : '';
+    `<span class="tr"></span>Needs review (${revN})</label>`+
+    `<span class="swt-help" tabindex="0" aria-label="What does this toggle do?">?`+
+    `<span class="swt-help-tip" role="tooltip">Filters to sessions missing a track, car, or finish position — the ones to clean up before they count in stats.</span>`+
+    `</span>` : '';
 
   // clear-all stays in the DOM (display-toggled) so an option click can
   // sync it in place without rebuilding — keeps the open panel/scroll.
@@ -192,14 +203,24 @@ function renderTable(){
     const t = typeOf(s); const tl = t ? (TYPE_LABELS[t]||t) : '';
     const cond = [s.weather_condition, s.tyre_compound].filter(Boolean).join(' · ');
     const sub = [tl, cond].filter(Boolean).join(' &middot; ');
+    // Mini track outline — reuses each track's PB lap (cached, so many
+    // sessions of the same track share one fetch). Skip if no PB on file
+    // yet (new tracks); the cell collapses to a transparent placeholder.
+    const tx = _tix.get(s.track);
+    const outAttr = (tx && tx.pb_session_id && tx.pb_lap_number != null)
+      ? ` data-sid="${esc(tx.pb_session_id)}" data-lap="${tx.pb_lap_number}"` : '';
     return `<tr onclick="location.href='${href}'">`+
-      `<td><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
-      `${sub?`<div class="c-sub">${sub}</div>`:''}</td>`+
+      `<td><div class="c-cell">`+
+        `<div class="track-outline"${outAttr}></div>`+
+        `<div><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
+        `${sub?`<div class="c-sub">${sub}</div>`:''}</div>`+
+      `</div></td>`+
       `<td>${esc(carName(s))}${badge}</td>`+
       `<td class="num">${fmtLap(s.best_lap_time_s)}</td>`+
       `<td class="num">${fmtD(s.started_at)} <span style="opacity:.6">${fmtT(s.started_at)}</span></td>`+
       `</tr>`;
   }).join('');
+  if(window.pfLoadMinis) window.pfLoadMinis(list);
 }
 
 // In-place sync so an option/clear click never rebuilds #filters —

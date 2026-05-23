@@ -49,16 +49,23 @@ async function init(){
 function drawTrack(){
   const svg = document.getElementById('map-svg');
   if(!_track.length){
+    svg.setAttribute('viewBox', '0 0 1000 480');
     svg.innerHTML = '<text x="500" y="240" fill="#666" font-size="13" text-anchor="middle" font-family="sans-serif">No position data for this session</text>';
     _xform = null;
     return;
   }
-  // Fit the (x,y) point cloud into the 1000×480 viewBox with padding.
+  // viewBox sized to the track's own aspect ratio so a square circuit
+  // doesn't get letterboxed inside a 2:1 rectangle. Cap 0.5–2.5 so a
+  // long thin track like Le Mans can't collapse the panel to a sliver.
   const xs = _track.map(p=>p.x), ys = _track.map(p=>p.y);
   const minX=Math.min(...xs), maxX=Math.max(...xs);
   const minY=Math.min(...ys), maxY=Math.max(...ys);
-  const pad=40, W=1000, H=480;
   const spanX=(maxX-minX)||1, spanY=(maxY-minY)||1;
+  const trackAspect=Math.max(0.5,Math.min(2.5,spanX/spanY));
+  const pad=40;
+  const W = trackAspect >= 1 ? 1000 : Math.round(1000 * trackAspect);
+  const H = trackAspect >= 1 ? Math.round(1000 / trackAspect) : 1000;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   const sc=Math.min((W-2*pad)/spanX, (H-2*pad)/spanY);
   const ox=(W-spanX*sc)/2, oy=(H-spanY*sc)/2;
   // Y is flipped so the loop isn't upside down (screen y grows down).

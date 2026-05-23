@@ -36,6 +36,7 @@ CIRCUIT_INDEX_HTML_PRE = """<!DOCTYPE html>
 
 </div>
 
+<script src="/static/js/track_mini.js"></script>
 <script src="/static/js/sessions_circuits.js"></script>
 </body>
 </html>

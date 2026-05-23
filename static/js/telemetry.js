@@ -385,8 +385,16 @@ function renderTrackMap(){
   const mnX=Math.min(...xs),mxX=Math.max(...xs);
   const mnZ=Math.min(...zs2),mxZ=Math.max(...zs2);
   const mnS=Math.min(...spds),mxS=Math.max(...spds);
-  const TW=900,TH=260,pd=24;
+  // viewBox sized to the track's own aspect ratio so the SVG fills its
+  // container with the shape (vs. letterboxing inside a fixed 900×260
+  // rectangle). Cap aspect so a long thin track like Le Mans doesn't
+  // collapse the column to a sliver. pd is padding inside the viewBox.
+  const pd=24;
   const scX=(mxX-mnX)||1,scZ=(mxZ-mnZ)||1;
+  const trackAspect=Math.max(0.5,Math.min(2.5,scX/scZ));
+  const TW=trackAspect>=1?600:Math.round(600*trackAspect);
+  const TH=trackAspect>=1?Math.round(600/trackAspect):600;
+  _tmTW=TW;_tmTH=TH;
   const sc=Math.min((TW-pd*2)/scX,(TH-pd*2)/scZ);
   const offX=(TW-(mxX-mnX)*sc)/2,offZ=(TH-(mxZ-mnZ)*sc)/2;
   const cx=x=>offX+(x-mnX)*sc;
@@ -399,12 +407,12 @@ function renderTrackMap(){
     segs+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${spdRgb(spds[i],mnS,mxS)}" stroke-width="3" stroke-linecap="round"/>`;
   }
   const ix=cx(s[0].px).toFixed(1),iy=cy(xz(s[0])).toFixed(1);
-  $('track-map-inner').innerHTML=`<svg viewBox="0 0 ${TW} ${TH}" width="100%" style="max-height:260px;display:block">
+  $('track-map-inner').innerHTML=`<svg viewBox="0 0 ${TW} ${TH}" width="100%" style="display:block">
     ${segs}
     <circle id="tmap-dot" cx="${ix}" cy="${iy}" r="7" fill="#fff" stroke="rgba(0,0,0,.6)" stroke-width="1.5" opacity=".9"/>
   </svg>`;
 }
-let _tmHasPz=false,_tmSamples=null;
+let _tmHasPz=false,_tmSamples=null,_tmTW=600,_tmTH=600;
 function updateTrackDot(pos){
   const dot=$('tmap-dot');
   if(!dot||!_tmCx||!_tmSamples)return;
@@ -425,9 +433,11 @@ function renderAll(){
     if(empty)empty.style.display='';
     allPanelIds.forEach(id=>{const p=$(id);if(p)p.style.display='none';});
     const tm=$('track-map-wrap');if(tm)tm.style.display='none';
+    hideHud();
     return;
   }
   if(empty)empty.style.display='none';
+  showHud(); resetHud();
   // Delta panel only renders when a reference is selected AND a non-reference lap is also selected.
   let deltaHtml='',showDeltaPanel=false;
   if(_refSamples){
@@ -492,6 +502,7 @@ function paintCursor(xFrac, mouseEvent){
   }
   if(_cursorLocked) lines.push('🔒 locked — Esc to release');
   tip.textContent=lines.join('\\n');
+  updateHud(pos);
   if(mouseEvent){
     tip.style.left=Math.min(mouseEvent.clientX+14,window.innerWidth-180)+'px';
     tip.style.top=Math.max(8,mouseEvent.clientY-tip.offsetHeight-8)+'px';
@@ -592,27 +603,42 @@ function setupInteraction(){
     const nLo=lo+Math.min(f0,f1)*range,nHi=lo+Math.max(f0,f1)*range;
     if(nHi-nLo>0.01){_zoom=[nLo,nHi];renderAll();}
   };
-  document.addEventListener('keydown',e=>{
-    if(e.target.matches('input,textarea,select'))return;
-    if(e.code==='Space'){
-      e.preventDefault();_spaceDown=true;
-      area.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.add('panning'));
-    } else if(e.code==='Escape' && _cursorLocked){
-      unlockCursor();
-    } else if(_cursorLocked && (e.code==='ArrowLeft' || e.code==='ArrowRight')){
-      // Nudge locked cursor: ±1% of zoom window per arrow, ±10% with Shift
-      e.preventDefault();
-      const step=(e.shiftKey?0.10:0.01)*(e.code==='ArrowRight'?1:-1);
-      _cursorXFrac=Math.max(0,Math.min(1, _cursorXFrac+step));
-      paintCursor(_cursorXFrac, null);
-    }
-  });
-  document.addEventListener('keyup',e=>{
-    if(e.code==='Space'){
-      _spaceDown=false;
-      if(!_panning)area.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.remove('panning'));
-    }
-  });
+  // Bind document-level keydown ONCE — setupInteraction is called from
+  // renderAll on every re-render, which used to add a fresh listener each
+  // time. After N renders ArrowRight fired the handler N times and the
+  // cursor jumped by N% per press.
+  if(!window._teleKeysBound){
+    window._teleKeysBound=true;
+    document.addEventListener('keydown',e=>{
+      if(e.target.matches('input,textarea,select'))return;
+      if(e.code==='Space'){
+        e.preventDefault();_spaceDown=true;
+        const a=$('charts-area'); if(a) a.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.add('panning'));
+      } else if(e.code==='Escape' && _cursorLocked){
+        unlockCursor();
+      } else if(_cursorLocked && (e.code==='ArrowLeft' || e.code==='ArrowRight')){
+        // Nudge locked cursor: ±1% of zoom window per arrow, ±10% with Shift
+        e.preventDefault();
+        const step=(e.shiftKey?0.10:0.01)*(e.code==='ArrowRight'?1:-1);
+        _cursorXFrac=Math.max(0,Math.min(1, _cursorXFrac+step));
+        paintCursor(_cursorXFrac, null);
+      }
+    });
+  }
+  // Embedded inside the Session detail iframe? Clicks on inner SVG paths
+  // don't reliably give the iframe focus, so arrow keys never reach our
+  // document keydown. Pull focus on any mousedown inside the chart area.
+  area.addEventListener('mousedown',()=>{try{window.focus();}catch(_){} });
+  if(!window._teleKeyupBound){
+    window._teleKeyupBound=true;
+    document.addEventListener('keyup',e=>{
+      if(e.code==='Space'){
+        _spaceDown=false;
+        const a=$('charts-area');
+        if(!_panning && a) a.querySelectorAll('.panel-svg-wrap').forEach(w=>w.classList.remove('panning'));
+      }
+    });
+  }
 
   // Click on the track map → lock cursor at the corresponding lap distance.
   // Finds the sample whose px/py is closest to the click point and uses its
@@ -624,8 +650,9 @@ function setupInteraction(){
       const svg=mapInner.querySelector('svg');
       if(!svg) return;
       const rect=svg.getBoundingClientRect();
-      // Convert click to SVG user coords (the map uses viewBox, so scale)
-      const vbW=900, vbH=260;  // matches renderTrackMap TW/TH
+      // Convert click to SVG user coords (the map uses viewBox, so scale).
+      // TW/TH are now dynamic per-track; read what renderTrackMap stashed.
+      const vbW=_tmTW, vbH=_tmTH;
       const sx=(e.clientX-rect.left)*(vbW/rect.width);
       const sy=(e.clientY-rect.top )*(vbH/rect.height);
       const hasPz=_tmHasPz;
@@ -649,6 +676,123 @@ function setupInteraction(){
 function hideX(){
   document.querySelectorAll('.px-line').forEach(l=>{l.style.display='none';l.classList.remove('locked');});
   $('tele-tip').style.display='none';
+  resetHud();
+}
+// ── HUD column ────────────────────────────────────────────────────────────
+// Live cockpit readouts on the right rail. Driven entirely by paintCursor:
+// no separate state, no extra DB calls — just another consumer of the same
+// interpolated samples that build the floating tooltip. Shows the primary
+// lap vs the selected reference; hidden when no lap is selected.
+function _set(id,v){const el=document.getElementById(id);if(el)el.textContent=v;}
+function _setFill(id,pct){const el=document.getElementById(id);if(el)el.style.width=Math.max(0,Math.min(100,pct))+'%';}
+function _setTick(id,pct){const el=document.getElementById(id);if(!el)return;
+  if(pct==null||isNaN(pct)){el.style.display='none';return;}
+  el.style.display='block';el.style.left=Math.max(0,Math.min(100,pct))+'%';
+}
+function showHud(){const c=document.getElementById('hud-col');if(c)c.style.display='';}
+function hideHud(){const c=document.getElementById('hud-col');if(c)c.style.display='none';}
+function resetHud(){
+  // Cursor not active — clear the cards back to em-dashes so a stale read
+  // doesn't look live. Lap identity stays in the header because that
+  // sticks regardless of cursor (it tells you whose values you'll see
+  // when you DO scrub).
+  _set('hud-pos','— %');
+  _setHudLapHeader();
+  _set('hud-speed-val','—');_set('hud-speed-ref','');
+  const sd=document.getElementById('hud-speed-delta');if(sd)sd.innerHTML='';
+  _setFill('hud-thr-fill',0);_setFill('hud-brk-fill',0);
+  _setTick('hud-thr-tick',null);_setTick('hud-brk-tick',null);
+  _set('hud-thr-val','—');_set('hud-brk-val','—');
+  _set('hud-gear-val','—');
+  const dv=document.getElementById('hud-delta-val');if(dv){dv.className='hud-mid';dv.innerHTML='—<span class="hud-delta-sub">here</span>';}
+}
+// Header line: one chip per selected lap. Primary is filled and shows
+// the HUD numbers; clicking a non-primary chip swaps focus without
+// reaching back to the left ctrl-col lap list.
+function _setHudLapHeader(){
+  const sel=document.getElementById('hud-lapsel');
+  const refRow=document.getElementById('hud-refrow');
+  const refName=document.getElementById('hud-ref-name');
+  if(!sel) return;
+  if(!_selectedLaps.length){
+    sel.innerHTML='<span style="font-size:10px;color:var(--color-text-quaternary);letter-spacing:.06em;text-transform:uppercase">No lap selected</span>';
+    if(refRow) refRow.style.display='none';
+    return;
+  }
+  sel.innerHTML=_selectedLaps.map((ln,ci)=>{
+    const isPrim=ln===_primaryLap;
+    return `<button type="button" class="hud-lapsel-btn${isPrim?' is-primary':''}" `+
+      `style="--c:${LAP_COLORS[ci]}" data-lap="${ln}" `+
+      `onclick="setPrimaryLap(${ln})" `+
+      `aria-pressed="${isPrim?'true':'false'}">L${ln+1}</button>`;
+  }).join('');
+  if(refRow && refName){
+    if(_refSamples && _primaryLap!=null && !isRefLap(_primaryLap)){
+      refName.textContent=refLabel();
+      refRow.style.display='';
+    } else {
+      refRow.style.display='none';
+    }
+  }
+}
+// Public: switch which selected lap the HUD reflects (and which trace
+// renders at full opacity on the charts). No-op if the lap isn't in the
+// selection set — chips are only emitted for selected laps so this
+// should never be called with an invalid value.
+function setPrimaryLap(lapN){
+  if(_selectedLaps.indexOf(lapN) < 0) return;
+  if(_primaryLap === lapN) return;
+  _primaryLap = lapN;
+  renderAll();
+  if(_cursorLocked && _cursorXFrac != null) paintCursor(_cursorXFrac, null);
+}
+function updateHud(pos){
+  if(!_primaryLap||!_lapSamples[_primaryLap])return;
+  const s=_lapSamples[_primaryLap];
+  const sp=interpAt(s,pos,'speed_mph');
+  const th=interpAt(s,pos,'throttle_pct');
+  const br=interpAt(s,pos,'brake_pct');
+  const gr=interpAt(s,pos,'gear');
+  _set('hud-pos',(pos*100).toFixed(1)+' %');
+  _set('hud-speed-val',sp==null||isNaN(sp)?'—':Math.round(sp));
+  _set('hud-thr-val',th==null||isNaN(th)?'—':Math.round(th)+'%');
+  _set('hud-brk-val',br==null||isNaN(br)?'—':Math.round(br)+'%');
+  _setFill('hud-thr-fill',th||0);
+  _setFill('hud-brk-fill',br||0);
+  _set('hud-gear-val',gr==null||isNaN(gr)?'—':Math.round(gr));
+  // Reference comparison — only when a ref is loaded and the primary lap
+  // is NOT the reference itself (showing 0 deltas vs your own lap is noise).
+  if(_refSamples && !isRefLap(_primaryLap)){
+    const rsp=interpAt(_refSamples,pos,'speed_mph');
+    const rth=interpAt(_refSamples,pos,'throttle_pct');
+    const rbr=interpAt(_refSamples,pos,'brake_pct');
+    const rt=interpAt(_refSamples,pos,'t');
+    const ct=interpAt(s,pos,'t');
+    _set('hud-speed-ref',rsp==null||isNaN(rsp)?'':'ref '+Math.round(rsp));
+    _setTick('hud-thr-tick',rth);
+    _setTick('hud-brk-tick',rbr);
+    const sd=document.getElementById('hud-speed-delta');
+    if(sd){
+      if(sp!=null&&rsp!=null&&!isNaN(sp)&&!isNaN(rsp)){
+        const d=sp-rsp,sign=d>0?'+':(d<0?'−':'·'),cls=d>0?'gain':(d<0?'lost':'');
+        sd.innerHTML='<span class="v '+cls+'">'+sign+Math.abs(d).toFixed(0)+' vs ref</span>';
+      } else sd.innerHTML='';
+    }
+    const dv=document.getElementById('hud-delta-val');
+    if(dv){
+      if(ct!=null&&rt!=null&&!isNaN(ct)&&!isNaN(rt)){
+        const dd=ct-rt,sign=dd>0?'+':(dd<0?'−':'·'),cls=dd>0?'lost':(dd<0?'gain':'');
+        dv.className='hud-mid '+cls;
+        dv.innerHTML=sign+Math.abs(dd).toFixed(2)+'<span class="hud-delta-sub">here</span>';
+      } else { dv.className='hud-mid'; dv.innerHTML='—<span class="hud-delta-sub">here</span>'; }
+    }
+  } else {
+    _set('hud-speed-ref','');
+    _setTick('hud-thr-tick',null);_setTick('hud-brk-tick',null);
+    const sd=document.getElementById('hud-speed-delta');if(sd)sd.innerHTML='';
+    const dv=document.getElementById('hud-delta-val');
+    if(dv){dv.className='hud-mid';dv.innerHTML='—<span class="hud-delta-sub">here</span>';}
+  }
 }
 function resetZoom(){_zoom=[0,1];renderAll();}
 function stepZoom(dir){
@@ -704,7 +848,12 @@ async function onLapToggle(lapN,checked){
   }else{
     _selectedLaps=_selectedLaps.filter(n=>n!==lapN);
   }
-  _primaryLap=_selectedLaps[0]||null;
+  // Preserve user's HUD lap choice if it's still selected; otherwise
+  // fall back to the first. Without this, toggling any other lap in the
+  // left rail would silently snap focus back to _selectedLaps[0].
+  if(_primaryLap==null || _selectedLaps.indexOf(_primaryLap)<0){
+    _primaryLap = _selectedLaps[0] || null;
+  }
   updateMaxT();renderLapList();renderAll();
 }
 async function onRefChange(){
@@ -766,10 +915,14 @@ async function openCrossSessionPicker(){
   let sessions=[];
   try{
     const url='/sessions/track/data?name='+encodeURIComponent(track)+(game?'&game='+encodeURIComponent(game):'');
-    sessions=await fetch(url).then(r=>r.json());
+    // /sessions/track/data returns {sessions:[...], pb:..., progress:...} —
+    // a dict, not an array. The shape changed when Circuits added PB /
+    // progress fields; old `.filter(...)` on the dict threw silently.
+    const resp=await fetch(url).then(r=>r.json());
+    sessions=Array.isArray(resp)?resp:(resp&&Array.isArray(resp.sessions)?resp.sessions:[]);
   }catch(e){sessions=[];}
   // Exclude the current session — comparing against yourself defeats the purpose
-  const others=(sessions||[]).filter(s=>s.session_id!==_id);
+  const others=sessions.filter(s=>s.session_id!==_id);
   if(!others.length){list.innerHTML='<div class="cs-empty">No other sessions at this track yet.</div>';return;}
   list.innerHTML=others.map(s=>{
     const dt=fmtDt(s.started_at);

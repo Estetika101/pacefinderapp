@@ -1,19 +1,38 @@
 import asyncio
+import gzip
 import json
 import socket
 import time
 import urllib.parse
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 
 from net.perf import _perf_ctx, _perf_ring, _perf_client_ring, _PERF_LOG_THRESHOLD_MS
 
 
+_accept_encoding_ctx: ContextVar = ContextVar("pf_accept_encoding", default="")
+
+# Compress JSON/text bodies above this size when the client advertises gzip.
+# Smaller payloads aren't worth the round-trip cost on a Pi.
+_GZIP_MIN_BYTES = 860
+_GZIP_TYPES = ("application/json", "text/", "application/javascript")
+
+
 def _http_response(status: str, content_type: str, body: bytes, extra_headers: str = "") -> bytes:
+    enc_header = ""
+    if (
+        len(body) >= _GZIP_MIN_BYTES
+        and any(content_type.startswith(t) for t in _GZIP_TYPES)
+        and "gzip" in _accept_encoding_ctx.get().lower()
+    ):
+        body = gzip.compress(body, compresslevel=6)
+        enc_header = "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n"
     return (
         f"HTTP/1.1 {status}\r\n"
         f"Content-Type: {content_type}\r\n"
         f"Content-Length: {len(body)}\r\n"
+        f"{enc_header}"
         f"Access-Control-Allow-Origin: *\r\n"
         f"Access-Control-Allow-Private-Network: true\r\n"
         f"Connection: close\r\n"
@@ -123,12 +142,17 @@ def make_handler(ctx: dict):
             _perf_path = path
             _perf_token = _perf_ctx.set({"db_ms": 0.0})
 
-            # Parse Content-Length so we read the full POST body
+            # Parse Content-Length so we read the full POST body, and capture
+            # Accept-Encoding so _http_response can gzip JSON/text payloads.
             content_length = 0
+            accept_encoding = ""
             for line in header_lines[1:]:
-                if line.lower().startswith("content-length:"):
+                lower = line.lower()
+                if lower.startswith("content-length:"):
                     content_length = int(line.split(":", 1)[1].strip())
-                    break
+                elif lower.startswith("accept-encoding:"):
+                    accept_encoding = line.split(":", 1)[1].strip()
+            _accept_encoding_ctx.set(accept_encoding)
 
             body_buf = body_so_far
             while len(body_buf) < content_length:

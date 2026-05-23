@@ -105,8 +105,6 @@ function renderTopCars(cars){
 }
 
 function renderRecent(recents){
-  document.getElementById('recent-count').textContent =
-    recents.length ? ('showing ' + recents.length + ' latest') : '—';
   const list = document.getElementById('recent-list');
   if(!recents.length){
     list.innerHTML = '<div class="recent-empty">No sessions recorded yet. Open the <a href="/dashboard">live dashboard</a> and drive.</div>';
@@ -185,7 +183,10 @@ function renderCareerSpark(form){
   const withPos = (form || []).filter(s => s.finish_pos != null);
   const trendEl = document.getElementById('cs-trend');
   const sparkEl = document.getElementById('cs-spark');
-  if(withPos.length < 2){trendEl.textContent = ''; trendEl.className = 'cs-trend fl'; sparkEl.innerHTML = ''; return;}
+  const linkEl = document.getElementById('cs-form-link');
+  if(withPos.length < 2){trendEl.textContent = ''; trendEl.className = 'cs-trend fl'; sparkEl.innerHTML = '';
+    if(linkEl) linkEl.style.display = 'none'; return;}
+  if(linkEl) linkEl.style.display = '';
   const pcts = withPos.map(s => posToPct(s.finish_pos));
   const half = Math.floor(pcts.length / 2);
   const a1 = pcts.slice(0, half).reduce((a, b) => a + b, 0) / (half || 1);
