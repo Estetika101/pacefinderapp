@@ -62,6 +62,7 @@ function render(cars){
     ].filter(Boolean).join(' ');
 
     return `<a href="${href}" class="track-row">
+      <div class="track-outline"></div>
       <div>
         <div class="track-name">
           ${escapeHtml(displayName)}

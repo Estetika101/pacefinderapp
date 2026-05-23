@@ -14,7 +14,15 @@ function carName(s){
   if(s.car_ordinal!=null) return 'Car #'+s.car_ordinal;
   return 'Unknown Car';
 }
-function typeOf(s){ return s.race_type || (s.session_type && s.session_type!=='unknown' ? s.session_type : null); }
+// Normalize Forza's race_type aliases so the Type facet doesn't show two
+// "AI Race" entries (legacy `ai` vs newer `race_ai`) or two "Race" entries
+// (`real` vs `race`). Same labels were already mapped in TYPE_LABELS — but
+// uniq() dedupes by raw value, so the dupes survived into the dropdown.
+const _RT_ALIAS = {ai:'race_ai', real:'race'};
+function typeOf(s){
+  const raw = s.race_type || (s.session_type && s.session_type!=='unknown' ? s.session_type : null);
+  return raw ? (_RT_ALIAS[raw] || raw) : null;
+}
 
 let _all = [];
 let _tix = new Map();          // track name → {best_lap_time_s, spark_laps, trend}
@@ -155,7 +163,9 @@ function renderFilters(){
   const toggle = revN ? `<label class="swt${swtOn?' on':''}">`+
     `<input type="checkbox" id="rev-t"${swtOn?' checked':''}>`+
     `<span class="tr"></span>Needs review (${revN})</label>`+
-    `<span class="swt-help" tabindex="0" title="Filters to sessions missing a track, car, or finish position — the ones to clean up before they count in stats.">?</span>` : '';
+    `<span class="swt-help" tabindex="0" aria-label="What does this toggle do?">?`+
+    `<span class="swt-help-tip" role="tooltip">Filters to sessions missing a track, car, or finish position — the ones to clean up before they count in stats.</span>`+
+    `</span>` : '';
 
   // clear-all stays in the DOM (display-toggled) so an option click can
   // sync it in place without rebuilding — keeps the open panel/scroll.

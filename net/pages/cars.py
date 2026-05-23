@@ -39,6 +39,7 @@ CAR_INDEX_HTML_PRE = """<!DOCTYPE html>
 </div>
 
 <script src="/static/js/class.js"></script>
+<script src="/static/js/track_mini.js"></script>
 <script src="/static/js/sessions_cars.js"></script>
 </body>
 </html>
@@ -118,6 +119,7 @@ CAR_DETAIL_HTML_PRE = """<!DOCTYPE html>
 </div>
 
 <script src="/static/js/class.js"></script>
+<script src="/static/js/track_mini.js"></script>
 <script src="/static/js/sessions_car.js"></script>
 </body>
 </html>

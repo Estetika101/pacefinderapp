@@ -33,13 +33,25 @@ function fmtDuration(seconds){
 
 const _ordinal = location.pathname.split('/')[2] || '';
 
+// Track-name → {pb_session_id, pb_lap_number} lookup, populated from
+// /sessions/tracks. Used to render the per-track outline glyph on each
+// row of "Tracks in this car". Cheap (one tracks-index fetch shared
+// with the rest of the app's mini-map cache).
+const _tix = new Map();
+
 async function init(){
   if(!_ordinal){location.href = '/sessions'; return;}
-  let d;
-  try{d = await fetch('/cars/' + encodeURIComponent(_ordinal) + '/data').then(r => r.json());}
+  let d, tix;
+  try{
+    [d, tix] = await Promise.all([
+      fetch('/cars/' + encodeURIComponent(_ordinal) + '/data').then(r => r.json()),
+      fetch('/sessions/tracks').then(r => r.json()).catch(() => []),
+    ]);
+  }
   catch(e){document.getElementById('nickname').textContent = 'Car not found'; return;}
   if(d.error){document.getElementById('nickname').textContent = 'Car not found'; return;}
   _tf = d.time_format || '24h';
+  (tix || []).forEach(t => _tix.set(t.track, t));
 
   renderTitle(d.car);
   renderHero(d.car, d.stats);
@@ -124,7 +136,11 @@ function renderTracks(tracks){
     } else {
       gapHtml = `<span class="track-gap">+${gap.toFixed(2)}s</span>`;
     }
+    const tx = _tix.get(t.track);
+    const outAttr = (tx && tx.pb_session_id && tx.pb_lap_number != null)
+      ? ` data-sid="${escapeHtml(tx.pb_session_id)}" data-lap="${tx.pb_lap_number}"` : '';
     return `<a href="${href}" class="track-row">
+      <div class="track-outline"${outAttr}></div>
       <div>
         <div class="track-name">${escapeHtml(t.track)}</div>
         <div class="track-meta">${t.sessions_count} session${t.sessions_count === 1 ? '' : 's'} · ${t.laps_count} lap${t.laps_count === 1 ? '' : 's'} · last ${lastDate}</div>
@@ -135,6 +151,7 @@ function renderTracks(tracks){
       <div class="track-arrow">→</div>
     </a>`;
   }).join('');
+  if(window.pfLoadMinis) window.pfLoadMinis(list);
 }
 
 function renderRecent(recent, bestEver){
