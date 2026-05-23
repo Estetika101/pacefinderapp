@@ -87,12 +87,19 @@ a{color:inherit;text-decoration:none}
 .sect-prov{font-size:11px;color:var(--color-text-quaternary);margin-top:6px}
 .sect-prov a:hover{color:var(--color-accent)}
 
-/* ── AI track tip ───────────────────────────────────────────────── */
-.tip{padding:var(--space-4) 0;border-bottom:1px solid var(--color-border)}
+/* ── AI track tip — full-width coaching card ───────────────────── */
+.tip{
+  margin:var(--space-4) 0;
+  padding:var(--space-4) var(--space-5);
+  background:var(--color-surface);
+  border:1px solid var(--color-border);
+  border-left:2px solid var(--color-accent);
+  border-radius:var(--radius-md);
+}
 .tip-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--space-2)}
 .tip-head h2{font-size:var(--text-sm);font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin:0}
 .tip-meta{font-size:11px;color:var(--color-text-quaternary)}
-.tip-body{font-size:var(--text-md);line-height:1.6;color:var(--color-text-primary);font-style:italic;max-width:70ch}
+.tip-body{font-size:var(--text-md);line-height:1.6;color:var(--color-text-primary);font-style:italic}
 .tip-gen{
   display:inline-block;margin-top:var(--space-3);
   background:var(--color-surface-2);color:var(--color-accent);
