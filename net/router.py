@@ -329,6 +329,199 @@ def make_handler(ctx: dict):
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps(payload).encode()))
 
+            elif path == "/home/worst-sector":
+                # Answers "what's your biggest single leak?" — the
+                # (track, sector) combo with the largest average gap
+                # between your best sector and the theoretical best at
+                # that track. Surfaces ONE focus card on Home; cheaper
+                # than the watchlist (one SQL aggregation).
+                # See docs/specs/home-worst-sector.md (brainstorm).
+                with db_lock:
+                    conn = db_connect()
+                    try:
+                        # Per session, the BEST sector achieved (across all
+                        # laps in that session). Then average that across
+                        # sessions and compare to track theoretical.
+                        agg_rows = [dict(r) for r in conn.execute(
+                            "WITH session_best AS ( "
+                            "  SELECT s.track AS track, s.session_id AS session_id, "
+                            "         MIN(l.s1_time_s) AS bs1, "
+                            "         MIN(l.s2_time_s) AS bs2, "
+                            "         MIN(l.s3_time_s) AS bs3 "
+                            "  FROM sessions s "
+                            "  JOIN laps l ON l.session_id = s.session_id "
+                            "  WHERE s.track IS NOT NULL AND s.track != '' AND s.track != 'unknown' "
+                            "    AND l.s1_time_s IS NOT NULL "
+                            "    AND l.s2_time_s IS NOT NULL "
+                            "    AND l.s3_time_s IS NOT NULL "
+                            "  GROUP BY s.track, s.session_id "
+                            ") "
+                            "SELECT sb.track, "
+                            "       AVG(sb.bs1) AS avg_bs1, "
+                            "       AVG(sb.bs2) AS avg_bs2, "
+                            "       AVG(sb.bs3) AS avg_bs3, "
+                            "       COUNT(*)    AS session_count, "
+                            "       tr.theoretical_s1_s AS th1, "
+                            "       tr.theoretical_s2_s AS th2, "
+                            "       tr.theoretical_s3_s AS th3 "
+                            "FROM session_best sb "
+                            "JOIN track_references tr "
+                            "  ON tr.track = sb.track AND tr.reference_type = 'theoretical' "
+                            "WHERE tr.theoretical_s1_s IS NOT NULL "
+                            "  AND tr.theoretical_s2_s IS NOT NULL "
+                            "  AND tr.theoretical_s3_s IS NOT NULL "
+                            "GROUP BY sb.track "
+                            "HAVING session_count >= 3"
+                        ).fetchall()]
+                    finally:
+                        conn.close()
+
+                # Find the (track, sector) with the largest avg gap.
+                worst = None
+                for r in agg_rows:
+                    for n, avg_field, th_field in ((1, "avg_bs1", "th1"),
+                                                   (2, "avg_bs2", "th2"),
+                                                   (3, "avg_bs3", "th3")):
+                        gap = r[avg_field] - r[th_field]
+                        if gap <= 0.30:  # don't surface trivia
+                            continue
+                        if worst is None or gap > worst["avg_gap_s"]:
+                            worst = {
+                                "track": r["track"],
+                                "sector": n,
+                                "avg_gap_s": round(gap, 3),
+                                "avg_sector_s": round(r[avg_field], 3),
+                                "theoretical_sector_s": round(r[th_field], 3),
+                                "session_count": r["session_count"],
+                            }
+
+                # Enrich with the track's PB session for the outline +
+                # for a deep-link CTA.
+                if worst:
+                    with db_lock:
+                        conn = db_connect()
+                        try:
+                            pb_row = conn.execute(
+                                "SELECT s.session_id, l.lap_number "
+                                "FROM sessions s JOIN laps l ON l.session_id=s.session_id "
+                                "WHERE s.track = ? AND s.best_lap_time_s IS NOT NULL "
+                                "  AND l.lap_time_s IS NOT NULL "
+                                "  AND ABS(l.lap_time_s - s.best_lap_time_s) < 0.001 "
+                                "ORDER BY s.best_lap_time_s ASC LIMIT 1",
+                                (worst["track"],)
+                            ).fetchone()
+                        finally:
+                            conn.close()
+                    if pb_row:
+                        worst["pb_session_id"] = pb_row["session_id"]
+                        worst["pb_lap_number"] = pb_row["lap_number"]
+
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(worst).encode()))
+
+            elif path == "/home/regression-watchlist":
+                # Surfaces (track, car) combos where the user's recent 3
+                # sessions are SLOWER than the prior 3 — i.e. they're
+                # getting worse. This is the page's "what should I work
+                # on?" answer; see docs/specs/home-regression-watchlist.md
+                # (brainstorm). Cheap: one SELECT + Python aggregation.
+                with db_lock:
+                    conn = db_connect()
+                    try:
+                        sess_rows = [dict(r) for r in conn.execute(
+                            "SELECT session_id, track, car_ordinal, car_class, car_pi, "
+                            "started_at, best_lap_time_s "
+                            "FROM sessions "
+                            "WHERE track IS NOT NULL AND track != '' AND track != 'unknown' "
+                            "  AND car_ordinal IS NOT NULL "
+                            "  AND best_lap_time_s IS NOT NULL "
+                            "ORDER BY track, car_ordinal, started_at ASC"
+                        ).fetchall()]
+                    finally:
+                        conn.close()
+
+                # Group by (track, car_ordinal), chronological
+                from collections import defaultdict
+                combos = defaultdict(list)
+                for s in sess_rows:
+                    combos[(s["track"], s["car_ordinal"])].append(s)
+
+                candidates = []
+                for (track, car_ord), seqs in combos.items():
+                    if len(seqs) < 6:
+                        continue
+                    recent = seqs[-3:]
+                    prior  = seqs[-6:-3]
+                    rmean = sum(x["best_lap_time_s"] for x in recent) / 3.0
+                    pmean = sum(x["best_lap_time_s"] for x in prior)  / 3.0
+                    delta = rmean - pmean
+                    # Slower by ≥0.2s OR ≥1% of the prior mean (whichever
+                    # is bigger) — guards against tracks with very short
+                    # laps where small absolute deltas would still flag.
+                    thresh = max(0.2, pmean * 0.01)
+                    if delta < thresh:
+                        continue
+                    # Last 6 best laps for the row sparkline (chronological)
+                    sparkline = [x["best_lap_time_s"] for x in seqs[-6:]]
+                    car_pi    = next((x["car_pi"]    for x in reversed(seqs) if x["car_pi"]    is not None), None)
+                    car_class = next((x["car_class"] for x in reversed(seqs) if x["car_class"] is not None), None)
+                    candidates.append({
+                        "track": track,
+                        "car_ordinal": car_ord,
+                        "car_pi": car_pi,
+                        "car_class": car_class,
+                        "delta_s": round(delta, 3),
+                        "recent_mean_s": round(rmean, 3),
+                        "prior_mean_s":  round(pmean, 3),
+                        "sparkline": sparkline,
+                        "last_session_id": seqs[-1]["session_id"],
+                        "session_count": len(seqs),
+                    })
+
+                # Worst regression first; cap so Home doesn't bloat.
+                candidates.sort(key=lambda c: c["delta_s"], reverse=True)
+                candidates = candidates[:3]
+
+                # Enrich: car name from FORZA_CARS + the track's overall PB
+                # lap (any car) so the row outline matches the track shape.
+                if candidates:
+                    tracks_needed = {c["track"] for c in candidates}
+                    with db_lock:
+                        conn = db_connect()
+                        try:
+                            placeholders = ",".join("?" for _ in tracks_needed)
+                            track_pb = {}
+                            if tracks_needed:
+                                pb_rows = conn.execute(
+                                    f"SELECT s.track, s.session_id, l.lap_number "
+                                    f"FROM sessions s JOIN laps l ON l.session_id=s.session_id "
+                                    f"WHERE s.track IN ({placeholders}) "
+                                    f"  AND s.best_lap_time_s IS NOT NULL "
+                                    f"  AND l.lap_time_s IS NOT NULL "
+                                    f"  AND ABS(l.lap_time_s - s.best_lap_time_s) < 0.001 "
+                                    f"ORDER BY s.best_lap_time_s ASC",
+                                    tuple(tracks_needed)
+                                ).fetchall()
+                            # Keep the FIRST row per track (= the overall PB)
+                            for r in pb_rows:
+                                track_pb.setdefault(r["track"], {
+                                    "session_id": r["session_id"],
+                                    "lap_number": r["lap_number"],
+                                })
+                        finally:
+                            conn.close()
+                    for c in candidates:
+                        info = FORZA_CARS.get(int(c["car_ordinal"])) or {}
+                        c["car_name"]     = info.get("name")
+                        c["car_year"]     = info.get("year")
+                        c["car_nickname"] = db_get_car_nickname(int(c["car_ordinal"]))
+                        pb = track_pb.get(c["track"]) or {}
+                        c["pb_session_id"] = pb.get("session_id")
+                        c["pb_lap_number"] = pb.get("lap_number")
+
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(candidates).encode()))
+
             elif path == "/setup":
                 writer.write(_http_response("200 OK", "text/html", SETUP_HTML.encode()))
 
