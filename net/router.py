@@ -1500,13 +1500,18 @@ def make_handler(ctx: dict):
                       for pair in query_string.split("&") if "=" in pair
                       for k, v in [pair.split("=", 1)]}
                 sid = qs.get("session_id", "")
+                # Forza UDP lap_number is 0-indexed (race lap 1 = 0),
+                # so 0 IS a valid value here — guard only on missing
+                # session_id or a negative lap. Previously rejected
+                # lap=0 as falsy, which broke per-track mini outlines
+                # whenever a track's PB was set on its first lap.
                 try:
                     lap_n = int(qs.get("lap", "0"))
                 except ValueError:
-                    lap_n = 0
-                if not sid or not lap_n:
+                    lap_n = -1
+                if not sid or lap_n < 0:
                     writer.write(_http_response("400 Bad Request", "application/json",
-                                                b'{"error":"session_id and lap required"}'))
+                                                b'{"error":"session_id required, lap must be >= 0"}'))
                 else:
                     data = db_get_lap_samples(sid, lap_n)
                     if data:
