@@ -498,6 +498,33 @@ SESSIONS_HTML = """<!DOCTYPE html>
     border-top-color:var(--color-border)}
   .swt-help:hover .swt-help-tip,
   .swt-help:focus .swt-help-tip{opacity:1;visibility:visible}
+  /* ── Row rhythm: left-edge accent by race type ─────────────────
+     Race = red, AI race = amber, Time Trial/Hot Lap = blue,
+     practice = transparent. Lets the eye scan a page of rows and
+     see the shape of a week ("3 races, 12 practice") at a glance. */
+  .stbl tbody tr td:first-child{border-left:3px solid transparent}
+  .stbl tbody tr[data-rt="race"]     td:first-child{border-left-color:var(--color-red,#ef4444)}
+  .stbl tbody tr[data-rt="ai"]       td:first-child{border-left-color:var(--color-amber,#fbbf24)}
+  .stbl tbody tr[data-rt="tt"]       td:first-child{border-left-color:var(--color-blue,#60a5fa)}
+  .stbl tbody tr[data-rt="practice"] td:first-child{border-left-color:var(--color-border)}
+  /* Lap-count pill in the Date cell — tells apart a 1-lap test
+     session from a 47-lap race without forcing a column. */
+  .stbl .lap-count{
+    display:inline-block;margin-left:8px;padding:1px 7px;
+    background:var(--color-surface-2);border:1px solid var(--color-border);
+    border-radius:999px;font-size:10px;color:var(--color-text-tertiary);
+    font-variant-numeric:tabular-nums;letter-spacing:0.02em;vertical-align:middle;
+  }
+  /* Lap-time coloured by Δ to the track PB (across all cars). PBs
+     get a ★; soft green for close; amber/red as the gap grows. */
+  .stbl .bl{font-variant-numeric:tabular-nums}
+  .stbl .bl-pb   {color:var(--color-green,#22c55e);font-weight:600}
+  .stbl .bl-close{color:#86efac}
+  .stbl .bl-mid  {color:var(--color-text-primary)}
+  .stbl .bl-amber{color:var(--color-amber,#fbbf24)}
+  .stbl .bl-bad  {color:var(--color-red,#f87171)}
+  .stbl .bl-pb-star{margin-right:3px}
+
   /* Pagination — filtering applies to ALL sessions; pager just slices
      to a 25-row page. Hidden when total filtered count fits one page. */
   .pager{display:flex;align-items:center;justify-content:center;gap:6px;

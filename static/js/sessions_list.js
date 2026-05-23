@@ -29,6 +29,32 @@ function typeOf(s){
 const PAGE_SIZE = 25;
 let PAGE = 1;
 
+// Race-type → row stripe key. Drives the left-edge accent in CSS:
+// race = red, AI race = amber, time trial / hot lap = blue, practice
+// = neutral. Anything unrecognised: no stripe.
+function rtKey(s){
+  const t = typeOf(s);
+  if(!t) return '';
+  if(t === 'race' || t === 'real' || t === 'race_online') return 'race';
+  if(t === 'race_ai' || t === 'ai') return 'ai';
+  if(t === 'time_trial' || t === 'hot_lap' || t === 'qualifying') return 'tt';
+  if(t === 'practice') return 'practice';
+  return '';
+}
+// Lap-time colour vs the track's overall PB (across all cars). Tiers
+// match the visual brief: PB → green + ★, close → soft green, mid →
+// neutral, 2-5s amber, >5s red.
+function blClass(s){
+  const tx = _tix.get(s.track);
+  if(s.best_lap_time_s == null || !tx || tx.best_lap_time_s == null) return 'mid';
+  const d = s.best_lap_time_s - tx.best_lap_time_s;
+  if(d < 0.005) return 'pb';
+  if(d < 0.5)   return 'close';
+  if(d < 2.0)   return 'mid';
+  if(d < 5.0)   return 'amber';
+  return 'bad';
+}
+
 let _all = [];
 let _tix = new Map();          // track name → {best_lap_time_s, spark_laps, trend}
 let _openF = null;             // which facet dropdown panel is open
@@ -242,15 +268,22 @@ function renderTable(){
     const tx = _tix.get(s.track);
     const outAttr = (tx && tx.pb_session_id && tx.pb_lap_number != null)
       ? ` data-sid="${esc(tx.pb_session_id)}" data-lap="${tx.pb_lap_number}"` : '';
-    return `<tr onclick="location.href='${href}'">`+
+    // Row rhythm bits — see rtKey() and blClass() above.
+    const rt = rtKey(s);
+    const rtAttr = rt ? ` data-rt="${rt}"` : '';
+    const blCls = blClass(s);
+    const blStar = blCls === 'pb' ? '<span class="bl-pb-star">★</span>' : '';
+    const lapCountHtml = (s.lap_count && s.lap_count > 0)
+      ? `<span class="lap-count">${s.lap_count} lap${s.lap_count===1?'':'s'}</span>` : '';
+    return `<tr${rtAttr} onclick="location.href='${href}'">`+
       `<td><div class="c-cell">`+
         `<div class="track-outline"${outAttr}></div>`+
         `<div><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
         `${sub?`<div class="c-sub">${sub}</div>`:''}</div>`+
       `</div></td>`+
       `<td>${esc(carName(s))}${badge}</td>`+
-      `<td class="num">${fmtLap(s.best_lap_time_s)}</td>`+
-      `<td class="num">${fmtD(s.started_at)} <span style="opacity:.6">${fmtT(s.started_at)}</span></td>`+
+      `<td class="num"><span class="bl bl-${blCls}">${blStar}${fmtLap(s.best_lap_time_s)}</span></td>`+
+      `<td class="num">${fmtD(s.started_at)} <span style="opacity:.6">${fmtT(s.started_at)}</span>${lapCountHtml}</td>`+
       `</tr>`;
   }).join('');
   if(window.pfLoadMinis) window.pfLoadMinis(list);
