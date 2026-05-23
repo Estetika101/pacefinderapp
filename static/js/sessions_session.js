@@ -562,21 +562,10 @@ function renderAIContent(text){
       // mini-card — sits 2-up on desktop, 1-up on mobile.
       html += '<div class="ai-findings">';
       findings.forEach(f => {
-        // Deep-link each finding into telemetry. When the prompt set a
-        // specific lap_number, we pass ?lap=N so the telemetry page lands
-        // with that lap already selected as primary. Otherwise just open
-        // the page; user picks from there.
-        const lapNum = (typeof f.lap === 'number' && f.lap >= 0) ? f.lap : null;
-        const ctaUrl = '/sessions/telemetry?id=' + encodeURIComponent(_id) +
-          (lapNum != null ? '&lap=' + lapNum : '');
-        const ctaLabel = lapNum != null
-          ? 'Open Lap ' + (lapNum + 1) + ' in Telemetry'
-          : 'Open in Telemetry';
         html += `<div class="ai-finding">
           <div class="ai-finding-area">${escapeHtml(f.area || '')}</div>
           <div class="ai-finding-issue">${escapeHtml(f.issue || '')}</div>
           ${f.fix ? `<div class="ai-finding-fix">→ ${escapeHtml(f.fix)}</div>` : ''}
-          <a class="ai-finding-cta" href="${ctaUrl}">${ctaLabel} →</a>
         </div>`;
       });
       html += '</div>';
