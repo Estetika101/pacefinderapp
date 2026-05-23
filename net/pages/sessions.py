@@ -498,15 +498,19 @@ SESSIONS_HTML = """<!DOCTYPE html>
     border-top-color:var(--color-border)}
   .swt-help:hover .swt-help-tip,
   .swt-help:focus .swt-help-tip{opacity:1;visibility:visible}
-  /* ── Row rhythm: left-edge accent by race type ─────────────────
-     Race = red, AI race = amber, Time Trial/Hot Lap = blue,
-     practice = transparent. Lets the eye scan a page of rows and
-     see the shape of a week ("3 races, 12 practice") at a glance. */
-  .stbl tbody tr td:first-child{border-left:3px solid transparent}
-  .stbl tbody tr[data-rt="race"]     td:first-child{border-left-color:var(--color-red,#ef4444)}
-  .stbl tbody tr[data-rt="ai"]       td:first-child{border-left-color:var(--color-amber,#fbbf24)}
-  .stbl tbody tr[data-rt="tt"]       td:first-child{border-left-color:var(--color-blue,#60a5fa)}
-  .stbl tbody tr[data-rt="practice"] td:first-child{border-left-color:var(--color-border)}
+  /* Session-type chip — neutral letter badge that prefixes the row's
+     sub-text (e.g. [R] Wet · Soft). Colour-neutral by design: the
+     lap-time column already uses red/amber/green for the PB gap, so
+     stacking another colour scale on race type was confusing. */
+  .stbl .rt-chip{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:20px;height:16px;padding:0 5px;margin-right:6px;
+    background:var(--color-surface-2);border:1px solid var(--color-border);
+    color:var(--color-text-secondary);
+    border-radius:3px;font-size:9px;font-weight:700;
+    letter-spacing:0.04em;font-variant-numeric:tabular-nums;
+    vertical-align:middle;line-height:1;
+  }
   /* Lap-count pill in the Date cell — tells apart a 1-lap test
      session from a 47-lap race without forcing a column. */
   .stbl .lap-count{
