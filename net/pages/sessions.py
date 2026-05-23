@@ -466,6 +466,13 @@ SESSIONS_HTML = """<!DOCTYPE html>
   .swt input:checked + .tr{background:rgba(232,184,75,.25);border-color:var(--color-accent)}
   .swt input:checked + .tr::after{transform:translateX(15px);background:var(--color-accent)}
   .swt.on{color:var(--color-text-primary)}
+  .swt-help{display:inline-flex;align-items:center;justify-content:center;
+    width:16px;height:16px;border-radius:50%;border:1px solid var(--color-border);
+    color:var(--color-text-quaternary);font-size:10px;font-weight:600;
+    cursor:help;margin-left:6px;user-select:none;vertical-align:middle;
+    background:var(--color-surface-2);transition:color .12s,border-color .12s}
+  .swt-help:hover,.swt-help:focus{color:var(--color-text-primary);
+    border-color:var(--color-accent);outline:none}
 </style>
 </head>
 <body>

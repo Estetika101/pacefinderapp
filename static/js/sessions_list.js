@@ -154,7 +154,8 @@ function renderFilters(){
   const swtOn = F.review === '1';
   const toggle = revN ? `<label class="swt${swtOn?' on':''}">`+
     `<input type="checkbox" id="rev-t"${swtOn?' checked':''}>`+
-    `<span class="tr"></span>Needs review (${revN})</label>` : '';
+    `<span class="tr"></span>Needs review (${revN})</label>`+
+    `<span class="swt-help" tabindex="0" title="Filters to sessions missing a track, car, or finish position — the ones to clean up before they count in stats.">?</span>` : '';
 
   // clear-all stays in the DOM (display-toggled) so an option click can
   // sync it in place without rebuilding — keeps the open panel/scroll.
