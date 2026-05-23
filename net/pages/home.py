@@ -138,19 +138,9 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Footer: Pi stats -->
-  <div class="footstrip">
-    <div class="links">
-      <a href="/setup">Setup</a>
-      <a href="/admin" id="link-admin" style="display:none">Debug</a>
-      <a href="/debug/perf">Performance</a>
-    </div>
-    <div class="pi-stats" id="pi-stats">&mdash;</div>
-  </div>
 
 </div>
 
-<script>if(location.search.includes('debug=true'))document.getElementById('link-admin').style.display='';</script>
 <script src="/static/js/class.js"></script>
 <script src="/static/js/track_mini.js"></script>
 <script src="/static/js/home.js"></script>
