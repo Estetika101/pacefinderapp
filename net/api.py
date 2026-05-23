@@ -171,22 +171,35 @@ def build_analysis_prompt(session: dict, laps: list, historical: list,
         f"Track: {track} | Game: {game} | Session: {date}\n\n"
         f"THIS SESSION — LAP TABLE:\n{hdr}{rows}\n"
         f"{hist_block}\n"
-        "Analyze this sim-racing session. Focus on slip management, throttle "
-        "discipline, brake consistency, and lap-time trend. Reference specific "
-        "laps. Compare against the historical baseline where relevant.\n\n"
+        "You're a race engineer doing a strat debrief. The driver is tired, "
+        "sweaty, and won't read essays. Speak the way an engineer talks on the "
+        "radio: short sentences, numbers instead of adjectives, imperative voice.\n\n"
         "Respond with ONLY a JSON object (no markdown fences, no prose before "
         "or after) in exactly this shape:\n"
         "{\n"
-        '  "summary": "one or two sentences — the headline read of this session",\n'
+        '  "summary": "ONE sentence, max 15 words. The session in a punchline.",\n'
         '  "findings": [\n'
-        '    {"area": "short label e.g. \'T-sequence braking\' or \'Lap 4-6 slip\'",\n'
-        '     "issue": "what went wrong, specific and concrete",\n'
-        '     "fix": "the actionable change, one sentence"}\n'
+        '    {"area":  "3-6 word title — e.g. \'Lap 0 spin\', \'Brake oscillation\'",\n'
+        '     "issue": "max 20 words. State the fact + the number that proves it.",\n'
+        '     "fix":   "max 15 words, starts with a verb. The driver\'s next move."}\n'
         "  ],\n"
-        '  "strengths": ["short phrase", "short phrase"]\n'
-        "}\n"
-        "2-4 findings, ordered most-costly first. 1-3 strengths. Be direct, "
-        "no padding. Plain text inside the JSON string values — no markdown."
+        '  "strengths": ["max 5 words each", "max 5 words each"]\n'
+        "}\n\n"
+        "Rules — non-negotiable:\n"
+        "• 2-4 findings. Most-costly first. If you can't fit a finding inside "
+        "  the word limit, it isn't important enough — drop it.\n"
+        "• 1-3 strengths. Each ≤5 words. No \"meaningful\", no \"real\".\n"
+        "• Numbers replace adjectives. \"Lap 5 was 4.9s slower\" beats \"Lap 5 was "
+        "  significantly slower\". \"Peak slip 13.9 vs 1.4 average\" beats "
+        "  \"costly instability\".\n"
+        "• Imperative voice on fix. \"Brake later at T7\" not \"you might "
+        "  consider braking later\".\n"
+        "• Banned words anywhere in the output: productive, meaningful, "
+        "  meaningfully, significant, significantly, costly, real, "
+        "  competitive, likely, indicating, suggesting, demonstrably.\n"
+        "• No throat-clearing summary like \"A productive session with…\". The "
+        "  summary is one punchline only.\n"
+        "• Plain text inside JSON strings — no markdown, no bullets."
     )
 
 
