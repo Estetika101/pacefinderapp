@@ -110,7 +110,7 @@ a{color:inherit;text-decoration:none}
 /* ── Tracks-in-this-car table ───────────────────────────────────── */
 .track-list{display:flex;flex-direction:column;gap:4px}
 .track-row{
-  display:grid;grid-template-columns:1fr 140px 140px 100px 60px;
+  display:grid;grid-template-columns:52px 1fr 140px 140px 100px 60px;
   gap:var(--space-3);align-items:center;
   padding:14px var(--space-3);
   background:var(--color-surface);
@@ -129,6 +129,11 @@ a{color:inherit;text-decoration:none}
 .track-sessions{font-size:var(--text-sm);color:var(--color-text-secondary);text-align:right}
 .track-arrow{color:#555;text-align:right}
 .track-row:hover .track-arrow{color:var(--color-text-primary)}
+.track-outline{width:48px;height:36px;display:flex;align-items:center;justify-content:center;
+  color:var(--color-text-tertiary)}
+.track-outline svg{width:100%;height:100%;overflow:visible}
+.track-outline .tm-line{fill:none;stroke:currentColor;stroke-width:1.2;opacity:.65}
+.track-row:hover .track-outline{color:var(--color-accent)}
 
 /* ── Recent sessions list ───────────────────────────────────────── */
 .recent-list{display:flex;flex-direction:column;gap:2px}
@@ -157,10 +162,11 @@ a{color:inherit;text-decoration:none}
 @media (max-width:760px){
   .hero{grid-template-columns:1fr}
   .stat-grid{grid-template-columns:repeat(2,1fr)}
-  .track-row{grid-template-columns:1fr auto;row-gap:6px}
+  .track-row{grid-template-columns:44px 1fr auto;row-gap:6px}
   .track-row .track-sessions,
   .track-row .track-arrow,
   .track-row .track-gap{display:none}
+  .track-outline{width:40px;height:30px}
   .recent-row{grid-template-columns:1fr auto}
   .recent-row .recent-track,
   .recent-row .recent-cond,

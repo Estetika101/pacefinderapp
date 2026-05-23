@@ -66,8 +66,9 @@
   //                   /sessions (capture is browser-independent, so
   //                   unattended races would otherwise be invisible —
   //                   see docs/specs/unattended-capture-confirmation.md).
-  //  • "N to review" → metadata gaps the user can fix (rail deep-links
-  //                    into /sessions?review=1 when there's a backlog).
+  //  • "N to review" → metadata gaps the user can fix. Just a nudge —
+  //                    Sessions still loads chrono-by-default, the user
+  //                    opts into the filter from the toggle.
   // Both can show together; they're independent signals.
   (async function(){
     try{
@@ -75,7 +76,6 @@
       if(n > 0){
         var b = document.getElementById('pf-rev');
         b.textContent = n + ' to review'; b.style.display = '';
-        document.getElementById('pf-i-sessions').setAttribute('href', '/sessions?review=1');
       }
     }catch(e){}
   })();
