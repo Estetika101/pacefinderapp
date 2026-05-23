@@ -556,13 +556,20 @@ function renderAIContent(text){
     if(structured.summary){
       html += `<div class="ai-summary">${escapeHtml(structured.summary)}</div>`;
     }
-    (structured.findings || []).forEach(f => {
-      html += `<div class="ai-finding">
-        <div class="ai-finding-area">${escapeHtml(f.area || '')}</div>
-        <div class="ai-finding-issue">${escapeHtml(f.issue || '')}</div>
-        ${f.fix ? `<div class="ai-finding-fix">→ ${escapeHtml(f.fix)}</div>` : ''}
-      </div>`;
-    });
+    const findings = structured.findings || [];
+    if(findings.length){
+      // Wrap in a grid container so each finding is its own self-contained
+      // mini-card — sits 2-up on desktop, 1-up on mobile.
+      html += '<div class="ai-findings">';
+      findings.forEach(f => {
+        html += `<div class="ai-finding">
+          <div class="ai-finding-area">${escapeHtml(f.area || '')}</div>
+          <div class="ai-finding-issue">${escapeHtml(f.issue || '')}</div>
+          ${f.fix ? `<div class="ai-finding-fix">→ ${escapeHtml(f.fix)}</div>` : ''}
+        </div>`;
+      });
+      html += '</div>';
+    }
     if(structured.strengths && structured.strengths.length){
       html += `<div class="ai-strengths"><span class="ai-strengths-lbl">Strengths</span> ` +
               structured.strengths.map(x => escapeHtml(x)).join(' · ') + `</div>`;
