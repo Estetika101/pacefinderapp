@@ -180,6 +180,7 @@ def build_analysis_prompt(session: dict, laps: list, historical: list,
         '  "summary": "ONE sentence, max 15 words. The session in a punchline.",\n'
         '  "findings": [\n'
         '    {"area":  "3-6 word title — e.g. \'Lap 0 spin\', \'Brake oscillation\'",\n'
+        '     "lap":   "integer lap_number (0-indexed) when the finding points at ONE specific lap; null when it spans laps or is a session-wide pattern",\n'
         '     "issue": "max 20 words. State the fact + the number that proves it.",\n'
         '     "fix":   "max 15 words, starts with a verb. The driver\'s next move."}\n'
         "  ],\n"

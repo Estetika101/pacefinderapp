@@ -337,6 +337,17 @@ table.lap-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular
   font-size:var(--text-sm);color:var(--color-accent);
   line-height:1.45;margin-top:2px;
 }
+/* Per-finding CTA — turns the card from a passive summary into a one-click
+   jump into telemetry with the specific lap pre-selected. Sits at the
+   bottom of the card so the eye reads: title → issue → fix → action. */
+.ai-finding-cta{
+  margin-top:auto;padding-top:8px;
+  font-size:11px;color:var(--color-text-tertiary);
+  text-transform:uppercase;letter-spacing:0.06em;
+  text-decoration:none;align-self:flex-start;
+  transition:color 120ms;
+}
+.ai-finding-cta:hover{color:var(--color-accent)}
 .ai-strengths{
   margin-top:var(--space-3);padding-top:var(--space-3);
   border-top:1px solid var(--color-border-subtle);

@@ -1016,16 +1016,25 @@ async function init(){
   if(track)sessHref+='&track='+encodeURIComponent(track);
   $('bc-sess').href=sessHref;
   $('link-overview').href=sessHref;
-  // Best lap default — skip partial laps
+  // Best lap default — skip partial laps. Overridden when the URL carries
+  // ?lap=N (e.g. a Spotter coaching card deep-linked into this specific
+  // lap so the user lands on the trace the finding is about).
   const best=_sess.best_lap_time_s;
   const validLaps=_laps.filter(l=>l.lap_time_s);
   const pThreshInit=_partialThresh();
   const nonPartialLaps=pThreshInit>0?validLaps.filter(l=>l.lap_time_s>=pThreshInit):validLaps;
   const bestLap=nonPartialLaps.find(l=>best&&Math.abs(l.lap_time_s-best)<0.001)||nonPartialLaps[0]||validLaps[0];
-  if(bestLap){
-    _selectedLaps=[bestLap.lap_number];
-    _primaryLap=bestLap.lap_number;
-    await fetchLap(bestLap.lap_number);
+  const qLapRaw=new URLSearchParams(location.search).get('lap');
+  const qLap=qLapRaw!=null && qLapRaw!=='' ? parseInt(qLapRaw,10) : NaN;
+  let chosen=null;
+  if(!isNaN(qLap)){
+    chosen=_laps.find(l=>l.lap_number===qLap && l.lap_time_s) || null;
+  }
+  if(!chosen) chosen=bestLap;
+  if(chosen){
+    _selectedLaps=[chosen.lap_number];
+    _primaryLap=chosen.lap_number;
+    await fetchLap(chosen.lap_number);
   }
   // Reference metadata
   try{
