@@ -43,6 +43,37 @@ function rtChip(s){
   if(t === 'practice')                                    return 'P';
   return '';
 }
+// Per-row lap-time sparkline. Returns inline SVG (or empty string if
+// there aren't enough laps to draw a meaningful shape). Reads
+// s.lap_times — a chronological array of lap_time_s shipped in the
+// /sessions/data payload. No fetch, no observer, no cache: just
+// render. Answers "how did this session go?" at a glance:
+//   descending curve = improving | ascending = fading
+//   tight cluster    = consistent | scatter   = unstable
+function sparklineSVG(times){
+  if(!Array.isArray(times) || times.length < 2) return '';
+  const W = 80, H = 36, pd = 3;
+  const mn = Math.min(...times), mx = Math.max(...times);
+  // Floor the Y range so a near-flat session doesn't show artificial
+  // dramatic spikes from tiny absolute variance. 1s = "interesting".
+  const rng = Math.max(mx - mn, 1.0);
+  const xs = times.map((_, i) =>
+    pd + ((W - 2*pd) * i / Math.max(times.length - 1, 1)));
+  // Y inverted: smaller lap_time_s → drawn higher (faster = up).
+  const ys = times.map(t =>
+    H - pd - ((t - mn) / rng) * (H - 2*pd));
+  const pts = xs.map((x, i) => x.toFixed(1) + ',' + ys[i].toFixed(1)).join(' ');
+  // Best lap dot (the minimum time)
+  let bi = 0;
+  for(let i = 1; i < times.length; i++) if(times[i] < times[bi]) bi = i;
+  const bx = xs[bi].toFixed(1), by = ys[bi].toFixed(1);
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" `+
+    `role="img" aria-label="Lap times this session">`+
+    `<polyline class="ls-line" points="${pts}"/>`+
+    `<circle class="ls-best" cx="${bx}" cy="${by}" r="2"/>`+
+    `</svg>`;
+}
+
 // Lap-time colour vs the track's overall PB (across all cars). Tiers
 // match the visual brief: PB → green + ★, close → soft green, mid →
 // neutral, 2-5s amber, >5s red.
@@ -278,7 +309,6 @@ function renderTable(){
     return prefix + _renderRow(s);
   }).join('');
   if(window.pfLoadMinis) window.pfLoadMinis(list);
-  if(window.pfLoadFingerprints) window.pfLoadFingerprints(list);
   renderPager(rows.length);
 }
 
@@ -302,11 +332,10 @@ function _renderRow(s){
   const tx = _tix.get(s.track);
   const outAttr = (tx && tx.pb_session_id && tx.pb_lap_number != null)
     ? ` data-sid="${esc(tx.pb_session_id)}" data-lap="${tx.pb_lap_number}"` : '';
-  // Best-lap fingerprint — needs s.best_lap_number which the backend
-  // joined in from the laps table. Empty if the session has no
-  // recorded best lap (no completed timed laps).
-  const fpAttr = (s.session_id && s.best_lap_number != null)
-    ? ` data-sid="${esc(s.session_id)}" data-lap="${s.best_lap_number}"` : '';
+  // Lap-time sparkline — synchronous, no fetch (data shipped inline
+  // in s.lap_times). Empty string when too few laps to draw.
+  const sparkHtml = sparklineSVG(s.lap_times);
+  const sparkAttr = sparkHtml ? ' data-has-laps="1"' : '';
   // Lap-time colour vs track PB (see blClass) + lap-count pill in the
   // date cell. The race-type chip lives in the sub line — see `sub`.
   const blCls = blClass(s);
@@ -317,7 +346,7 @@ function _renderRow(s){
   return `<tr onclick="location.href='${href}'">`+
     `<td><div class="c-cell">`+
       `<div class="track-outline"${outAttr}></div>`+
-      `<div class="lap-fp"${fpAttr}></div>`+
+      `<div class="lap-spark"${sparkAttr}>${sparkHtml}</div>`+
       `<div><div class="c-name">${esc(s.track||'Unknown Circuit')}</div>`+
       `${hasSub?`<div class="c-sub">${sub}</div>`:''}</div>`+
     `</div></td>`+
