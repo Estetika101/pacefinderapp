@@ -11,6 +11,7 @@ TRACK_DETAIL_HTML_PRE = """<!DOCTYPE html>
 </head>
 <body>
 <div id="pf-nav"></div>
+<script src="/static/js/_safe.js"></script>
 <script src="/static/js/nav.js"></script>
 <div class="page">
 

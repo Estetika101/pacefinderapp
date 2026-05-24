@@ -71,6 +71,7 @@ SESSION_EVENTS_HTML = """<!DOCTYPE html>
   <div class="ev-empty" id="ev-empty" style="display:none">No events detected for this session.</div>
 
 </div>
+<script src="/static/js/_safe.js"></script>
 <script src="/static/js/sessions_events.js"></script>
 </body>
 </html>

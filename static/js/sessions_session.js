@@ -481,8 +481,8 @@ function renderCards(){
       if(v >= 11 && v <= 13) return n + 'th';
       return n + ({1:'st',2:'nd',3:'rd'}[n % 10] || 'th');
     };
-    const carText = s.car_nickname || s.car || 'this car';
-    const trackText = (s.track && s.track !== 'unknown') ? s.track : 'this circuit';
+    const carText = escHtml(s.car_nickname || s.car || 'this car');
+    const trackText = escHtml((s.track && s.track !== 'unknown') ? s.track : 'this circuit');
     document.getElementById('card-car-headline').innerHTML = total === 1
       ? `Your <em>only</em> session in this car at ${trackText}`
       : `Your <em>${ord(rank)}-best</em> of ${total} sessions in this car at ${trackText}`;

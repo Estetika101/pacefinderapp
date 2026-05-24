@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.7.1 — Security hardening + Pi load widget (2026-05-24)
+
+A focused follow-up to v0.7.0. Originated from a same-day review of orphaned files / code-quality / security.
+
+**Security**
+
+- **Anthropic API key no longer leaks via `GET /config`.** The previous handler returned the full config dict including `anthropic_api_key`. With `Access-Control-Allow-Origin: *` and no auth, any host on the LAN — or any web page the user visited while on the LAN — could `fetch('http://pi.local:8000/config')` and grab the key. `_redact_config()` now strips the value and surfaces a boolean `anthropic_api_key_set` so the Setup page renders a "key set" placeholder without ever receiving the secret. `POST /config` treats empty key as no-op, explicit `null` as clear.
+- **CSRF gate on POST.** Same `Access-Control-Allow-Origin: *` meant any visited page could drive-by-POST to `/admin/inject`, `/reset`, `/config`, `/sessions/update`, `/sessions/delete`, `/cars/nickname`, `/finish`. `_csrf_ok()` now rejects POSTs whose `Origin` host doesn't match `Host`. Origin-less calls (curl, native test harness) still pass.
+- **Path traversal closed on `sid` params.** `/sessions/laps`, `/analyze`, `/sessions/update`, `/sessions/delete` interpolated `sid` into file paths without bounds checking — `../` was accepted. `_safe_sid()` now rejects anything with `/`, `\`, `..`, leading `.`, or length >128.
+- **Stored-XSS escapes** on the highest-risk site (`sessions_session.js` car-PB headline interpolated user-mutable `track` / `car_nickname` raw into innerHTML). New shared `static/js/_safe.js` exposes a global `escHtml()` loaded on all rendered pages; applied at the unescaped site.
+- **`/browse` gated** the same way as POSTs — directory enumeration was previously open to any LAN host.
+
+**Reliability**
+
+- `/stream` now caps concurrent SSE clients at 32 and exits cleanly on `ConnectionError` / `BrokenPipeError` / `writer.is_closing()`. The idle-throttle from #124 is preserved.
+
+**Performance**
+
+- `Cache-Control: public, max-age=31536000, immutable` on `/sessions/laps` — closed sessions are immutable on disk; browsers no longer re-fetch on lap-switching.
+
+**Pi system load widget**
+
+- New `GET /system/load` endpoint returns CPU%, load avg, memory, CPU temp, disk usage from `/proc` and `/sys`. Stdlib only; fails gracefully on Mac/Windows (fields return `null`).
+- Strip rendered in the Debug Console header on the dashboard. Polls every 2s while the panel is open; stops when closed.
+
 ## v0.7.0 — IA rebuild, Spotter, Deep Dive, perf pass (2026-05-24)
 
 A big release. 165 PRs since v0.6.0. The app got a new information architecture (Home is now the front door, left rail replaces the top bar, Sessions is a filterable index), an AI Spotter pass, the Deep Dive analysis tab, a Pi-aware perf pass, and a much sturdier race-end / lap-detection path.
