@@ -100,6 +100,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div>
           <div class="t-lbl">Best</div>
           <div class="t-val green" id="t-best">—</div>
+          <div class="t-rec" id="t-pb" style="display:none">PB <span id="t-pb-val">—</span></div>
         </div>
         <div>
           <div class="t-lbl">Last</div>
@@ -118,6 +119,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div>
           <div class="t-lbl">Pos</div>
           <div class="t-val" id="pos-cur">—</div>
+          <div class="t-rec" id="t-bf" style="display:none">Best <span id="t-bf-val">—</span></div>
         </div>
         <div>
           <div class="t-lbl">Grid</div>

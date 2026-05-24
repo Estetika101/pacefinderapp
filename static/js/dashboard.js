@@ -8,6 +8,38 @@ let _maxRpm=8500,_dbgEs=null,_dbgOpen=false,_bestLap=null;
 let state_sid=null;
 const _dbgLines=[];
 const _flashTimers={};
+
+// Track-records cache — flips when the live track changes. Avoids
+// per-packet refetches; this is static context for the live values.
+let _lastRecordsTrack = null;
+function fmtLapStatic(s){
+  if(s == null) return '—';
+  const m = Math.floor(s / 60);
+  return m + ':' + (s % 60).toFixed(3).padStart(6, '0');
+}
+async function loadTrackRecords(track){
+  let r;
+  try{ r = await fetch('/dashboard/records?track=' + encodeURIComponent(track))
+        .then(x => x.json()); }
+  catch(e){ return; }
+  // Guard against a track change firing between request and response —
+  // only paint records that still match the current live track.
+  if(track !== _lastRecordsTrack) return;
+  const pbEl  = $('t-pb'), pbVal  = $('t-pb-val');
+  const bfEl  = $('t-bf'), bfVal  = $('t-bf-val');
+  if(r && r.best_lap_time_s != null){
+    pbVal.textContent = fmtLapStatic(r.best_lap_time_s);
+    pbEl.style.display = '';
+  } else { pbEl.style.display = 'none'; }
+  if(r && r.best_finish_pos != null){
+    bfVal.textContent = 'P' + r.best_finish_pos;
+    bfEl.style.display = '';
+  } else { bfEl.style.display = 'none'; }
+}
+function hideTrackRecords(){
+  const pbEl = $('t-pb'); if(pbEl) pbEl.style.display = 'none';
+  const bfEl = $('t-bf'); if(bfEl) bfEl.style.display = 'none';
+}
 // Check ?edit=<sid> on load — open confirm modal for that session
 const _editSid=new URLSearchParams(location.search).get('edit');
 if(_editSid) setTimeout(()=>openFinish(_editSid),600);
@@ -68,6 +100,16 @@ es.onmessage=e=>{
   gEl.textContent=d.game?gameLabels[d.game]||d.game.replace(/_/g,' ').toUpperCase():'—';
   gEl.className='tb-game game-'+(d.game?gameClsMap[d.game]||'none':'none');
   $('tb-track').textContent=d.track&&d.track!=='unknown'?d.track:'—';
+  // Track-record lookup — fires once per track-change (or on first
+  // packet of a fresh session). Cheap aggregate hit, never re-fired
+  // per packet. See loadTrackRecords() below.
+  if(d.track && d.track !== 'unknown' && d.track !== _lastRecordsTrack){
+    _lastRecordsTrack = d.track;
+    loadTrackRecords(d.track);
+  } else if(!d.track || d.track === 'unknown'){
+    _lastRecordsTrack = null;
+    hideTrackRecords();
+  }
   // Car name + class badge + PI. Class derived from PI via shared
   // pfCarClass() (FM2023 ranges) — see static/js/class.js.
   const carName=d.car&&d.car!=='unknown'?d.car:null;
