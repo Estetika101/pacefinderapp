@@ -179,7 +179,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <div id="dbg">
   <div class="dh">
     <span>Debug Console</span>
-    <div style="display:flex;gap:10px;align-items:center">
+    <div id="sys-load-strip" style="display:flex;gap:14px;align-items:center;font-size:var(--text-xs);color:var(--color-text-muted);font-family:var(--font-mono,monospace);margin-left:14px">
+      <span title="CPU usage">CPU <span id="sys-cpu" style="color:var(--color-text-primary)">—</span></span>
+      <span title="Load average 1m / 5m / 15m">Load <span id="sys-load" style="color:var(--color-text-primary)">—</span></span>
+      <span title="Memory used / total">Mem <span id="sys-mem" style="color:var(--color-text-primary)">—</span></span>
+      <span title="CPU temperature">Temp <span id="sys-temp" style="color:var(--color-text-primary)">—</span></span>
+      <span title="Storage used">Disk <span id="sys-disk" style="color:var(--color-text-primary)">—</span></span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-left:auto">
       <label style="font-size:var(--text-xs);color:var(--color-text-muted);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="dbg-as" checked> scroll</label>
       <select id="dbg-f" onchange="applyFilter()" style="background:var(--color-surface);border:1px solid var(--color-border-subtle);color:var(--color-text-muted);font-family:inherit;font-size:var(--text-xs);padding:2px 6px;border-radius:2px">
         <option value="all">All</option><option value="warn">Warn+</option><option value="udp">UDP</option>
@@ -250,6 +257,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 </div>
 
+<script src="/static/js/_safe.js"></script>
 <script src="/static/js/perf.js"></script>
 <script>Perf.autoReport('/');</script>
 <script src="/static/js/class.js"></script>

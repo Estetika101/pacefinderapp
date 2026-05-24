@@ -454,7 +454,12 @@ async function load() {
   document.getElementById('storage_path').value      = d.storage_path || '';
   document.getElementById('session_timeout_s').value = d.session_timeout_s || 10;
   document.getElementById('port_forza').value        = (d.ports || {}).forza_motorsport || 5300;
-  document.getElementById('anthropic_api_key').value = d.anthropic_api_key || '';
+  // Server never returns the real key (see _redact_config). Show a 'set'
+  // placeholder when one is configured so the user knows it's there without
+  // exposing the value. Typing a new key overwrites; leaving blank keeps it.
+  const keyEl = document.getElementById('anthropic_api_key');
+  keyEl.value = '';
+  keyEl.placeholder = d.anthropic_api_key_set ? '•••• key set — leave blank to keep' : 'sk-ant-…';
   const modelSel = document.getElementById('anthropic_model');
   if (d.anthropic_model) modelSel.value = d.anthropic_model;
   document.getElementById('time_format').value = (d.time_format === '12h') ? '12h' : '24h';
@@ -476,17 +481,20 @@ async function save() {
   const btn = document.getElementById('save-btn');
   const toast = document.getElementById('toast');
   btn.disabled = true; toast.className = 'toast';
+  const keyVal = document.getElementById('anthropic_api_key').value.trim();
   const body = {
     storage_path:      document.getElementById('storage_path').value.trim(),
     session_timeout_s: parseInt(document.getElementById('session_timeout_s').value, 10),
     ports: {
       forza_motorsport: parseInt(document.getElementById('port_forza').value, 10),
     },
-    anthropic_api_key: document.getElementById('anthropic_api_key').value.trim(),
     anthropic_model:   document.getElementById('anthropic_model').value,
     time_format:       document.getElementById('time_format').value,
     debug_mode:        document.getElementById('debug_mode').checked,
   };
+  // Only send the key when the user actually typed one — blank means
+  // "keep existing." Server treats "" as no-op, null as explicit clear.
+  if (keyVal) body.anthropic_api_key = keyVal;
   try {
     const r = await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const d = await r.json();

@@ -7,11 +7,69 @@ import urllib.parse
 from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from net.perf import _perf_ctx, _perf_ring, _perf_client_ring, _PERF_LOG_THRESHOLD_MS
 
 
 _accept_encoding_ctx: ContextVar = ContextVar("pf_accept_encoding", default="")
+
+# Cap concurrent /stream clients so a tab-leaving or buggy poller can't
+# spawn unbounded SSE coroutines on the Pi. 32 is generous for a household.
+_STREAM_CLIENT_CAP = 32
+_stream_clients = 0
+
+
+def _redact_config(cfg: dict) -> dict:
+    """Strip secrets before serializing config to a network client.
+
+    The Anthropic key only lives on the server. With Access-Control-Allow-Origin
+    set to '*' (so the dashboard works from any LAN host), returning the key
+    over /config would let any web page the user visits on the same network
+    exfiltrate it. Setup UI uses anthropic_api_key_set to render a 'key set'
+    placeholder without ever receiving the value.
+    """
+    out = dict(cfg)
+    key = out.get("anthropic_api_key") or ""
+    out["anthropic_api_key"] = ""
+    out["anthropic_api_key_set"] = bool(key)
+    return out
+
+
+def _safe_sid(sid: str) -> bool:
+    """Reject session IDs that could escape the sessions/raw directories.
+
+    sid flows into f-strings that become file paths (e.g. {sid}_laps.json).
+    Without this guard, '../../etc/passwd' would resolve to an arbitrary read.
+    Real sids look like '2026-05-01T14-32-00_forza_motorsport' — no slashes,
+    no dots-leading, bounded length.
+    """
+    if not sid or len(sid) > 128:
+        return False
+    if "/" in sid or "\\" in sid or ".." in sid or sid.startswith("."):
+        return False
+    return True
+
+
+def _csrf_ok(host_header: str, origin_header: str) -> bool:
+    """Allow same-origin POSTs (Origin host == Host) or no Origin (curl, native).
+
+    With Access-Control-Allow-Origin: *, browsers will happily send
+    state-changing POSTs from any web page the user visits while on the LAN.
+    This gate blocks that drive-by attack without breaking the dashboard
+    (which is same-origin) or native callers (curl, pytest, the listener
+    itself) that don't set an Origin header.
+    """
+    if not origin_header:
+        return True
+    try:
+        origin_host = urlparse(origin_header).hostname or ""
+    except ValueError:
+        return False
+    if not origin_host:
+        return False
+    host_only = (host_header or "").split(":", 1)[0].strip().lower()
+    return origin_host.lower() == host_only
 
 # Compress JSON/text bodies above this size when the client advertises gzip.
 # Smaller payloads aren't worth the round-trip cost on a Pi.
@@ -144,15 +202,31 @@ def make_handler(ctx: dict):
 
             # Parse Content-Length so we read the full POST body, and capture
             # Accept-Encoding so _http_response can gzip JSON/text payloads.
+            # Host + Origin feed the CSRF gate on POSTs and /browse below.
             content_length = 0
             accept_encoding = ""
+            host_header = ""
+            origin_header = ""
             for line in header_lines[1:]:
                 lower = line.lower()
                 if lower.startswith("content-length:"):
                     content_length = int(line.split(":", 1)[1].strip())
                 elif lower.startswith("accept-encoding:"):
                     accept_encoding = line.split(":", 1)[1].strip()
+                elif lower.startswith("host:"):
+                    host_header = line.split(":", 1)[1].strip()
+                elif lower.startswith("origin:"):
+                    origin_header = line.split(":", 1)[1].strip()
             _accept_encoding_ctx.set(accept_encoding)
+
+            if method == "POST" and not _csrf_ok(host_header, origin_header):
+                writer.write(_http_response(
+                    "403 Forbidden", "application/json",
+                    b'{"error":"cross-origin POST blocked"}',
+                ))
+                await writer.drain()
+                writer.close()
+                return
 
             body_buf = body_so_far
             while len(body_buf) < content_length:
@@ -537,7 +611,7 @@ def make_handler(ctx: dict):
                 writer.write(_http_response("200 OK", "application/json", json.dumps(payload).encode()))
 
             elif path == "/config" and method == "GET":
-                payload = {**config, "disk": disk_info()}
+                payload = {**_redact_config(config), "disk": disk_info()}
                 writer.write(_http_response("200 OK", "application/json", json.dumps(payload, indent=2).encode()))
 
             elif path == "/config" and method == "POST":
@@ -565,7 +639,16 @@ def make_handler(ctx: dict):
                                 if k in config["ports"]
                             })
                         if "anthropic_api_key" in incoming:
-                            config["anthropic_api_key"] = str(incoming["anthropic_api_key"]).strip()
+                            # null  → explicit clear
+                            # ""    → no-op (UI never sends the key it doesn't have)
+                            # other → set
+                            v = incoming["anthropic_api_key"]
+                            if v is None:
+                                config["anthropic_api_key"] = ""
+                            else:
+                                new_key = str(v).strip()
+                                if new_key:
+                                    config["anthropic_api_key"] = new_key
                         if "anthropic_model" in incoming:
                             config["anthropic_model"] = str(incoming["anthropic_model"]).strip()
                         if "time_format" in incoming:
@@ -1415,11 +1498,19 @@ def make_handler(ctx: dict):
                       for pair in query_string.split("&") if "=" in pair
                       for k, v in [pair.split("=", 1)]}
                 sid = qs.get("id", "")
-                laps_file = storage_path() / "sessions" / f"{sid}_laps.json"
-                try:
-                    writer.write(_http_response("200 OK", "application/json", laps_file.read_bytes()))
-                except OSError:
-                    writer.write(_http_response("404 Not Found", "application/json", b"[]"))
+                if not _safe_sid(sid):
+                    writer.write(_http_response("400 Bad Request", "application/json", b'{"error":"bad id"}'))
+                else:
+                    laps_file = storage_path() / "sessions" / f"{sid}_laps.json"
+                    try:
+                        # Closed sessions are immutable on disk — let the
+                        # browser cache aggressively. v0.7.1 perf pass.
+                        writer.write(_http_response(
+                            "200 OK", "application/json", laps_file.read_bytes(),
+                            "Cache-Control: public, max-age=31536000, immutable\r\n",
+                        ))
+                    except OSError:
+                        writer.write(_http_response("404 Not Found", "application/json", b"[]"))
 
             elif path == "/sessions/references":
                 qs = {k: urllib.parse.unquote_plus(v)
@@ -1636,6 +1727,12 @@ def make_handler(ctx: dict):
                                                 json.dumps({"error": str(exc)}).encode()))
                 else:
                     sid = body_data.get("id", "")
+                    if not _safe_sid(sid):
+                        writer.write(_http_response("400 Bad Request", "application/json",
+                                                    b'{"error":"bad id"}'))
+                        await writer.drain()
+                        writer.close()
+                        return
                     sessions_dir = storage_path() / "sessions"
                     session_file = sessions_dir / f"{sid}.json"
                     laps_file    = sessions_dir / f"{sid}_laps.json"
@@ -1752,9 +1849,9 @@ def make_handler(ctx: dict):
                                                 json.dumps({"error": str(exc)}).encode()))
                 else:
                     sid = body_data.get("id", "")
-                    if not sid:
+                    if not _safe_sid(sid):
                         writer.write(_http_response("400 Bad Request", "application/json",
-                                                    b'{"error":"id required"}'))
+                                                    b'{"error":"bad id"}'))
                     else:
                         deleted = db_delete_session(sid)
                         sessions_dir = storage_path() / "sessions"
@@ -1779,6 +1876,11 @@ def make_handler(ctx: dict):
                       for k, v in [pair.split("=", 1)]}
                 sid   = qs.get("id", "")
                 force = qs.get("force", "") == "true"
+                if not _safe_sid(sid):
+                    writer.write(_http_response("400 Bad Request", "application/json", b'{"error":"bad id"}'))
+                    await writer.drain()
+                    writer.close()
+                    return
                 sessions_dir  = storage_path() / "sessions"
                 analysis_file = sessions_dir / f"{sid}_analysis.json"
 
@@ -1890,6 +1992,18 @@ def make_handler(ctx: dict):
                             writer.write(_http_response("500 Internal Server Error", "application/json", err))
 
             elif path == "/browse":
+                # Path picker on the Setup page — enumerates directories on
+                # the Pi, which is information disclosure if hit from a
+                # foreign origin. Gate the same way as POSTs: same-origin or
+                # no Origin (curl, native test harness).
+                if not _csrf_ok(host_header, origin_header):
+                    writer.write(_http_response(
+                        "403 Forbidden", "application/json",
+                        b'{"error":"cross-origin blocked"}',
+                    ))
+                    await writer.drain()
+                    writer.close()
+                    return
                 qs = {k: urllib.parse.unquote_plus(v)
                       for pair in query_string.split("&") if "=" in pair
                       for k, v in [pair.split("=", 1)]}
@@ -1943,33 +2057,63 @@ def make_handler(ctx: dict):
                         debug_clients.remove(q)
 
             elif path == "/stream":
-                writer.write(
-                    b"HTTP/1.1 200 OK\r\n"
-                    b"Content-Type: text/event-stream\r\n"
-                    b"Cache-Control: no-cache\r\n"
-                    b"Access-Control-Allow-Origin: *\r\n"
-                    b"Connection: keep-alive\r\n\r\n"
-                )
-                # Idle-aware emit: 10 Hz when a session is live, 0.5 Hz when idle.
-                # After 60 s of continuous idle, close so a forgotten tab can't
-                # stream MBs overnight — EventSource auto-reconnects when the
-                # user comes back, and traffic resumes the moment UDP does.
-                idle_since = None
-                while True:
-                    is_idle = state.get("status") == "idle"
-                    if is_idle:
-                        if idle_since is None:
-                            idle_since = time.monotonic()
-                        elif time.monotonic() - idle_since > 60:
-                            writer.write(b"event: bye\ndata: idle-timeout\n\n")
-                            await writer.drain()
-                            break
-                    else:
+                global _stream_clients
+                if _stream_clients >= _STREAM_CLIENT_CAP:
+                    writer.write(_http_response(
+                        "503 Service Unavailable", "text/plain",
+                        b"too many stream clients",
+                    ))
+                else:
+                    _stream_clients += 1
+                    try:
+                        writer.write(
+                            b"HTTP/1.1 200 OK\r\n"
+                            b"Content-Type: text/event-stream\r\n"
+                            b"Cache-Control: no-cache\r\n"
+                            b"Access-Control-Allow-Origin: *\r\n"
+                            b"Connection: keep-alive\r\n\r\n"
+                        )
+                        # Idle-aware emit: 10 Hz when a session is live, 0.5 Hz
+                        # when idle. After 60s continuous idle, close so a
+                        # forgotten tab can't stream MBs overnight. Explicit
+                        # disconnect handling so a dead client doesn't keep
+                        # us busy serializing JSON nobody will read.
                         idle_since = None
-                    data = f"data: {json.dumps({**state, 'debug_mode': config.get('debug_mode', False)})}\n\n"
-                    writer.write(data.encode())
-                    await writer.drain()
-                    await asyncio.sleep(2.0 if is_idle else 0.1)
+                        while True:
+                            is_idle = state.get("status") == "idle"
+                            if is_idle:
+                                if idle_since is None:
+                                    idle_since = time.monotonic()
+                                elif time.monotonic() - idle_since > 60:
+                                    writer.write(b"event: bye\ndata: idle-timeout\n\n")
+                                    try:
+                                        await writer.drain()
+                                    except (ConnectionError, BrokenPipeError):
+                                        pass
+                                    break
+                            else:
+                                idle_since = None
+                            data = f"data: {json.dumps({**state, 'debug_mode': config.get('debug_mode', False)})}\n\n"
+                            writer.write(data.encode())
+                            try:
+                                await writer.drain()
+                            except (ConnectionError, BrokenPipeError):
+                                break
+                            if writer.is_closing():
+                                break
+                            await asyncio.sleep(2.0 if is_idle else 0.1)
+                    finally:
+                        _stream_clients -= 1
+
+            elif path == "/system/load":
+                # Pi system stats — CPU%, load avg, memory, temp, disk.
+                # Cheap (~1ms): reads /proc + /sys directly. Returns nulls on
+                # Mac/Windows so the same widget works in dev. Surfaced in
+                # the Debug panel; poll runs only while the panel is open.
+                from net.sysinfo import snapshot
+                payload = snapshot(str(storage_path()))
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(payload).encode()))
 
             elif path == "/health":
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")

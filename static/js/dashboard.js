@@ -256,6 +256,31 @@ function toggleDebug(){
   $('dbg').style.display=_dbgOpen?'flex':'none';
   $('dbg-btn').className='bot-btn'+(_dbgOpen?' on':'');
   if(_dbgOpen&&!_dbgEs)startDbg();
+  // System-load widget — only poll while the debug panel is visible so we
+  // don't burn CPU/network on every dashboard while idle.
+  if(_dbgOpen)startSysLoad();
+  else stopSysLoad();
+}
+
+// ── System load widget (debug panel) ────────────────────────────────────────
+let _sysTimer=null;
+async function tickSysLoad(){
+  try{
+    const s=await fetch('/system/load').then(r=>r.json());
+    $('sys-cpu').textContent  = s.cpu_pct  != null ? s.cpu_pct + '%' : '—';
+    $('sys-load').textContent = s.load     ? s.load.map(v=>v.toFixed(2)).join(' / ') : '—';
+    $('sys-mem').textContent  = s.mem      ? (s.mem.used_mb + '/' + s.mem.total_mb + ' MB (' + s.mem.used_pct + '%)') : '—';
+    $('sys-temp').textContent = s.cpu_temp_c != null ? s.cpu_temp_c + '°C' : '—';
+    $('sys-disk').textContent = s.disk_used_pct != null ? s.disk_used_pct + '%' : '—';
+  }catch(e){/* keep the previous values on transient errors */}
+}
+function startSysLoad(){
+  if(_sysTimer)return;
+  tickSysLoad();                      // first read primes the CPU-delta calc; UI fills on the second tick
+  _sysTimer=setInterval(tickSysLoad, 2000);
+}
+function stopSysLoad(){
+  if(_sysTimer){clearInterval(_sysTimer);_sysTimer=null;}
 }
 function startDbg(){
   _dbgEs=new EventSource('/debug-stream');
