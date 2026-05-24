@@ -584,6 +584,43 @@ def make_handler(ctx: dict):
                 status_payload = {**state, "debug_mode": config.get("debug_mode", False)}
                 writer.write(_http_response("200 OK", "application/json", json.dumps(status_payload, indent=2).encode()))
 
+            elif path == "/dashboard/records":
+                # Lightweight "what are my records here?" lookup for the live
+                # dashboard. Two cheap aggregates against indexed columns:
+                #   • best_lap_time_s   — overall PB at this track (any car)
+                #   • best_finish_pos   — best finish position ever in races
+                # Fired once per track change by dashboard.js, not on every
+                # packet — so it stays off the hot path.
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                track = qs.get("track", "")
+                if not track or track == "unknown":
+                    writer.write(_http_response("200 OK", "application/json",
+                        b'{"best_lap_time_s":null,"best_finish_pos":null}'))
+                else:
+                    with db_lock:
+                        conn = db_connect()
+                        try:
+                            r1 = conn.execute(
+                                "SELECT MIN(best_lap_time_s) AS pb FROM sessions "
+                                "WHERE track=? AND best_lap_time_s IS NOT NULL",
+                                (track,)
+                            ).fetchone()
+                            r2 = conn.execute(
+                                "SELECT MIN(finish_pos) AS bf FROM sessions "
+                                "WHERE track=? AND finish_pos IS NOT NULL "
+                                "  AND (race_type IN ('race','real','race_ai','ai','race_online') "
+                                "       OR session_type='race')",
+                                (track,)
+                            ).fetchone()
+                        finally:
+                            conn.close()
+                    writer.write(_http_response("200 OK", "application/json", json.dumps({
+                        "best_lap_time_s": (r1["pb"] if r1 else None),
+                        "best_finish_pos": (r2["bf"] if r2 else None),
+                    }).encode()))
+
             elif path == "/debug/raw":
                 writer.write(_http_response("200 OK", "text/html", DEBUG_RAW_HTML.encode()))
 

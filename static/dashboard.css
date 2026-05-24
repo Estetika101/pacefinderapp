@@ -192,6 +192,14 @@ body{
   font-variant-numeric:tabular-nums;
 }
 .t-val.green{color:var(--color-green)}
+/* Record sub-label under a t-val — track PB or best finish ever.
+   Static context for the live numbers; doesn't compete with them. */
+.t-rec{
+  font-size:10px;color:var(--color-text-quaternary);
+  font-variant-numeric:tabular-nums;
+  margin-top:2px;letter-spacing:0.04em;
+}
+.t-rec span{color:var(--color-text-tertiary);font-weight:500}
 .timing-grid{
   display:grid;grid-template-columns:1fr 1fr;
   gap:10px var(--space-2);
