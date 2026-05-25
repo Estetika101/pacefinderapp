@@ -88,7 +88,7 @@ if IS_MAC:
         coll,
         name=f"{APP_NAME}.app",
         icon="packaging/icons/pacefinder.icns" if Path("packaging/icons/pacefinder.icns").exists() else None,
-        bundle_identifier="org.estetika.pacefinder",
+        bundle_identifier="app.pacefinder.macos",
         # CFBundleShortVersionString must be three integers per Apple; use the
         # SHORT env var (PACEFINDER_VERSION with any -rcN suffix stripped) for
         # plist fields, and the full tag for filenames elsewhere.

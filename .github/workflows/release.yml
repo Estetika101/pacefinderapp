@@ -23,7 +23,7 @@ name: Release
 #   MAC_INSTALLER_CERT_PASSWORD        — password set when exporting the .p12
 #   KEYCHAIN_PASSWORD                  — arbitrary value (`openssl rand -hex 32`); unlocks the temp build keychain
 #
-# Prerequisite: a Mac app record with bundle ID `org.estetika.pacefinder`
+# Prerequisite: a Mac app record with bundle ID `app.pacefinder.macos`
 # must exist at https://appstoreconnect.apple.com (My Apps → +) before the
 # first upload — altool errors with "no app record found" otherwise.
 #
