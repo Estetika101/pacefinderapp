@@ -122,6 +122,9 @@ def make_handler(ctx: dict):
     TELEMETRY_HTML         = ctx["TELEMETRY_HTML"]
     DEBUG_RAW_HTML         = ctx["DEBUG_RAW_HTML"]
     DEBUG_PERF_HTML        = ctx["DEBUG_PERF_HTML"]
+    F1_LIVE_HTML           = ctx["F1_LIVE_HTML"]
+    F1_RAW_HTML            = ctx["F1_RAW_HTML"]
+    f1_state_snapshot      = ctx["f1_state_snapshot"]
     last_parsed            = ctx["last_parsed"]
     get_local_ips          = ctx["get_local_ips"]
     disk_info              = ctx["disk_info"]
@@ -711,6 +714,16 @@ def make_handler(ctx: dict):
 
             elif path == "/debug/raw.json":
                 writer.write(_http_response("200 OK", "application/json", json.dumps(last_parsed).encode()))
+
+            elif path == "/f1":
+                # Exploratory F1 live dashboard (feature/f1-dip-toes).
+                writer.write(_http_response("200 OK", "text/html", F1_LIVE_HTML.encode()))
+
+            elif path == "/f1/raw":
+                writer.write(_http_response("200 OK", "text/html", F1_RAW_HTML.encode()))
+
+            elif path == "/f1/state.json":
+                writer.write(_http_response("200 OK", "application/json", json.dumps(f1_state_snapshot()).encode()))
 
             elif path == "/debug/perf":
                 # Two flavors: HTML inspector (default) and ?json=1 raw dump.

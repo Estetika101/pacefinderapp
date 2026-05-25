@@ -23,8 +23,11 @@ DEFAULTS: dict = {
     "idle_timeout_s":    30,
     "status_port":       8000,
     "ports": {
-        # ACC (9996) and F1 (20777) are PARKED — see docs/specs/park-acc-f1.md
+        # ACC (9996) is PARKED — see docs/specs/park-acc-f1.md
+        # F1 (20777) is re-bound on feature/f1-dip-toes for the exploratory
+        # /f1 live + /f1/raw screens; ingestion to the DB is still parked.
         "forza_motorsport": 5300,
+        "f1":               20777,
     },
     "anthropic_api_key": "",
     "anthropic_model":   "claude-sonnet-4-6",

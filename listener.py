@@ -36,6 +36,8 @@ from net.pages.home import HOME_HTML_PRE
 from net.pages.events import SESSION_EVENTS_HTML
 from net.pages.telemetry import TELEMETRY_HTML
 from net.pages.debug import DEBUG_RAW_HTML, DEBUG_PERF_HTML
+from net.pages.f1 import F1_LIVE_HTML, F1_RAW_HTML
+from net import f1_state as _f1_state
 from net.router import make_handler
 from net.api import (
     build_inject_packets as _build_inject_packets_core,
@@ -377,10 +379,20 @@ async def main(demo_mode: bool = False):
     # UDP packets to these ports, and that's the *only* way to populate the
     # live dashboard for screenshots / smoke tests. Bind in demo mode too;
     # if a port's already in use (real game running) we log and continue.
+    # parse_f1 emits packet-type-tagged dicts; the live + raw F1 screens want
+    # a merged view across telemetry/lap_data/motion/car_status. Side-effect:
+    # update f1_state on every successful parse, return the dict untouched so
+    # the session pipeline downstream is unchanged.
+    def _parse_f1_capture(data: bytes):
+        parsed = parse_f1(data)
+        if parsed:
+            _f1_state.update(parsed)
+        return parsed
+
     parsers = {
         "forza_motorsport": parse_forza,
         "acc":              parse_acc,
-        "f1":               parse_f1,
+        "f1":               _parse_f1_capture,
     }
 
     for game, port in PORTS.items():
@@ -422,6 +434,9 @@ async def main(demo_mode: bool = False):
         "TELEMETRY_HTML": TELEMETRY_HTML,
         "DEBUG_RAW_HTML": DEBUG_RAW_HTML,
         "DEBUG_PERF_HTML": DEBUG_PERF_HTML,
+        "F1_LIVE_HTML": F1_LIVE_HTML,
+        "F1_RAW_HTML": F1_RAW_HTML,
+        "f1_state_snapshot": _f1_state.snapshot,
         "get_local_ips": _get_local_ips,
         "disk_info": disk_info,
         "save_config": save_config,
