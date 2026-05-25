@@ -141,6 +141,17 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign:,productbuild: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           rm -f app.p12 inst.p12
 
+      - name: Scrub bundle artifacts written by the smoke test
+        if: github.event_name == 'push'
+        # Belt-and-suspenders: even though CONFIG_FILE is now bundle-aware in
+        # frozen builds, scrub any stray post-build writes (caches, .DS_Store,
+        # configs that leaked into Frameworks/) before codesign — Apple's
+        # codesign refuses to sign non-code subcomponents.
+        run: |
+          set -euo pipefail
+          find dist/Pacefinder.app -name "simtelemetry.config.json" -print -delete || true
+          find dist/Pacefinder.app -name ".DS_Store"                -print -delete || true
+
       - name: Codesign .app with sandbox entitlements
         if: github.event_name == 'push'
         run: |

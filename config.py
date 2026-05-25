@@ -1,10 +1,21 @@
 import json
 import logging
+import sys
 from pathlib import Path
 
 from platformdirs import user_data_dir
 
-CONFIG_FILE = Path(__file__).parent / "simtelemetry.config.json"
+# Where the user config lives. Frozen (PyInstaller) builds MUST write to a
+# per-user dir — never inside the .app/.exe bundle. macOS App Sandbox enforces
+# this, and codesign rejects bundles that contain post-build modifications.
+# Source clones (Pi systemd service, dev macOS/Linux) keep the in-tree path
+# so existing setups don't need migration.
+if getattr(sys, "frozen", False):
+    _USER_DATA = Path(user_data_dir("Pacefinder", appauthor=False))
+    _USER_DATA.mkdir(parents=True, exist_ok=True)
+    CONFIG_FILE = _USER_DATA / "simtelemetry.config.json"
+else:
+    CONFIG_FILE = Path(__file__).parent / "simtelemetry.config.json"
 
 DEFAULTS: dict = {
     "storage_path":      "/mnt/usb/simtelemetry",
