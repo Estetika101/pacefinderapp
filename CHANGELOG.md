@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.7.3 — DM Mono web font + screenshot pipeline (2026-05-25)
+
+Two-line hotfix after v0.7.2:
+
+- **`@import` DM Mono in `static/tokens.css`** ([#226](https://github.com/Estetika101/pacefinderapp/pull/226)). The font stack declared `'DM Mono', 'Fira Mono', 'Courier New', monospace` but DM Mono was never loaded — no `@font-face`, no `<link>`. Browsers fell through to Fira Mono (not installed on most systems), then Courier New (Mac only), then generic monospace. The fallback's wider metrics overflowed hero lap times, stat cards, and TRACK TIP headings. Now served from Google Fonts via `@import url('...family=DM+Mono...&display=swap')` at the top of tokens.css; all pages import tokens.css so this fires once per page.
+- **CI: install listener `requirements.txt` from marketing-side screenshot pipeline** ([Estetika101/pacefindermarketing#34](https://github.com/Estetika101/pacefindermarketing/pull/34)). After v0.7.2-rc6 added `platformdirs` as a runtime dep, the marketing screenshot pipeline started failing with `ModuleNotFoundError` on listener boot. Marketing CI now pulls from `listener-app/requirements.txt`.
+
+Together: the v0.7.0 IA carousel + format-matrix shots on the marketing site now render in DM Mono instead of generic monospace, matching what users see on their own dashboard.
+
+No other runtime changes vs v0.7.2.
+
 ## v0.7.2-rc6 — Installer matrix lands (2026-05-25)
 
 Full distribution pipeline (#210, #216, #217, #219, #220, #221) shipping on every tag push:
