@@ -1,16 +1,20 @@
 # Changelog
 
-## v0.7.2-rc1 — Installer matrix first tag (2026-05-25)
+## v0.7.2-rc6 — Installer matrix lands (2026-05-25)
 
-First real tag against the installer pipeline (#210, #216, #217). Validates the full publish path end-to-end:
+Full distribution pipeline (#210, #216, #217, #219, #220, #221) shipping on every tag push:
 
-- Linux AppImages (x64 + ARM) attach to a GitHub Release.
-- Multi-arch Docker image publishes to `ghcr.io/estetika101/pacefinder` (`linux/amd64`, `linux/arm64`).
-- macOS `.app` signs against the Mac Distribution + Mac Installer Distribution certs and uploads to App Store Connect via `xcrun altool` using an App Store Connect API key. The build becomes available for TestFlight (internal testers immediately, external testers after Beta App Review on the first build per short-version). App Store submission is a separate downstream click in App Store Connect.
+- **macOS** → `Pacefinder.app` codesigned with the Mac App Distribution + Mac Installer Distribution certs, packaged as a signed `.pkg`, uploaded to App Store Connect via `xcrun altool` using an App Store Connect API key. Becomes available immediately in TestFlight for internal testers; external testers after Apple's Beta App Review on the first build per short-version. App Store submission is a separate downstream click.
+- **Linux x64** + **Linux ARM (Pi 4 / Pi 5)** → AppImages built on `ubuntu-latest` and `ubuntu-24.04-arm` (native ARM runner — no QEMU), attached to the GitHub Release.
+- **Docker** → multi-arch image (`linux/amd64`, `linux/arm64`) built with `docker buildx`, pushed to `ghcr.io/estetika101/pacefinder` with tags `latest`, `0.7.2`, `0.7.2-rc6`, and `sha-<short>`.
 
-`CFBundleShortVersionString` strips the `-rc*` suffix (`0.7.2-rc1` → `0.7.2`) so successive rc builds and the eventual `v0.7.2` final all share the same short version, distinguished by `CFBundleVersion = GITHUB_RUN_NUMBER`. Apple requires three-integer short versions and monotonically increasing build numbers within a short version.
+Listener code stays stdlib-only beyond one new pip dep (`platformdirs`) used to resolve per-user data dirs when the configured `storage_path` is unavailable. Existing Pi USB / dev configs untouched.
 
-No user-visible behavior changes vs v0.7.1.
+`CFBundleShortVersionString` strips the `-rc*` suffix (`0.7.2-rc1` → `0.7.2`) so successive rc builds and the eventual `v0.7.2` final share a short version, distinguished by `CFBundleVersion = GITHUB_RUN_NUMBER`. Apple requires three-integer short versions and monotonic build numbers within a short version.
+
+The road from rc1 → rc6 caught four issues in CI that would have been painful to find post-release: PyInstaller's `_maybe_open_browser_on_first_run` writing the config file into the .app bundle and breaking codesign (`CONFIG_FILE` now resolves to `user_data_dir` when frozen); a revoked App Store Connect API key returning the unhelpful `-26000` auth error (pre-flight diagnostic step now isolates auth from upload); the placeholder `.icns` not actually existing yet (now generated, ready to be swapped for real artwork).
+
+No user-visible runtime changes vs v0.7.1.
 
 ## v0.7.1 — Security hardening + Pi load widget (2026-05-24)
 

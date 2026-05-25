@@ -39,12 +39,29 @@ Listens for both Forza Motorsport (2023) and Forza Horizon 5 — auto-detected b
 
 ---
 
-## Quick Start
+## Install
+
+Pacefinder ships through four channels — pick the one that matches your machine.
+
+| Platform | Channel | How |
+|---|---|---|
+| **macOS** | TestFlight (App Store beta) | Request access via [pacefinder.app](https://pacefinder.app#install). Apple emails an invite; install the **TestFlight** app from the App Store, accept the invite, click **Install**. Auto-updates. |
+| **Linux x64** | AppImage | Download `Pacefinder-*-x86_64.AppImage` from the latest [Release](https://github.com/Estetika101/pacefinderapp/releases). `chmod +x Pacefinder-*.AppImage && ./Pacefinder-*.AppImage`. |
+| **Linux ARM (Raspberry Pi)** | AppImage | Download `Pacefinder-*-aarch64.AppImage` from the latest [Release](https://github.com/Estetika101/pacefinderapp/releases). Same `chmod +x` flow. Pi 4 / Pi 5 only — Pi 3 is 32-bit. |
+| **Docker** (any OS) | GHCR | `docker run -p 5300:5300/udp -p 8000:8000 -v $(pwd)/data:/data ghcr.io/estetika101/pacefinder:latest` |
+| **All** (power-user) | `git clone` + Python | See **Quick Start** below. Used by the Pi systemd service and for development. |
+
+All channels resolve to the same listener — same UDP port, same dashboard at `http://localhost:8000`.
+
+---
+
+## Quick Start (from source)
 
 **Mac / Linux / Pi**
 ```bash
 git clone https://github.com/Estetika101/pacefinderapp
 cd pacefinderapp
+pip install -r requirements.txt   # one dep: platformdirs
 python3 listener.py
 ```
 
@@ -52,6 +69,7 @@ python3 listener.py
 ```
 git clone https://github.com/Estetika101/pacefinderapp
 cd pacefinderapp
+pip install -r requirements.txt
 python listener.py
 ```
 Python 3.9+ required — download from [python.org/downloads](https://python.org/downloads). Check "Add Python to PATH" during install.

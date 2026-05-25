@@ -134,6 +134,43 @@ Forza Motorsport doesn't always broadcast the track name in UDP — only the ord
 
 Or use the "Add a Forza track or car ordinal" issue template — easier than a PR for one-offs.
 
+## Releasing
+
+Tag pushes drive everything. The `.github/workflows/release.yml` matrix builds and publishes to five channels in parallel; no manual upload steps.
+
+```bash
+git checkout main && git pull
+git tag -a vX.Y.Z -m "vX.Y.Z — <short summary>"
+git push origin vX.Y.Z
+```
+
+What runs on a `v*` tag:
+
+| Job | Outcome |
+|---|---|
+| `macOS .app (MAS)` | PyInstaller → codesign (Mac App Distribution + Installer cert) → `productbuild` .pkg → `xcrun altool` upload to App Store Connect. Build appears in TestFlight within 5–15 min. |
+| `Linux AppImage x86_64` | PyInstaller on `ubuntu-latest` → `appimagetool` → attached to GitHub Release. |
+| `Linux AppImage aarch64` | PyInstaller on `ubuntu-24.04-arm` (native ARM, no QEMU) → AppImage → attached to GitHub Release. |
+| `Docker (multi-arch → GHCR)` | `docker buildx` for `linux/amd64,linux/arm64` → push to `ghcr.io/estetika101/pacefinder` with `vX.Y.Z`, `X.Y.Z`, `X.Y`, `latest`, and `sha-<short>` tags. |
+| `Publish GitHub Release` | Attaches both AppImages to the auto-generated release. |
+
+### Pre-release tags
+
+Tags with a `-` suffix (e.g. `v0.7.2-rc1`, `v0.8.0-beta2`) reach App Store Connect via the same path — that's how TestFlight builds are populated. Apple's three-integer `CFBundleShortVersionString` requirement is honored by stripping the suffix in CI: `0.7.2-rc1` becomes short version `0.7.2 (build N)` where `N = GITHUB_RUN_NUMBER`. Pre-release and final tags can therefore share a short version; the build number keeps them distinct.
+
+### Secrets
+
+Nine repo secrets live at **Settings → Secrets and variables → Actions**. They're consumed only by the macOS job; Linux + Docker rely on `GITHUB_TOKEN` for GHCR. Full list and how-to-obtain in the comment block at the top of `.github/workflows/release.yml`. The Apple credentials are owned by **apple@estetika.org** (Apple Developer team `2MRMLK5999`). Rotate the App Store Connect API key by revoking + regenerating with **App Manager** role and updating `APP_STORE_CONNECT_API_KEY_ID` + `APP_STORE_CONNECT_API_KEY_P8` — the Issuer ID stays the same.
+
+### TestFlight follow-up after a release
+
+1. https://appstoreconnect.apple.com → My Apps → Pacefinder → **TestFlight** tab.
+2. Build appears as `X.Y.Z (build N)` within 5–15 min of the workflow finishing.
+3. First time only: answer the Export Compliance email — Pacefinder uses only standard HTTPS (libssl), so the answer is "No".
+4. Internal testers: add yourself / the team to **Internal Testing → App Store Connect Users**. Builds are instantly available in the TestFlight macOS app.
+5. External testers: create a group, add the build, fill out **Test Details**, submit for **Beta App Review** (~24 h).
+6. Promote to the App Store via **Submit for Review** on the build, once happy with external feedback.
+
 ## Code style
 
 - Pure Python 3.9+, stdlib only (plus `anthropic` for the optional Spotter feature)
