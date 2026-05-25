@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.7.2-rc1 — Installer matrix first tag (2026-05-25)
+
+First real tag against the installer pipeline (#210, #216, #217). Validates the full publish path end-to-end:
+
+- Linux AppImages (x64 + ARM) attach to a GitHub Release.
+- Multi-arch Docker image publishes to `ghcr.io/estetika101/pacefinder` (`linux/amd64`, `linux/arm64`).
+- macOS `.app` signs against the Mac Distribution + Mac Installer Distribution certs and uploads to App Store Connect via `xcrun altool` using an App Store Connect API key. The build becomes available for TestFlight (internal testers immediately, external testers after Beta App Review on the first build per short-version). App Store submission is a separate downstream click in App Store Connect.
+
+`CFBundleShortVersionString` strips the `-rc*` suffix (`0.7.2-rc1` → `0.7.2`) so successive rc builds and the eventual `v0.7.2` final all share the same short version, distinguished by `CFBundleVersion = GITHUB_RUN_NUMBER`. Apple requires three-integer short versions and monotonically increasing build numbers within a short version.
+
+No user-visible behavior changes vs v0.7.1.
+
 ## v0.7.1 — Security hardening + Pi load widget (2026-05-24)
 
 A focused follow-up to v0.7.0. Originated from a same-day review of orphaned files / code-quality / security.

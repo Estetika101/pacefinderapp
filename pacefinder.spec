@@ -88,12 +88,15 @@ if IS_MAC:
         coll,
         name=f"{APP_NAME}.app",
         icon="packaging/icons/pacefinder.icns" if Path("packaging/icons/pacefinder.icns").exists() else None,
-        bundle_identifier="org.estetika.pacefinder",
-        version=os.environ.get("PACEFINDER_VERSION", "0.7.1"),
+        bundle_identifier="app.pacefinder.macos",
+        # CFBundleShortVersionString must be three integers per Apple; use the
+        # SHORT env var (PACEFINDER_VERSION with any -rcN suffix stripped) for
+        # plist fields, and the full tag for filenames elsewhere.
+        version=os.environ.get("PACEFINDER_VERSION_SHORT", os.environ.get("PACEFINDER_VERSION", "0.7.1")),
         info_plist={
             "CFBundleName":               APP_NAME,
             "CFBundleDisplayName":        APP_NAME,
-            "CFBundleShortVersionString": os.environ.get("PACEFINDER_VERSION", "0.7.1"),
+            "CFBundleShortVersionString": os.environ.get("PACEFINDER_VERSION_SHORT", os.environ.get("PACEFINDER_VERSION", "0.7.1")),
             "CFBundleVersion":            os.environ.get("PACEFINDER_BUILD", "1"),
             "LSApplicationCategoryType":  "public.app-category.utilities",
             "LSMinimumSystemVersion":     "12.0",
