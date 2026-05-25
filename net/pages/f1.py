@@ -30,7 +30,7 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .sub{font-size:var(--text-xs);color:var(--color-text-muted)}
 .span-3{grid-column:span 3}.span-4{grid-column:span 4}.span-6{grid-column:span 6}.span-12{grid-column:span 12}
 .bar{height:14px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-sm);overflow:hidden;position:relative}
-.bar>i{display:block;height:100%;width:0;background:var(--color-green);transition:width .08s linear}
+.bar>i{display:block;height:100%;width:0;background:var(--color-green)}
 .bar.brake>i{background:var(--color-red)}
 .bar.rpm>i{background:var(--color-amber)}
 .bar .lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:10px;color:var(--color-text-primary);mix-blend-mode:difference}
@@ -139,74 +139,104 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 </div>
 
 <script>
-let lastTs=null, rateBuf=[];
+// Cache every DOM ref once — getElementById in a 10 Hz loop is wasteful
+// and was the main source of the laggy feel.
+const $ = id => document.getElementById(id);
+const E = {};
+['dot','m-rate','m-age','m-session','m-track','gear','drs','speed','speed-kph',
+ 'rpm','rpm-bar','rpm-pct','lap-num','lap-cur','lap-last','pos','thr','thr-v',
+ 'brk','brk-v','steer','clutch','eng-t','fuel','fuel-laps','cmp','tage',
+ 'glat','glon','gver','air','trk','wx'].forEach(k=>E[k]=$(k));
+for(const c of ['fl','fr','rl','rr']){ E['t-'+c]=$('t-'+c); E['p-'+c]=$('p-'+c); E['bt-'+c]=$('bt-'+c); }
+
+// Only write to the DOM when a value actually changed — avoids the
+// reflow churn of restamping 30+ identical strings every tick.
+const last = {};
+function set(key, val){ if(last[key]!==val){ last[key]=val; E[key].textContent = val; } }
+function setBar(id, labelKey, v){
+  const w = Math.max(0, Math.min(100, v||0));
+  const k = id+'.w';
+  if(last[k]!==w){ last[k]=w; E[id].style.width = w+'%'; }
+  set(labelKey, (typeof v==='number')?Math.round(v)+'%':'—');
+}
 function num(x,d){return (typeof x==='number')?x.toFixed(d):'—'}
-function pct(x){return (typeof x==='number')?Math.round(x)+'%':'—'}
-function setBar(id,v,labelId){
-  const el=document.getElementById(id);
-  if(el)el.style.width=Math.max(0,Math.min(100,v||0))+'%';
-  if(labelId){const l=document.getElementById(labelId);if(l)l.textContent=pct(v)}
-}
-function tick(d){
-  const now=performance.now();
-  if(lastTs!==null){rateBuf.push(now-lastTs);if(rateBuf.length>30)rateBuf.shift();}
-  lastTs=now;
-  const avg=rateBuf.length?(rateBuf.reduce((a,b)=>a+b,0)/rateBuf.length):0;
-  document.getElementById('m-rate').textContent=avg?(1000/avg).toFixed(1)+' Hz':'—';
 
-  const age=d._last_update_age_s;
-  const dot=document.getElementById('dot');
-  dot.className='dot '+(age==null?'':age<2?'live':'stale');
-  document.getElementById('m-age').textContent=age==null?'—':age.toFixed(1)+'s';
-  document.getElementById('m-session').textContent=d._session_uid?String(d._session_uid).slice(-6):'—';
-  document.getElementById('m-track').textContent=d.track||'—';
+let latest = null;            // newest snapshot from server
+let lastTs = null, rateBuf = [];
+let dotClass = '';
 
-  const g=d.gear; document.getElementById('gear').textContent=(g===0?'N':(g===-1?'R':(g==null?'—':String(g))));
-  document.getElementById('drs').textContent='DRS';
-  document.getElementById('drs').className=d.drs?'drs-on':'drs-off';
+function render(){
+  if(latest){
+    const d = latest;
 
-  document.getElementById('speed').textContent=num(d.speed_mph,0);
-  document.getElementById('speed-kph').textContent=(typeof d.speed_mph==='number'?Math.round(d.speed_mph*1.60934):'—')+' km/h';
+    const age = d._last_update_age_s;
+    const cls = 'dot '+(age==null?'':age<2?'live':'stale');
+    if(cls!==dotClass){ dotClass=cls; E.dot.className=cls; }
+    set('m-age', age==null?'—':age.toFixed(1)+'s');
+    set('m-session', d._session_uid?String(d._session_uid).slice(-6):'—');
+    set('m-track', d.track||'—');
 
-  document.getElementById('rpm').textContent=d.rpm!=null?d.rpm:'—';
-  // F1 doesn't ship a max RPM in CarTelemetry; assume 15000 for the bar.
-  const rpmPct = d.rpm!=null ? Math.min(100, d.rpm/15000*100) : 0;
-  setBar('rpm-bar', rpmPct, 'rpm-pct');
+    const g = d.gear;
+    set('gear', g===0?'N':(g===-1?'R':(g==null?'—':String(g))));
+    const drsCls = d.drs?'drs-on':'drs-off';
+    if(last['drs.cls']!==drsCls){ last['drs.cls']=drsCls; E.drs.className=drsCls; }
 
-  document.getElementById('lap-num').textContent=d.lap_number??'—';
-  document.getElementById('lap-cur').textContent=d.current_lap_time!=null?d.current_lap_time.toFixed(3)+'s':'—';
-  document.getElementById('lap-last').textContent=d.last_lap_time!=null?d.last_lap_time.toFixed(3)+'s':'—';
-  document.getElementById('pos').textContent=d.race_position??'—';
+    set('speed', num(d.speed_mph,0));
+    set('speed-kph', (typeof d.speed_mph==='number'?Math.round(d.speed_mph*1.60934):'—')+' km/h');
 
-  setBar('thr', d.throttle_pct, 'thr-v');
-  setBar('brk', d.brake_pct,    'brk-v');
-  document.getElementById('steer').textContent=num(d.steer,3);
-  document.getElementById('clutch').textContent=pct(d.clutch_pct);
+    set('rpm', d.rpm!=null?String(d.rpm):'—');
+    // F1 doesn't ship max RPM in CarTelemetry; bar normalized against 15000.
+    setBar('rpm-bar','rpm-pct', d.rpm!=null ? Math.min(100, d.rpm/15000*100) : 0);
 
-  for(const c of ['fl','fr','rl','rr']){
-    const t=d['tyre_surface_temp_'+c], p=d['tyre_pressure_'+c];
-    document.getElementById('t-'+c).textContent = t!=null?t+'°':'—';
-    document.getElementById('p-'+c).textContent = p!=null?p.toFixed(1)+' psi':'—';
-    const bt=d['brake_temp_'+c];
-    document.getElementById('bt-'+c).textContent = bt!=null?bt+'°':'—';
+    set('lap-num', d.lap_number??'—');
+    set('lap-cur', d.current_lap_time!=null?d.current_lap_time.toFixed(3)+'s':'—');
+    set('lap-last',d.last_lap_time!=null?d.last_lap_time.toFixed(3)+'s':'—');
+    set('pos', d.race_position??'—');
+
+    setBar('thr','thr-v', d.throttle_pct);
+    setBar('brk','brk-v', d.brake_pct);
+    set('steer', num(d.steer,3));
+    set('clutch', (typeof d.clutch_pct==='number'?Math.round(d.clutch_pct)+'%':'—'));
+
+    for(const c of ['fl','fr','rl','rr']){
+      const t = d['tyre_surface_temp_'+c], p = d['tyre_pressure_'+c], bt = d['brake_temp_'+c];
+      set('t-'+c,  t!=null?t+'°':'—');
+      set('p-'+c,  p!=null?p.toFixed(1)+' psi':'—');
+      set('bt-'+c, bt!=null?bt+'°':'—');
+    }
+    set('eng-t', d.engine_temp!=null?d.engine_temp+'°':'—');
+    set('fuel', num(d.fuel_in_tank,2));
+    set('fuel-laps', num(d.fuel_remaining_laps,1));
+    set('cmp', d.tyre_compound||'—');
+    set('tage', d.tyre_age_laps??'—');
+
+    set('glat', num(d.g_lat,2));
+    set('glon', num(d.g_lon,2));
+    set('gver', num(d.g_vert,2));
+    set('air', d.air_temp_c!=null?d.air_temp_c+'°':'—');
+    set('trk', d.track_temp_c!=null?d.track_temp_c+'°':'—');
+    set('wx',  d.weather_condition||'—');
   }
-  document.getElementById('eng-t').textContent=d.engine_temp!=null?d.engine_temp+'°':'—';
-  document.getElementById('fuel').textContent=num(d.fuel_in_tank,2);
-  document.getElementById('fuel-laps').textContent=num(d.fuel_remaining_laps,1);
-  document.getElementById('cmp').textContent=d.tyre_compound||'—';
-  document.getElementById('tage').textContent=d.tyre_age_laps??'—';
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
 
-  document.getElementById('glat').textContent=num(d.g_lat,2);
-  document.getElementById('glon').textContent=num(d.g_lon,2);
-  document.getElementById('gver').textContent=num(d.g_vert,2);
-  document.getElementById('air').textContent=d.air_temp_c!=null?d.air_temp_c+'°':'—';
-  document.getElementById('trk').textContent=d.track_temp_c!=null?d.track_temp_c+'°':'—';
-  document.getElementById('wx').textContent=d.weather_condition||'—';
-}
+// Decouple network from render: pull at ~15 Hz, paint at native refresh.
+let inFlight = false;
 async function poll(){
-  try{ tick(await fetch('/f1/state.json',{cache:'no-store'}).then(r=>r.json())); }catch(e){}
+  if(inFlight) return;            // skip if previous request still pending
+  inFlight = true;
+  try{
+    latest = await fetch('/f1/state.json',{cache:'no-store'}).then(r=>r.json());
+    const now = performance.now();
+    if(lastTs!==null){ rateBuf.push(now-lastTs); if(rateBuf.length>30) rateBuf.shift(); }
+    lastTs = now;
+    const avg = rateBuf.length?(rateBuf.reduce((a,b)=>a+b,0)/rateBuf.length):0;
+    set('m-rate', avg?(1000/avg).toFixed(1)+' Hz':'—');
+  }catch(e){}
+  finally{ inFlight = false; }
 }
-setInterval(poll,100);
+setInterval(poll, 66);
 poll();
 </script>
 </body>
