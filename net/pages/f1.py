@@ -228,6 +228,10 @@ requestAnimationFrame(render);
 
 // Decouple network from render: pull at ~15 Hz, paint at native refresh.
 let inFlight = false;
+// Diagnostic: log gear to console every time we see a different value, with
+// wall clock + sessionTime + game_lag. Useful for comparing what the dash
+// shows vs what's actually happening in the cockpit at that moment.
+let lastLoggedGear = undefined;
 async function poll(){
   if(inFlight) return;            // skip if previous request still pending
   inFlight = true;
@@ -238,6 +242,14 @@ async function poll(){
     lastTs = now;
     const avg = rateBuf.length?(rateBuf.reduce((a,b)=>a+b,0)/rateBuf.length):0;
     set('m-rate', avg?(1000/avg).toFixed(1)+' Hz':'—');
+
+    if(latest.gear !== lastLoggedGear){
+      const wall = new Date().toLocaleTimeString('en-GB', {hour12:false}) +
+                   '.' + String(Date.now()%1000).padStart(3,'0');
+      console.log(`[${wall}] gear=${latest.gear}  rpm=${latest.rpm}  speed=${latest.speed_mph}mph  ` +
+                  `session_time=${latest._session_time}s  game_lag=${latest._game_clock_lag_s}s`);
+      lastLoggedGear = latest.gear;
+    }
   }catch(e){}
   finally{ inFlight = false; }
 }
