@@ -58,6 +58,7 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
   <span class="pill">Track <b id="m-track">—</b></span>
   <span class="pill">Rate <b id="m-rate">—</b></span>
   <span class="pill">Age <b id="m-age">—</b></span>
+  <span class="pill">Game lag <b id="m-glag">—</b></span>
   <a href="/f1/raw">Raw</a>
   <a href="/dashboard">Forza</a>
   <a href="/">Home</a>
@@ -145,7 +146,7 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 // and was the main source of the laggy feel.
 const $ = id => document.getElementById(id);
 const E = {};
-['dot','m-rate','m-age','m-session','m-track','gear','drs','speed','speed-kph',
+['dot','m-rate','m-age','m-glag','m-session','m-track','gear','drs','speed','speed-kph',
  'rpm','rpm-bar','rpm-pct','lap-num','lap-cur','lap-last','pos','thr','thr-v',
  'brk','brk-v','steer','clutch','eng-t','fuel','fuel-laps','cmp','tage',
  'glat','glon','gver','air','trk','wx'].forEach(k=>E[k]=$(k));
@@ -175,6 +176,8 @@ function render(){
     const cls = 'dot '+(age==null?'':age<2?'live':'stale');
     if(cls!==dotClass){ dotClass=cls; E.dot.className=cls; }
     set('m-age', age==null?'—':age.toFixed(1)+'s');
+    const gl = d._game_clock_lag_s;
+    set('m-glag', gl==null?'—':gl.toFixed(1)+'s');
     set('m-session', d._session_uid?String(d._session_uid).slice(-6):'—');
     set('m-track', d.track||'—');
 
