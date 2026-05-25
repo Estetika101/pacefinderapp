@@ -1,2 +1,5 @@
-# No external dependencies — stdlib only (Python 3.9+)
-# asyncio, json, logging, os, struct, time, datetime, pathlib are all stdlib
+# Pacefinder runs on Python 3.9+. Listener logic uses stdlib only; the single
+# pip dep below resolves the per-user data dir on Mac/Windows/Linux when the
+# configured storage_path is unavailable (e.g. Pi USB not mounted, or a fresh
+# install on a non-Pi platform).
+platformdirs>=4.0
