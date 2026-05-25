@@ -372,24 +372,29 @@ async def main(demo_mode: bool = False):
 
     loop = asyncio.get_event_loop()
 
+    # UDP listener binding. Demo mode used to skip this entirely on the
+    # theory that no game is sending packets — but /admin/inject sends real
+    # UDP packets to these ports, and that's the *only* way to populate the
+    # live dashboard for screenshots / smoke tests. Bind in demo mode too;
+    # if a port's already in use (real game running) we log and continue.
+    parsers = {
+        "forza_motorsport": parse_forza,
+        "acc":              parse_acc,
+        "f1":               parse_f1,
+    }
+
+    for game, port in PORTS.items():
+        try:
+            await loop.create_datagram_endpoint(
+                lambda g=game, p=parsers[game]: TelemetryProtocol(g, p, _debug_push),
+                local_addr=("0.0.0.0", port),
+            )
+            state["bound_ports"][game] = port
+            log.info(f"Listening for {game} on UDP port {port}")
+        except OSError as e:
+            log.error(f"Failed to bind {game} on port {port}: {e} — F1/ACC/Forza port conflict?")
+
     if not demo_mode:
-        parsers = {
-            "forza_motorsport": parse_forza,
-            "acc":              parse_acc,
-            "f1":               parse_f1,
-        }
-
-        for game, port in PORTS.items():
-            try:
-                await loop.create_datagram_endpoint(
-                    lambda g=game, p=parsers[game]: TelemetryProtocol(g, p, _debug_push),
-                    local_addr=("0.0.0.0", port),
-                )
-                state["bound_ports"][game] = port
-                log.info(f"Listening for {game} on UDP port {port}")
-            except OSError as e:
-                log.error(f"Failed to bind {game} on port {port}: {e} — F1/ACC/Forza port conflict?")
-
         asyncio.create_task(session_watchdog())
 
     _ctx = {
