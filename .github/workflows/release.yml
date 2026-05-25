@@ -22,6 +22,9 @@ name: Release
 #   MAC_INSTALLER_CERT_P12             — base64 of the "Mac Installer Distribution" .p12
 #   MAC_INSTALLER_CERT_PASSWORD        — password set when exporting the .p12
 #   KEYCHAIN_PASSWORD                  — arbitrary value (`openssl rand -hex 32`); unlocks the temp build keychain
+#   MAC_PROVISIONING_PROFILE           — base64 of the Mac App Store .provisionprofile
+#                                        (developer.apple.com → Profiles → + → Mac App Store)
+#                                        Required for TestFlight eligibility (ITMS-90889).
 #
 # Prerequisite: a Mac app record with bundle ID `app.pacefinder.macos`
 # must exist at https://appstoreconnect.apple.com (My Apps → +) before the
@@ -152,8 +155,34 @@ jobs:
           find dist/Pacefinder.app -name "simtelemetry.config.json" -print -delete || true
           find dist/Pacefinder.app -name ".DS_Store"                -print -delete || true
 
+      - name: Embed Mac App Store provisioning profile
+        if: github.event_name == 'push'
+        env:
+          PROFILE_B64: ${{ secrets.MAC_PROVISIONING_PROFILE }}
+        # Apple's TestFlight pipeline requires the .app to ship with an
+        # embedded provisioning profile (ITMS-90889). It must be placed at
+        # the canonical Contents/embedded.provisionprofile path BEFORE
+        # codesign — otherwise the signature is computed without it and
+        # App Store Connect rejects the build.
+        run: |
+          set -euo pipefail
+          if [ -z "${PROFILE_B64:-}" ]; then
+            echo "ERROR: MAC_PROVISIONING_PROFILE secret is empty."
+            echo "Create one at developer.apple.com → Profiles → + → Mac App Store"
+            echo "for App ID app.pacefinder.macos with the Mac App Distribution cert,"
+            echo "base64-encode it, and save as the MAC_PROVISIONING_PROFILE secret."
+            exit 1
+          fi
+          echo "$PROFILE_B64" | base64 --decode > "dist/Pacefinder.app/Contents/embedded.provisionprofile"
+          echo "Embedded $(wc -c < dist/Pacefinder.app/Contents/embedded.provisionprofile) bytes."
+
       - name: Codesign .app with sandbox entitlements
         if: github.event_name == 'push'
+        # Inside-out signing: nested .framework bundles first (each as a
+        # bundle, so its internal Info.plist + binary are signed together
+        # with a coherent Designated Requirement — fixes ITMS-90238), then
+        # loose .dylib / .so files, then the main executable, then the
+        # outer .app bundle with entitlements.
         run: |
           set -euo pipefail
           # Modern cert name is "Apple Distribution" (Xcode-managed). Fall
@@ -161,13 +190,35 @@ jobs:
           # for older certs.
           APP_CERT_NAME=$(security find-identity -v -p codesigning | grep -E "Apple Distribution|3rd Party Mac Developer Application" | head -1 | awk -F'"' '{print $2}')
           echo "Signing with: $APP_CERT_NAME"
-          # Sign every nested binary first, then the bundle itself.
-          find "dist/Pacefinder.app" -type f \( -name "*.dylib" -o -name "*.so" \) -exec \
-            codesign --force --options runtime --sign "$APP_CERT_NAME" {} \;
-          codesign --force --options runtime \
+
+          # 1. Nested frameworks as bundles (recurses into each framework's
+          #    Versions/<v>/<binary> + sub-frameworks). --deep is acceptable
+          #    INSIDE a framework, just not on the outer .app.
+          find "dist/Pacefinder.app" -type d -name "*.framework" -depth | while read -r fw; do
+            echo "Signing framework: $fw"
+            codesign --force --deep --timestamp --options runtime \
+              --sign "$APP_CERT_NAME" "$fw"
+          done
+
+          # 2. Loose Mach-O subcomponents PyInstaller drops outside frameworks.
+          find "dist/Pacefinder.app" -type f \( -name "*.dylib" -o -name "*.so" \) -not -path "*/Frameworks/*.framework/*" -exec \
+            codesign --force --timestamp --options runtime --sign "$APP_CERT_NAME" {} \;
+
+          # 3. Main executable.
+          codesign --force --timestamp --options runtime \
+            --entitlements packaging/mac/entitlements.plist \
+            --sign "$APP_CERT_NAME" \
+            "dist/Pacefinder.app/Contents/MacOS/pacefinder"
+
+          # 4. Outer .app bundle — entitlements again so the bundle's seal
+          #    references them. No --deep here: each subcomponent already
+          #    has its own (correct) signature.
+          codesign --force --timestamp --options runtime \
             --entitlements packaging/mac/entitlements.plist \
             --sign "$APP_CERT_NAME" \
             "dist/Pacefinder.app"
+
+          # Verify with the same strict mode Apple's pipeline uses.
           codesign --verify --deep --strict --verbose=2 "dist/Pacefinder.app"
 
       - name: Build .pkg installer
