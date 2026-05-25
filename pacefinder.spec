@@ -103,5 +103,12 @@ if IS_MAC:
             "LSUIElement":                False,
             "NSHighResolutionCapable":    True,
             "NSHumanReadableCopyright":   "© Woest Endeavours / Estetika",
+            # Skip the App Store Connect "App Encryption Documentation"
+            # dialog on every upload. Pacefinder ships standard HTTPS via
+            # the bundled OpenSSL (libssl.3.dylib / libcrypto.3.dylib)
+            # used only for the optional outbound Anthropic API call —
+            # that's the standard authentication/data-transfer exemption
+            # under Category 5, Part 2 of the U.S. EAR.
+            "ITSAppUsesNonExemptEncryption": False,
         },
     )
