@@ -1,21 +1,31 @@
 name: Release
 
 # Triggers:
-#   - tag push (vX.Y.Z): full release — builds artifacts, uploads to GHCR + MAS,
-#     attaches AppImages to a GitHub Release.
-#   - workflow_dispatch: manual debug runs. Skips publish steps (no MAS upload,
-#     no GHCR push, no Release attachment) so we can iterate on the matrix
-#     without burning version numbers or polluting GHCR.
+#   - tag push (vX.Y.Z or vX.Y.Z-rcN): full release — builds artifacts,
+#     pushes Docker to GHCR, attaches AppImages to a GitHub Release, and
+#     uploads the signed .pkg to App Store Connect. Pre-release tags
+#     (containing `-`) reach App Store Connect just like real tags — that's
+#     how TestFlight builds are distributed. The choice between TestFlight
+#     and App Store submission is made downstream in App Store Connect.
+#   - pull_request: full build matrix as a smoke test, no publish.
+#   - workflow_dispatch: manual debug runs, no publish.
 #
-# Required repo secrets for the macOS job (configure under Settings → Secrets):
-#   APPLE_ID                       — Apple ID email enrolled in Developer Program
-#   APPLE_TEAM_ID                  — 10-char team identifier
-#   APPLE_APP_SPECIFIC_PASSWORD    — app-specific password for altool / notarytool
-#   MAC_APPLICATION_CERT_P12       — base64 of the "3rd Party Mac Developer Application" .p12
-#   MAC_APPLICATION_CERT_PASSWORD  — password for the above .p12
-#   MAC_INSTALLER_CERT_P12         — base64 of the "3rd Party Mac Developer Installer" .p12
-#   MAC_INSTALLER_CERT_PASSWORD    — password for the above .p12
-#   KEYCHAIN_PASSWORD              — arbitrary password used to unlock the temp build keychain
+# Required repo secrets for the macOS job (Settings → Secrets and variables → Actions).
+# Uses App Store Connect API key auth — the modern replacement for the
+# legacy Apple ID + app-specific-password flow:
+#   APPLE_TEAM_ID                      — 10-char team identifier
+#   APP_STORE_CONNECT_API_KEY_ID       — 10-char Key ID (App Store Connect → Users and Access → Integrations → Keys)
+#   APP_STORE_CONNECT_API_ISSUER_ID    — UUID Issuer ID from the same page
+#   APP_STORE_CONNECT_API_KEY_P8       — base64 of the AuthKey_XXXXXXXXXX.p8 file
+#   MAC_APPLICATION_CERT_P12           — base64 of the "Mac App Distribution" .p12 (exported from Keychain)
+#   MAC_APPLICATION_CERT_PASSWORD      — password set when exporting the .p12
+#   MAC_INSTALLER_CERT_P12             — base64 of the "Mac Installer Distribution" .p12
+#   MAC_INSTALLER_CERT_PASSWORD        — password set when exporting the .p12
+#   KEYCHAIN_PASSWORD                  — arbitrary value (`openssl rand -hex 32`); unlocks the temp build keychain
+#
+# Prerequisite: a Mac app record with bundle ID `org.estetika.pacefinder`
+# must exist at https://appstoreconnect.apple.com (My Apps → +) before the
+# first upload — altool errors with "no app record found" otherwise.
 #
 # Linux + Docker jobs need no extra secrets — GITHUB_TOKEN covers GHCR push.
 
@@ -63,17 +73,26 @@ jobs:
 
       - name: Resolve version
         id: version
+        # PACEFINDER_VERSION       — full tag (e.g. 0.7.2-rc1). Used for filenames + Docker tags.
+        # PACEFINDER_VERSION_SHORT — semver-only (e.g. 0.7.2). Apple's CFBundleShortVersionString
+        #                            requires three integers — rc tags and the final tag share the
+        #                            same short version and are distinguished via CFBundleVersion
+        #                            (= GITHUB_RUN_NUMBER).
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             v="${GITHUB_REF#refs/tags/v}"
           else
             v="0.0.0-${GITHUB_SHA::7}"
           fi
+          short="${v%%-*}"
           echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "PACEFINDER_VERSION=$v" >> "$GITHUB_ENV"
+          echo "PACEFINDER_VERSION=$v"          >> "$GITHUB_ENV"
+          echo "PACEFINDER_VERSION_SHORT=$short" >> "$GITHUB_ENV"
           echo "PACEFINDER_BUILD=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
       - name: PyInstaller build
+        # The spec reads PACEFINDER_VERSION_SHORT for CFBundleShortVersionString
+        # and PACEFINDER_BUILD for CFBundleVersion.
         run: pyinstaller pacefinder.spec --clean --noconfirm
 
       - name: Smoke test (.app boots and serves /status)
@@ -91,17 +110,16 @@ jobs:
           # than `pkill -f` for app bundles.
           pkill -f "Pacefinder.app/Contents/MacOS/pacefinder" || true
 
-      # MAS sign + upload run only on real release tags (vX.Y.Z). Pre-release
-      # tags (vX.Y.Z-rc1, vX.Y.Z-beta2, etc.) and PR / workflow_dispatch runs
-      # skip MAS publish and instead upload the unsigned .app as an artifact
-      # so the build matrix can be exercised without burning a MAS submission.
-      - name: Skip MAS publish (rc / non-tag run)
-        if: "!(github.event_name == 'push' && !contains(github.ref_name, 'rc'))"
+      # Every tag push reaches App Store Connect — that's how TestFlight is
+      # populated. PR and workflow_dispatch runs skip signing and upload the
+      # unsigned .app as an artifact for inspection.
+      - name: Skip MAS publish (non-tag run)
+        if: github.event_name != 'push'
         run: |
-          echo "Skipping codesign + MAS upload (event=${{ github.event_name }}, ref=${{ github.ref_name }})."
+          echo "Skipping codesign + App Store Connect upload (event=${{ github.event_name }})."
 
       - name: Import signing certificates
-        if: github.event_name == 'push' && !contains(github.ref_name, 'rc')
+        if: github.event_name == 'push'
         env:
           APP_CERT_P12:        ${{ secrets.MAC_APPLICATION_CERT_P12 }}
           APP_CERT_PASSWORD:   ${{ secrets.MAC_APPLICATION_CERT_PASSWORD }}
@@ -124,10 +142,13 @@ jobs:
           rm -f app.p12 inst.p12
 
       - name: Codesign .app with sandbox entitlements
-        if: github.event_name == 'push' && !contains(github.ref_name, 'rc')
+        if: github.event_name == 'push'
         run: |
           set -euo pipefail
-          APP_CERT_NAME=$(security find-identity -v -p codesigning | grep "3rd Party Mac Developer Application" | head -1 | awk -F'"' '{print $2}')
+          # Modern cert name is "Apple Distribution" (Xcode-managed). Fall
+          # back to the legacy "3rd Party Mac Developer Application" name
+          # for older certs.
+          APP_CERT_NAME=$(security find-identity -v -p codesigning | grep -E "Apple Distribution|3rd Party Mac Developer Application" | head -1 | awk -F'"' '{print $2}')
           echo "Signing with: $APP_CERT_NAME"
           # Sign every nested binary first, then the bundle itself.
           find "dist/Pacefinder.app" -type f \( -name "*.dylib" -o -name "*.so" \) -exec \
@@ -139,29 +160,37 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "dist/Pacefinder.app"
 
       - name: Build .pkg installer
-        if: github.event_name == 'push' && !contains(github.ref_name, 'rc')
+        if: github.event_name == 'push'
         run: |
           set -euo pipefail
-          INST_CERT_NAME=$(security find-identity -v | grep "3rd Party Mac Developer Installer" | head -1 | awk -F'"' '{print $2}')
+          INST_CERT_NAME=$(security find-identity -v | grep -E "Apple Distribution|3rd Party Mac Developer Installer" | head -1 | awk -F'"' '{print $2}')
           productbuild --component "dist/Pacefinder.app" /Applications \
             --sign "$INST_CERT_NAME" \
             "dist/Pacefinder-${PACEFINDER_VERSION}.pkg"
 
-      - name: Upload to App Store Connect
-        if: github.event_name == 'push' && !contains(github.ref_name, 'rc')
+      - name: Upload to App Store Connect (TestFlight + App Store distribution)
+        if: github.event_name == 'push'
         env:
-          APPLE_ID:                    ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          API_KEY_ID:    ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          API_KEY_P8:    ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
         run: |
+          set -euo pipefail
+          # altool looks for the .p8 in one of these directories. We write it
+          # under the recommended location so neither --apiKey nor --apiIssuer
+          # need to point at a path.
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$API_KEY_P8" | base64 --decode > \
+            "$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
           xcrun altool --upload-app -f "dist/Pacefinder-${PACEFINDER_VERSION}.pkg" \
             --type osx \
-            --username "$APPLE_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-            --asc-provider "$APPLE_TEAM_ID"
+            --apiKey    "$API_KEY_ID" \
+            --apiIssuer "$API_ISSUER_ID"
+          # Wipe the key — the runner is ephemeral but be explicit.
+          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
 
-      - name: Upload .app as artifact (when MAS publish is skipped)
-        if: "!(github.event_name == 'push' && !contains(github.ref_name, 'rc'))"
+      - name: Upload .app as artifact (PR / dispatch runs)
+        if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
           name: pacefinder-macos-app
