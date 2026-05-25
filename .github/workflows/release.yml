@@ -458,8 +458,51 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Compose release body
+        id: body
+        # Leads with end-user install snippets for the four non-source
+        # channels, then defers to GitHub's auto-generated PR changelog.
+        # `generate_release_notes: true` appends the auto-changelog AFTER
+        # whatever's in `body:` — so users see install steps first.
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          {
+            echo "## Install"
+            echo
+            echo "### macOS — TestFlight"
+            echo "Public TestFlight link: _coming once external testing opens_. Currently invite-only for internal testers — see [pacefinder.app](https://pacefinder.app#install) to request access."
+            echo
+            echo "### Linux x86_64 (Intel/AMD)"
+            echo '```sh'
+            echo "curl -L -o Pacefinder.AppImage 'https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/Pacefinder-${tag#v}-x86_64.AppImage'"
+            echo "chmod +x Pacefinder.AppImage"
+            echo "./Pacefinder.AppImage"
+            echo '```'
+            echo
+            echo "### Linux aarch64 (Raspberry Pi 4 / Pi 5 / Apple Silicon Linux VMs)"
+            echo '```sh'
+            echo "curl -L -o Pacefinder.AppImage 'https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/Pacefinder-${tag#v}-aarch64.AppImage'"
+            echo "chmod +x Pacefinder.AppImage"
+            echo "./Pacefinder.AppImage"
+            echo '```'
+            echo
+            echo "### Docker (any OS, multi-arch)"
+            echo '```sh'
+            echo "docker run --rm -p 5300:5300/udp -p 8000:8000 -v \"\$(pwd)/pacefinder-data:/data\" \\"
+            echo "  ghcr.io/estetika101/pacefinder:${tag#v}"
+            echo '```'
+            echo
+            echo "Then open <http://localhost:8000> and point your game's UDP Data Out at this machine on port 5300."
+            echo
+            echo "---"
+          } > release-body.md
+          {
+            echo "body_file=release-body.md"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create release with AppImages
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/Pacefinder-*.AppImage
-          generate_release_notes: true
+          body_path: release-body.md
+          generate_release_notes: true   # auto-changelog is appended below the body
