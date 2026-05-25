@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.7.2-rc1 — Installer matrix dry run (2026-05-25)
+
+Release-candidate tag that exercises the new installer pipeline (#210, #216) end-to-end without shipping to the Mac App Store. Triggered as a "first real tag" to validate that:
+
+- Linux AppImages (x64 + ARM) build under tag triggers and attach to a GitHub Release.
+- Multi-arch Docker image publishes to `ghcr.io/estetika101/pacefinder` (`linux/amd64`, `linux/arm64`).
+- macOS `.app` builds and uploads as a workflow artifact (codesign / productbuild / App Store Connect upload skipped for tags containing `rc` — gated in `.github/workflows/release.yml`).
+
+No user-visible behavior changes vs v0.7.1.
+
 ## v0.7.1 — Security hardening + Pi load widget (2026-05-24)
 
 A focused follow-up to v0.7.0. Originated from a same-day review of orphaned files / code-quality / security.

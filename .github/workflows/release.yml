@@ -91,13 +91,17 @@ jobs:
           # than `pkill -f` for app bundles.
           pkill -f "Pacefinder.app/Contents/MacOS/pacefinder" || true
 
-      - name: Skip signing for dispatch runs
-        if: github.event_name != 'push'
+      # MAS sign + upload run only on real release tags (vX.Y.Z). Pre-release
+      # tags (vX.Y.Z-rc1, vX.Y.Z-beta2, etc.) and PR / workflow_dispatch runs
+      # skip MAS publish and instead upload the unsigned .app as an artifact
+      # so the build matrix can be exercised without burning a MAS submission.
+      - name: Skip MAS publish (rc / non-tag run)
+        if: "!(github.event_name == 'push' && !contains(github.ref_name, 'rc'))"
         run: |
-          echo "Manual dispatch — skipping codesign + MAS upload."
+          echo "Skipping codesign + MAS upload (event=${{ github.event_name }}, ref=${{ github.ref_name }})."
 
       - name: Import signing certificates
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !contains(github.ref_name, 'rc')
         env:
           APP_CERT_P12:        ${{ secrets.MAC_APPLICATION_CERT_P12 }}
           APP_CERT_PASSWORD:   ${{ secrets.MAC_APPLICATION_CERT_PASSWORD }}
@@ -120,7 +124,7 @@ jobs:
           rm -f app.p12 inst.p12
 
       - name: Codesign .app with sandbox entitlements
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !contains(github.ref_name, 'rc')
         run: |
           set -euo pipefail
           APP_CERT_NAME=$(security find-identity -v -p codesigning | grep "3rd Party Mac Developer Application" | head -1 | awk -F'"' '{print $2}')
@@ -135,7 +139,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "dist/Pacefinder.app"
 
       - name: Build .pkg installer
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !contains(github.ref_name, 'rc')
         run: |
           set -euo pipefail
           INST_CERT_NAME=$(security find-identity -v | grep "3rd Party Mac Developer Installer" | head -1 | awk -F'"' '{print $2}')
@@ -144,7 +148,7 @@ jobs:
             "dist/Pacefinder-${PACEFINDER_VERSION}.pkg"
 
       - name: Upload to App Store Connect
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !contains(github.ref_name, 'rc')
         env:
           APPLE_ID:                    ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
@@ -156,8 +160,8 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --asc-provider "$APPLE_TEAM_ID"
 
-      - name: Upload artifact (for non-tag debug runs)
-        if: github.event_name != 'push'
+      - name: Upload .app as artifact (when MAS publish is skipped)
+        if: "!(github.event_name == 'push' && !contains(github.ref_name, 'rc'))"
         uses: actions/upload-artifact@v4
         with:
           name: pacefinder-macos-app
