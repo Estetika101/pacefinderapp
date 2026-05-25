@@ -47,6 +47,8 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .dot{width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;margin-right:6px;vertical-align:middle}
 .dot.live{background:var(--color-green);box-shadow:0 0 8px var(--color-green)}
 .dot.stale{background:var(--color-amber)}
+.footer{position:fixed;bottom:0;left:0;right:0;padding:4px var(--space-4);font-size:10px;color:var(--color-text-muted);text-align:center;background:rgba(10,10,10,.85);border-top:1px solid var(--color-border-subtle);font-family:var(--font-mono);letter-spacing:.08em}
+.footer code{color:var(--color-text-secondary)}
 </style>
 </head>
 <body>
@@ -239,6 +241,7 @@ async function poll(){
 setInterval(poll, 66);
 poll();
 </script>
+<div class="footer">f1 live · <code>{{VERSION}}</code> · listener up <code>{{STARTED_AT}}</code></div>
 </body>
 </html>
 """
@@ -269,6 +272,8 @@ body{background:var(--color-bg);color:var(--color-text-primary);font-family:var(
 .empty{padding:60px;text-align:center;color:var(--color-text-muted)}
 .counts{display:flex;gap:10px;flex-wrap:wrap}
 .counts span{background:var(--color-surface);border:1px solid var(--color-border);padding:2px 8px;border-radius:var(--radius-sm)}
+.footer{position:fixed;bottom:0;left:0;right:0;padding:4px var(--space-4);font-size:10px;color:var(--color-text-muted);text-align:center;background:rgba(10,10,10,.85);border-top:1px solid var(--color-border-subtle);font-family:var(--font-mono);letter-spacing:.08em}
+.footer code{color:var(--color-text-secondary)}
 </style>
 </head>
 <body>
@@ -335,6 +340,7 @@ setInterval(poll,200);
 poll();
 filterEl.addEventListener('input',()=>tick(prev));
 </script>
+<div class="footer">f1 raw · <code>{{VERSION}}</code> · listener up <code>{{STARTED_AT}}</code></div>
 </body>
 </html>
 """

@@ -12,6 +12,7 @@ import json
 import logging
 import shutil
 import socket
+import subprocess
 import threading
 import urllib.parse
 import struct
@@ -185,6 +186,34 @@ def _get_local_ips() -> list:
     except Exception:
         pass
     return ips
+
+# ─── Build-version stamp (F1 dip-toes screens) ────────────────────────────────
+
+def _git_short_sha() -> str:
+    """Best-effort git short SHA so the F1 footer proves we're looking at
+    the same build as the branch. Returns 'unknown' if we're not in a git
+    checkout (e.g. PyInstaller bundle)."""
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).parent, stderr=subprocess.DEVNULL, timeout=1,
+        )
+        sha = out.decode().strip()
+        dirty = subprocess.call(
+            ["git", "diff", "--quiet"],
+            cwd=Path(__file__).parent, stderr=subprocess.DEVNULL, timeout=1,
+        )
+        return sha + ("+dirty" if dirty else "")
+    except Exception:
+        return "unknown"
+
+_BUILD_SHA   = _git_short_sha()
+_BUILD_BOOT  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def _stamp_f1(html: str) -> str:
+    """Substitute {{VERSION}} + {{STARTED_AT}} in F1 page templates so the
+    footer reveals which build the browser is rendering."""
+    return html.replace("{{VERSION}}", _BUILD_SHA).replace("{{STARTED_AT}}", _BUILD_BOOT)
 
 # ─── Admin Packet Injection ───────────────────────────────────────────────────
 
@@ -447,8 +476,8 @@ async def main(demo_mode: bool = False):
         "TELEMETRY_HTML": TELEMETRY_HTML,
         "DEBUG_RAW_HTML": DEBUG_RAW_HTML,
         "DEBUG_PERF_HTML": DEBUG_PERF_HTML,
-        "F1_LIVE_HTML": F1_LIVE_HTML,
-        "F1_RAW_HTML": F1_RAW_HTML,
+        "F1_LIVE_HTML": _stamp_f1(F1_LIVE_HTML),
+        "F1_RAW_HTML": _stamp_f1(F1_RAW_HTML),
         "f1_state_snapshot": _f1_state.snapshot,
         "get_local_ips": _get_local_ips,
         "disk_info": disk_info,
