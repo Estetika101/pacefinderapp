@@ -382,8 +382,12 @@ async def main(demo_mode: bool = False):
     # parse_f1 emits packet-type-tagged dicts; the live + raw F1 screens want
     # a merged view across telemetry/lap_data/motion/car_status. Side-effect:
     # update f1_state on every successful parse, return the dict untouched so
-    # the session pipeline downstream is unchanged.
+    # the session pipeline downstream is unchanged. Also record every inbound
+    # packet-id + size in f1_state.note_raw so the raw screen surfaces what's
+    # flowing even for packet types parse_f1 doesn't yet handle (e.g. Event,
+    # Participants, FinalClassification, F1-25-format changes).
     def _parse_f1_capture(data: bytes):
+        _f1_state.note_raw(data)
         parsed = parse_f1(data)
         if parsed:
             _f1_state.update(parsed)
@@ -396,13 +400,22 @@ async def main(demo_mode: bool = False):
     }
 
     for game, port in PORTS.items():
+        # F1 frequently coexists with TrackTitan / SimHub / etc. on 20777.
+        # reuse_port lets multiple sockets bind the same UDP port, but the
+        # kernel only delivers a packet to all of them when it's broadcast
+        # (255.255.255.255 / subnet broadcast) — unicast still goes to one
+        # socket. The F1 game has a "UDP Broadcast Mode" toggle for this.
+        kwargs = {"local_addr": ("0.0.0.0", port)}
+        if game == "f1":
+            kwargs["reuse_port"] = True
         try:
             await loop.create_datagram_endpoint(
                 lambda g=game, p=parsers[game]: TelemetryProtocol(g, p, _debug_push),
-                local_addr=("0.0.0.0", port),
+                **kwargs,
             )
             state["bound_ports"][game] = port
-            log.info(f"Listening for {game} on UDP port {port}")
+            log.info(f"Listening for {game} on UDP port {port}"
+                     + (" (reuse_port — needs game broadcast mode to coexist)" if game == "f1" else ""))
         except OSError as e:
             log.error(f"Failed to bind {game} on port {port}: {e} — F1/ACC/Forza port conflict?")
 
