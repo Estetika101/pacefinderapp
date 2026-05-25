@@ -46,9 +46,9 @@ Pacefinder ships through four channels — pick the one that matches your machin
 | Platform | Channel | How |
 |---|---|---|
 | **macOS** | TestFlight (App Store beta) | Request access via [pacefinder.app](https://pacefinder.app#install). Apple emails an invite; install the **TestFlight** app from the App Store, accept the invite, click **Install**. Auto-updates. |
-| **Linux x64** | AppImage | Download `Pacefinder-*-x86_64.AppImage` from the latest [Release](https://github.com/Estetika101/pacefinderapp/releases). `chmod +x Pacefinder-*.AppImage && ./Pacefinder-*.AppImage`. |
-| **Linux ARM (Raspberry Pi)** | AppImage | Download `Pacefinder-*-aarch64.AppImage` from the latest [Release](https://github.com/Estetika101/pacefinderapp/releases). Same `chmod +x` flow. Pi 4 / Pi 5 only — Pi 3 is 32-bit. |
-| **Docker** (any OS) | GHCR | `docker run -p 5300:5300/udp -p 8000:8000 -v $(pwd)/data:/data ghcr.io/estetika101/pacefinder:latest` |
+| **Linux x64** | AppImage | [`Pacefinder-0.7.2-x86_64.AppImage`](https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.2/Pacefinder-0.7.2-x86_64.AppImage). `chmod +x` and run. |
+| **Linux ARM (Raspberry Pi)** | AppImage | [`Pacefinder-0.7.2-aarch64.AppImage`](https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.2/Pacefinder-0.7.2-aarch64.AppImage). Same `chmod +x` flow. Pi 4 / Pi 5 only — Pi 3 is 32-bit. |
+| **Docker** (any OS) | GHCR | `docker run -p 5300:5300/udp -p 8000:8000 -v $(pwd)/data:/data ghcr.io/estetika101/pacefinder:0.7.2` |
 | **All** (power-user) | `git clone` + Python | See **Quick Start** below. Used by the Pi systemd service and for development. |
 
 All channels resolve to the same listener — same UDP port, same dashboard at `http://localhost:8000`.

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Pacefinder shipped through v0.7.1 as `git clone && python3 listener.py`. That works for developers but is a barrier for the broader Forza Motorsport audience. This spec captures the distribution pipeline introduced in v0.7.2-rc6 — five channels, all driven by a single tag push, no manual upload steps.
+Pacefinder shipped through v0.7.1 as `git clone && python3 listener.py`. That works for developers but is a barrier for the broader Forza Motorsport audience. This spec captures the distribution pipeline introduced in v0.7.2-rc6 and **first stable in v0.7.2** — five channels, all driven by a single tag push, no manual upload steps.
 
-Tracked in [#210](https://github.com/Estetika101/pacefinderapp/issues/210); landed across PRs [#216](https://github.com/Estetika101/pacefinderapp/pull/216), [#217](https://github.com/Estetika101/pacefinderapp/pull/217), [#219](https://github.com/Estetika101/pacefinderapp/pull/219), [#220](https://github.com/Estetika101/pacefinderapp/pull/220), [#221](https://github.com/Estetika101/pacefinderapp/pull/221).
+Tracked in [#210](https://github.com/Estetika101/pacefinderapp/issues/210); landed across PRs [#216](https://github.com/Estetika101/pacefinderapp/pull/216), [#217](https://github.com/Estetika101/pacefinderapp/pull/217), [#219](https://github.com/Estetika101/pacefinderapp/pull/219), [#220](https://github.com/Estetika101/pacefinderapp/pull/220), [#221](https://github.com/Estetika101/pacefinderapp/pull/221), [#223](https://github.com/Estetika101/pacefinderapp/pull/223), [#224](https://github.com/Estetika101/pacefinderapp/pull/224), [#225](https://github.com/Estetika101/pacefinderapp/pull/225), [#227](https://github.com/Estetika101/pacefinderapp/pull/227).
 
 ## Behavior
 
