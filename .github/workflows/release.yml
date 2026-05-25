@@ -22,6 +22,18 @@ name: Release
 on:
   push:
     tags: ['v*']
+  pull_request:
+    # PRs run the full build matrix as a smoke test (publish steps are gated
+    # on `github.event_name == 'push'` so no GHCR push / MAS upload happens).
+    paths:
+      - '.github/workflows/release.yml'
+      - 'pacefinder.spec'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'packaging/**'
+      - 'requirements.txt'
+      - 'listener.py'
+      - 'config.py'
   workflow_dispatch:
 
 permissions:
