@@ -3,6 +3,11 @@
 <!--
   Mac App Store sandbox entitlements for Pacefinder.
 
+  - application-identifier + team-identifier: must match the embedded
+    provisioning profile's app ID and team. Without these two, Apple's
+    TestFlight pipeline rejects the build with ITMS-90886
+    ("signature for the bundle is missing an application identifier
+    but has an application identifier in the provisioning profile").
   - app-sandbox: required for MAS submission.
   - network.server: app binds UDP 5300 (Forza telemetry) and TCP 8000 (HTTP dashboard).
   - network.client: needed for outbound Anthropic API calls when AI features are enabled.
@@ -10,6 +15,10 @@
 -->
 <plist version="1.0">
 <dict>
+  <key>com.apple.application-identifier</key>
+  <string>2MRMLK5999.app.pacefinder.macos</string>
+  <key>com.apple.developer.team-identifier</key>
+  <string>2MRMLK5999</string>
   <key>com.apple.security.app-sandbox</key>
   <true/>
   <key>com.apple.security.network.server</key>
