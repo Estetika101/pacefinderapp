@@ -1,0 +1,316 @@
+name: Release
+
+# Triggers:
+#   - tag push (vX.Y.Z): full release — builds artifacts, uploads to GHCR + MAS,
+#     attaches AppImages to a GitHub Release.
+#   - workflow_dispatch: manual debug runs. Skips publish steps (no MAS upload,
+#     no GHCR push, no Release attachment) so we can iterate on the matrix
+#     without burning version numbers or polluting GHCR.
+#
+# Required repo secrets for the macOS job (configure under Settings → Secrets):
+#   APPLE_ID                       — Apple ID email enrolled in Developer Program
+#   APPLE_TEAM_ID                  — 10-char team identifier
+#   APPLE_APP_SPECIFIC_PASSWORD    — app-specific password for altool / notarytool
+#   MAC_APPLICATION_CERT_P12       — base64 of the "3rd Party Mac Developer Application" .p12
+#   MAC_APPLICATION_CERT_PASSWORD  — password for the above .p12
+#   MAC_INSTALLER_CERT_P12         — base64 of the "3rd Party Mac Developer Installer" .p12
+#   MAC_INSTALLER_CERT_PASSWORD    — password for the above .p12
+#   KEYCHAIN_PASSWORD              — arbitrary password used to unlock the temp build keychain
+#
+# Linux + Docker jobs need no extra secrets — GITHUB_TOKEN covers GHCR push.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create releases + upload assets
+  packages: write   # push to ghcr.io
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  # ─── macOS · .app → .pkg → App Store Connect ────────────────────────────────
+  mac-app:
+    name: macOS .app (MAS)
+    runs-on: macos-14   # Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            v="${GITHUB_REF#refs/tags/v}"
+          else
+            v="0.0.0-${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "PACEFINDER_VERSION=$v" >> "$GITHUB_ENV"
+          echo "PACEFINDER_BUILD=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
+      - name: PyInstaller build
+        run: pyinstaller pacefinder.spec --clean --noconfirm
+
+      - name: Smoke test (.app boots and serves /status)
+        run: |
+          set -euo pipefail
+          open -a "$(pwd)/dist/Pacefinder.app" --args --port 8765
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8765/status >/dev/null; then
+              echo "smoke OK on try $i"; break
+            fi
+            sleep 1
+            if [ "$i" = "20" ]; then echo "smoke FAILED"; exit 1; fi
+          done
+          # Kill the bundled process. pgrep on the bundle name is more reliable
+          # than `pkill -f` for app bundles.
+          pkill -f "Pacefinder.app/Contents/MacOS/pacefinder" || true
+
+      - name: Skip signing for dispatch runs
+        if: github.event_name != 'push'
+        run: |
+          echo "Manual dispatch — skipping codesign + MAS upload."
+
+      - name: Import signing certificates
+        if: github.event_name == 'push'
+        env:
+          APP_CERT_P12:        ${{ secrets.MAC_APPLICATION_CERT_P12 }}
+          APP_CERT_PASSWORD:   ${{ secrets.MAC_APPLICATION_CERT_PASSWORD }}
+          INST_CERT_P12:       ${{ secrets.MAC_INSTALLER_CERT_P12 }}
+          INST_CERT_PASSWORD:  ${{ secrets.MAC_INSTALLER_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD:   ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN=build.keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security default-keychain -s "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+
+          echo "$APP_CERT_P12"  | base64 --decode > app.p12
+          echo "$INST_CERT_P12" | base64 --decode > inst.p12
+          security import app.p12  -k "$KEYCHAIN" -P "$APP_CERT_PASSWORD"  -T /usr/bin/codesign -T /usr/bin/productbuild
+          security import inst.p12 -k "$KEYCHAIN" -P "$INST_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign:,productbuild: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          rm -f app.p12 inst.p12
+
+      - name: Codesign .app with sandbox entitlements
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          APP_CERT_NAME=$(security find-identity -v -p codesigning | grep "3rd Party Mac Developer Application" | head -1 | awk -F'"' '{print $2}')
+          echo "Signing with: $APP_CERT_NAME"
+          # Sign every nested binary first, then the bundle itself.
+          find "dist/Pacefinder.app" -type f \( -name "*.dylib" -o -name "*.so" \) -exec \
+            codesign --force --options runtime --sign "$APP_CERT_NAME" {} \;
+          codesign --force --options runtime \
+            --entitlements packaging/mac/entitlements.plist \
+            --sign "$APP_CERT_NAME" \
+            "dist/Pacefinder.app"
+          codesign --verify --deep --strict --verbose=2 "dist/Pacefinder.app"
+
+      - name: Build .pkg installer
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          INST_CERT_NAME=$(security find-identity -v | grep "3rd Party Mac Developer Installer" | head -1 | awk -F'"' '{print $2}')
+          productbuild --component "dist/Pacefinder.app" /Applications \
+            --sign "$INST_CERT_NAME" \
+            "dist/Pacefinder-${PACEFINDER_VERSION}.pkg"
+
+      - name: Upload to App Store Connect
+        if: github.event_name == 'push'
+        env:
+          APPLE_ID:                    ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          xcrun altool --upload-app -f "dist/Pacefinder-${PACEFINDER_VERSION}.pkg" \
+            --type osx \
+            --username "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --asc-provider "$APPLE_TEAM_ID"
+
+      - name: Upload artifact (for non-tag debug runs)
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacefinder-macos-app
+          path: dist/Pacefinder.app
+
+  # ─── Linux x64 · AppImage ───────────────────────────────────────────────────
+  linux-appimage:
+    name: Linux AppImage
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch:   x86_64
+          - runner: ubuntu-24.04-arm
+            arch:   aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends file desktop-file-utils
+
+      - name: Fetch appimagetool
+        run: |
+          set -euo pipefail
+          TOOL_URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage"
+          curl -fsSL -o appimagetool "$TOOL_URL"
+          chmod +x appimagetool
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            v="${GITHUB_REF#refs/tags/v}"
+          else
+            v="0.0.0-${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: PyInstaller build
+        run: pyinstaller pacefinder.spec --clean --noconfirm
+
+      - name: Smoke test (binary boots and serves /status)
+        run: |
+          set -euo pipefail
+          ./dist/pacefinder/pacefinder --port 8765 &
+          PID=$!
+          trap "kill $PID 2>/dev/null || true" EXIT
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8765/status >/dev/null; then
+              echo "smoke OK on try $i"; break
+            fi
+            sleep 1
+            if [ "$i" = "20" ]; then echo "smoke FAILED"; exit 1; fi
+          done
+
+      - name: Assemble AppDir
+        run: |
+          set -euo pipefail
+          APPDIR=Pacefinder.AppDir
+          rm -rf "$APPDIR"
+          mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/512x512/apps"
+
+          # Drop the PyInstaller dist tree under usr/bin and expose the entrypoint.
+          cp -r dist/pacefinder/. "$APPDIR/usr/bin/"
+          chmod +x "$APPDIR/usr/bin/pacefinder"
+
+          cp packaging/appimage/AppRun "$APPDIR/AppRun"
+          chmod +x "$APPDIR/AppRun"
+          cp packaging/appimage/pacefinder.desktop "$APPDIR/pacefinder.desktop"
+          cp packaging/appimage/pacefinder.desktop "$APPDIR/usr/share/applications/"
+
+          if [ -f packaging/icons/pacefinder.png ]; then
+            cp packaging/icons/pacefinder.png "$APPDIR/pacefinder.png"
+            cp packaging/icons/pacefinder.png "$APPDIR/.DirIcon"
+            cp packaging/icons/pacefinder.png "$APPDIR/usr/share/icons/hicolor/512x512/apps/"
+          else
+            # appimagetool requires *some* icon next to the .desktop file —
+            # generate a 1×1 transparent PNG as a stand-in until real artwork lands.
+            python -c "import base64,pathlib; pathlib.Path('p.png').write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='))"
+            cp p.png "$APPDIR/pacefinder.png"
+            cp p.png "$APPDIR/.DirIcon"
+          fi
+
+      - name: Build AppImage
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          OUT="Pacefinder-${{ steps.version.outputs.version }}-${{ matrix.arch }}.AppImage"
+          ./appimagetool --no-appstream Pacefinder.AppDir "$OUT"
+          ls -lh "$OUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacefinder-${{ matrix.arch }}-appimage
+          path: Pacefinder-*.AppImage
+
+  # ─── Docker · multi-arch → GHCR ─────────────────────────────────────────────
+  docker:
+    name: Docker (multi-arch → GHCR)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/estetika101/pacefinder
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
+
+      - name: Build (and push on tag)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' }}
+          tags:   ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+  # ─── GitHub Release · attach AppImages ──────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    if: github.event_name == 'push'
+    needs: [mac-app, linux-appimage, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pacefinder-*-appimage
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release with AppImages
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/Pacefinder-*.AppImage
+          generate_release_notes: true

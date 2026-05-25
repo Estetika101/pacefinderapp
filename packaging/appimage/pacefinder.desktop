@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Pacefinder
+GenericName=Sim Racing Telemetry
+Comment=UDP telemetry listener and dashboard for Forza Motorsport
+Exec=pacefinder
+Icon=pacefinder
+Terminal=false
+Categories=Utility;Network;
+Keywords=forza;racing;telemetry;sim;
+StartupNotify=false

@@ -18,6 +18,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install runtime deps
+        run: pip install -r requirements.txt
       - name: Import every module
         run: |
           # Exercises the full import graph from listener.py, the entry point.

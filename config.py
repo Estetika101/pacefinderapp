@@ -2,6 +2,8 @@ import json
 import logging
 from pathlib import Path
 
+from platformdirs import user_data_dir
+
 CONFIG_FILE = Path(__file__).parent / "simtelemetry.config.json"
 
 DEFAULTS: dict = {
@@ -22,6 +24,9 @@ DEFAULTS: dict = {
     # is over" the moment race-end is detected — a diagnostic aid for
     # validating race-end timing against what actually happened on track.
     "debug_mode":        False,
+    # Set to True the first time a frozen (PyInstaller) build auto-opens the
+    # dashboard in the user's browser. Subsequent launches don't.
+    "first_run_done":    False,
 }
 
 
@@ -46,11 +51,16 @@ def save_config(cfg: dict):
 
 config = load_config()
 
-_LOCAL_FALLBACK = Path(__file__).parent / "data"
+# Per-user, per-OS data dir. Used when the configured storage_path is
+# unavailable — e.g. the Pi USB isn't mounted, or a fresh Mac/Windows install
+# inherits the DEFAULTS value (/mnt/usb/simtelemetry) that doesn't exist there.
+# Linux: ~/.local/share/Pacefinder · macOS: ~/Library/Application Support/Pacefinder
+# Windows: %LOCALAPPDATA%\Pacefinder
+_LOCAL_FALLBACK = Path(user_data_dir("Pacefinder", appauthor=False))
 
 
 def storage_path() -> Path:
-    """Return the active storage root, falling back to a local data/ dir if USB isn't mounted."""
+    """Return the active storage root, falling back to the per-user data dir if the configured path is unavailable."""
     p = Path(config["storage_path"])
     if p.exists():
         return p

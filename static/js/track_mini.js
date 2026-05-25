@@ -15,19 +15,54 @@
 (function(){
   const _cache = new Map();  // key "sid:lap" → samples[] or null
 
-  async function _fetchSamples(sid, lap){
-    const key = sid + ':' + lap;
-    if(_cache.has(key)) return _cache.get(key);
+  // Microtask-debounced batch queue. Per-row IntersectionObserver fires
+  // dozens of _fetchSamples calls back-to-back; we coalesce them into
+  // one /sessions/lap-outlines request so the server reads the
+  // outline_json column once with a multi-key SELECT instead of N gzip
+  // decompressions over N round-trips.
+  const _pending = new Map();  // key → [resolve, ...] — drained in place
+  let _flushScheduled = false;
+
+  function _scheduleFlush(){
+    if(_flushScheduled) return;
+    _flushScheduled = true;
+    // Coalesce within one animation frame — long enough to catch the
+    // IO-driven burst, short enough to feel synchronous.
+    requestAnimationFrame(_flush);
+  }
+
+  async function _flush(){
+    _flushScheduled = false;
+    if(!_pending.size) return;
+    // Drain in place: snapshot entries, clear the map so any awaits
+    // during fetch queue into a fresh batch.
+    const batch = new Map(_pending);
+    _pending.clear();
+    const keys = Array.from(batch.keys());
+    let result = {};
     try{
-      // ?outline=1 — server decimates to ≤80 points and strips to the 6
-      // fields this renderer + the fingerprint glyph need. Cuts the
-      // wire payload + JSON parse by ~95% vs the full sample stream.
-      const s = await fetch('/sessions/lap-samples?session_id=' + encodeURIComponent(sid)
-        + '&lap=' + encodeURIComponent(lap) + '&outline=1').then(r => r.json());
+      const url = '/sessions/lap-outlines?keys=' +
+        encodeURIComponent(keys.join(','));
+      result = await fetch(url).then(r => r.json());
+    } catch(e){ result = {}; }
+    for(const key of keys){
+      const s = result[key];
       const ok = Array.isArray(s) && s.length >= 8 && !s.some(p => p.px == null);
-      _cache.set(key, ok ? s : null);
-      return ok ? s : null;
-    } catch(e){ _cache.set(key, null); return null; }
+      const val = ok ? s : null;
+      _cache.set(key, val);
+      for(const resolve of batch.get(key)) resolve(val);
+    }
+  }
+
+  function _fetchSamples(sid, lap){
+    const key = sid + ':' + lap;
+    if(_cache.has(key)) return Promise.resolve(_cache.get(key));
+    return new Promise(resolve => {
+      const bucket = _pending.get(key);
+      if(bucket) bucket.push(resolve);
+      else _pending.set(key, [resolve]);
+      _scheduleFlush();
+    });
   }
 
   // Speed → RGB. Mirrors the telemetry HUD's spdRgb: blue (slow) →
