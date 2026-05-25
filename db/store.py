@@ -110,6 +110,7 @@ def _db_init():
                     lap_number    INTEGER NOT NULL,
                     samples_json  TEXT NOT NULL,
                     distance_m_json TEXT NOT NULL,
+                    outline_json  BLOB,
                     created_at    TEXT,
                     PRIMARY KEY (session_id, lap_number)
                 );
@@ -194,6 +195,11 @@ def _db_init():
                     conn.commit()
                 except Exception:
                     pass
+            try:
+                conn.execute("ALTER TABLE lap_samples ADD COLUMN outline_json BLOB")
+                conn.commit()
+            except Exception:
+                pass
         finally:
             conn.close()
     _db_migrate()
@@ -1127,6 +1133,26 @@ def _decode_samples(raw) -> list:
     raise TypeError(f"unexpected samples_json type: {type(raw).__name__}")
 
 
+# Fields the /sessions per-row mini outline + fingerprint glyphs read. Kept
+# in sync with the renderer in static/js/track_mini.js.
+_OUTLINE_FIELDS = ("px", "py", "pz", "speed_mph", "throttle_pct", "brake_pct")
+_OUTLINE_MAX_POINTS = 80
+
+
+def _compute_outline(samples: list) -> list:
+    """Decimate samples to ≤80 points, keeping only the 6 outline fields."""
+    if not samples:
+        return []
+    n_in = len(samples)
+    n_out = min(_OUTLINE_MAX_POINTS, n_in)
+    step = n_in / n_out
+    return [
+        {k: samples[int(i * step)][k]
+         for k in _OUTLINE_FIELDS if k in samples[int(i * step)]}
+        for i in range(n_out)
+    ]
+
+
 def _db_save_lap_samples(session_id: str, lap_number: int,
                           samples: list, dist_m: list):
     with _db_lock:
@@ -1134,10 +1160,12 @@ def _db_save_lap_samples(session_id: str, lap_number: int,
         try:
             conn.execute(
                 """INSERT OR REPLACE INTO lap_samples
-                   (session_id, lap_number, samples_json, distance_m_json, created_at)
-                   VALUES (?,?,?,?,?)""",
+                   (session_id, lap_number, samples_json, distance_m_json,
+                    outline_json, created_at)
+                   VALUES (?,?,?,?,?,?)""",
                 (session_id, lap_number,
                  _encode_samples(samples), _encode_samples(dist_m),
+                 _encode_samples(_compute_outline(samples)),
                  datetime.now().isoformat())
             )
             conn.commit()
@@ -1162,6 +1190,90 @@ def _db_get_lap_samples(session_id: str, lap_number: int) -> Optional[dict]:
             return None
         finally:
             conn.close()
+
+
+def _db_get_lap_outline(session_id: str, lap_number: int) -> Optional[list]:
+    """Return the precomputed slim outline for one lap, or None if no row.
+
+    Legacy rows (pre outline_json column) lazily compute and persist the
+    outline on first read so subsequent calls skip the full-blob decompress.
+    """
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            row = conn.execute(
+                "SELECT samples_json, outline_json FROM lap_samples "
+                "WHERE session_id=? AND lap_number=?",
+                (session_id, lap_number)
+            ).fetchone()
+            if not row:
+                return None
+            if row["outline_json"]:
+                return _decode_samples(row["outline_json"])
+            outline = _compute_outline(_decode_samples(row["samples_json"]))
+            try:
+                conn.execute(
+                    "UPDATE lap_samples SET outline_json=? "
+                    "WHERE session_id=? AND lap_number=?",
+                    (_encode_samples(outline), session_id, lap_number)
+                )
+                conn.commit()
+            except Exception:
+                pass
+            return outline
+        finally:
+            conn.close()
+
+
+def _db_get_lap_outlines(keys: list) -> dict:
+    """Batch reader. `keys` is a list of (session_id, lap_number) tuples.
+
+    Returns {"sid:lap": [outline_points...]}. Missing rows are absent from
+    the response. Lazily backfills outline_json for legacy rows.
+    """
+    if not keys:
+        return {}
+    out: dict = {}
+    to_backfill: list = []
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            # SQLite caps host params at 999. Chunk in groups of ~400 pairs
+            # (800 params) to stay well under the limit.
+            for chunk_start in range(0, len(keys), 400):
+                chunk = keys[chunk_start:chunk_start + 400]
+                placeholders = ",".join(["(?,?)"] * len(chunk))
+                params = [v for kv in chunk for v in kv]
+                rows = conn.execute(
+                    f"SELECT session_id, lap_number, samples_json, outline_json "
+                    f"FROM lap_samples "
+                    f"WHERE (session_id, lap_number) IN ({placeholders})",
+                    params
+                ).fetchall()
+                for r in rows:
+                    key = f"{r['session_id']}:{r['lap_number']}"
+                    if r["outline_json"]:
+                        out[key] = _decode_samples(r["outline_json"])
+                    else:
+                        outline = _compute_outline(
+                            _decode_samples(r["samples_json"]))
+                        out[key] = outline
+                        to_backfill.append(
+                            (_encode_samples(outline),
+                             r["session_id"], r["lap_number"]))
+            if to_backfill:
+                try:
+                    conn.executemany(
+                        "UPDATE lap_samples SET outline_json=? "
+                        "WHERE session_id=? AND lap_number=?",
+                        to_backfill
+                    )
+                    conn.commit()
+                except Exception:
+                    pass
+        finally:
+            conn.close()
+    return out
 
 
 def _db_get_all_lap_samples(session_id: str) -> list:

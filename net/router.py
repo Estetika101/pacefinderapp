@@ -156,6 +156,8 @@ def make_handler(ctx: dict):
     db_set_car_nickname = ctx["db_set_car_nickname"]
     db_get_lap_samples     = ctx["db_get_lap_samples"]
     db_get_all_lap_samples = ctx["db_get_all_lap_samples"]
+    db_get_lap_outline     = ctx["db_get_lap_outline"]
+    db_get_lap_outlines    = ctx["db_get_lap_outlines"]
     decode_samples         = ctx["decode_samples"]
     build_inject_packets   = ctx["build_inject_packets"]
     build_analysis_prompt  = ctx["build_analysis_prompt"]
@@ -1640,37 +1642,53 @@ def make_handler(ctx: dict):
                 if not sid or lap_n < 0:
                     writer.write(_http_response("400 Bad Request", "application/json",
                                                 b'{"error":"session_id required, lap must be >= 0"}'))
+                elif qs.get("outline") == "1":
+                    # Slim payload for /sessions per-row glyphs. Reads the
+                    # precomputed outline_json column directly — no full
+                    # sample-blob decompress on the hot path. See
+                    # db.store._db_get_lap_outline.
+                    outline = db_get_lap_outline(sid, lap_n) or []
+                    writer.write(_http_response("200 OK", "application/json",
+                                                json.dumps(outline).encode()))
                 else:
                     data = db_get_lap_samples(sid, lap_n)
                     if data:
-                        samples = data["samples"]
-                        # ?outline=1 — slim payload for the per-row mini
-                        # outline + fingerprint glyphs on /sessions. Decimates
-                        # to ≤80 points server-side and drops all fields
-                        # except the six the renderers actually read. Cuts
-                        # the wire payload (and JSON parse cost) by ~95% vs
-                        # the full sample stream.
-                        if qs.get("outline") == "1" and samples:
-                            _OUTLINE_FIELDS = ("px", "py", "pz", "speed_mph",
-                                               "throttle_pct", "brake_pct")
-                            n_in = len(samples)
-                            n_out = min(80, n_in)
-                            step = n_in / n_out
-                            slim = []
-                            for i in range(n_out):
-                                s = samples[int(i * step)]
-                                slim.append({k: s[k] for k in _OUTLINE_FIELDS if k in s})
-                            writer.write(_http_response("200 OK", "application/json",
-                                                        json.dumps(slim).encode()))
-                        else:
-                            writer.write(_http_response("200 OK", "application/json",
-                                                        json.dumps(samples).encode()))
+                        writer.write(_http_response("200 OK", "application/json",
+                                                    json.dumps(data["samples"]).encode()))
                     else:
                         # Lap with no stored samples is normal for older sessions
                         # that pre-date the lap_samples migration — return an
                         # empty array as 200 so it doesn't read as a real error
                         # in dev tools. Client treats [] and 404+[] identically.
                         writer.write(_http_response("200 OK", "application/json", b"[]"))
+
+            elif path == "/sessions/lap-outlines":
+                # Batch sibling of /sessions/lap-samples?outline=1. Accepts
+                # ?keys=sid:lap,sid:lap,... and returns {"sid:lap": [pts]}.
+                # Collapses N HTTP round-trips into one for the /sessions
+                # mini-glyph viewport.
+                qs = {k: urllib.parse.unquote_plus(v)
+                      for pair in query_string.split("&") if "=" in pair
+                      for k, v in [pair.split("=", 1)]}
+                raw_keys = qs.get("keys", "")
+                pairs = []
+                for tok in raw_keys.split(","):
+                    if ":" not in tok:
+                        continue
+                    s, _, l = tok.rpartition(":")
+                    if not s:
+                        continue
+                    try:
+                        pairs.append((s, int(l)))
+                    except ValueError:
+                        continue
+                    # Cap to keep one request bounded — typical viewport is
+                    # ~20 rows, 200 is plenty of headroom.
+                    if len(pairs) >= 200:
+                        break
+                result = db_get_lap_outlines(pairs) if pairs else {}
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(result).encode()))
 
             elif path == "/sessions/session/deepdive":
                 # Compute the Deep Dive tab payload from a session's stored

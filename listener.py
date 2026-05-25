@@ -92,6 +92,8 @@ from db.store import (
     _db_save_ai_analysis,
     _db_get_lap_samples,
     _db_get_all_lap_samples,
+    _db_get_lap_outline,
+    _db_get_lap_outlines,
     _decode_samples,
     _store_session_lap_samples,
     _backfill_lap_samples,
@@ -448,6 +450,8 @@ async def main(demo_mode: bool = False):
         "db_set_car_nickname": _db_set_car_nickname,
         "db_get_lap_samples": _db_get_lap_samples,
         "db_get_all_lap_samples": _db_get_all_lap_samples,
+        "db_get_lap_outline": _db_get_lap_outline,
+        "db_get_lap_outlines": _db_get_lap_outlines,
         "decode_samples": _decode_samples,
         "build_inject_packets": _build_inject_packets,
         "build_analysis_prompt": _build_analysis_prompt,
@@ -462,8 +466,32 @@ async def main(demo_mode: bool = False):
     log.info(f"Admin     at http://localhost:{STATUS_PORT}/admin")
     log.info(f"Status API at http://localhost:{STATUS_PORT}/status")
 
+    _maybe_open_browser_on_first_run()
+
     async with server:
         await server.serve_forever()
+
+
+def _maybe_open_browser_on_first_run():
+    # Only opens for frozen (PyInstaller) builds. Source clones — including the
+    # Pi systemd service — stay silent. After a successful open, the flag is
+    # persisted so subsequent launches don't re-open the browser.
+    import sys
+    if not getattr(sys, "frozen", False):
+        return
+    if config.get("first_run_done"):
+        return
+    try:
+        import webbrowser, threading
+        threading.Timer(
+            1.0,
+            lambda: webbrowser.open(f"http://localhost:{STATUS_PORT}/"),
+        ).start()
+        cfg = {**config, "first_run_done": True}
+        config["first_run_done"] = True
+        save_config(cfg)
+    except Exception as e:
+        log.warning(f"first-run browser open failed: {e}")
 
 
 if __name__ == "__main__":
