@@ -1,3 +1,9 @@
+/* DM Mono — the design-system font. Without this the cascade fell all
+   the way to generic monospace on machines without Fira Mono / Courier
+   New (notably the CI screenshot runners on Ubuntu), causing wide text
+   to overflow its container in headers, hero lap times, and stat cards. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
+
 :root {
   /* Typography */
   --font-mono: 'DM Mono', 'Fira Mono', 'Courier New', monospace;
