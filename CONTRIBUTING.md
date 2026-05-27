@@ -2,6 +2,8 @@
 
 Pacefinder records UDP telemetry from Forza Motorsport, archives every session, and serves a live dashboard. Active focus is **Forza only** — ACC and F1 are parked (parser code is in tree but not bound at startup).
 
+**New to the codebase?** Start with [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for a system overview, then [`scripts/README.md`](./scripts/README.md) for utility scripts.
+
 ## Workflow
 
 1. **Specs first.** Non-trivial features get a markdown file in [`docs/specs/`](./docs/specs/) before any code lands. Spec describes purpose, behavior, scope, out-of-scope, and open questions. Template at [`docs/specs/README.md`](./docs/specs/README.md).
@@ -177,6 +179,14 @@ Nine repo secrets live at **Settings → Secrets and variables → Actions**. Th
 - No frameworks for the frontend — vanilla JS, embedded `<style>` tags or single CSS files per page
 - Modular: parsers in `parsers/`, DB in `db/`, session lifecycle in `session/`, HTTP in `net/`, reference data in `reference/`, page templates in `net/pages/`
 - Logging via the `pacefinder` logger; user-facing diagnostic info goes to `INFO`
+- Comments only when WHY is non-obvious — code should be self-documenting
+
+## Common contributions
+
+See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md#Adding New Features) for step-by-step guides:
+- Adding a parser for a new game
+- Adding a new dashboard page
+- Updating the database schema
 
 ## Spec template
 
