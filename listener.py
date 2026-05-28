@@ -464,7 +464,21 @@ async def main(demo_mode: bool = False):
     }
     handle_status = make_handler(_ctx)
 
-    server = await asyncio.start_server(handle_status, "0.0.0.0", STATUS_PORT)
+    try:
+        server = await asyncio.start_server(handle_status, "0.0.0.0", STATUS_PORT)
+    except OSError as e:
+        import errno as _errno
+        if e.errno == _errno.EADDRINUSE:
+            log.error(
+                f"Dashboard port {STATUS_PORT} is already in use — most likely another "
+                f"Pacefinder instance is still running, or another app has claimed the port. "
+                f"Find what's using it with 'lsof -i :{STATUS_PORT}' (macOS/Linux) or "
+                f"'netstat -ano | findstr :{STATUS_PORT}' (Windows) and stop it, or relaunch "
+                f"Pacefinder on a different port: 'python3 listener.py --port 8001'."
+            )
+        else:
+            log.error(f"Could not start the dashboard server on port {STATUS_PORT}: {e}")
+        raise SystemExit(1)
     log.info(f"Storage path: {storage_path()}")
     log.info(f"Dashboard at http://localhost:{STATUS_PORT}/")
     log.info(f"Setup     at http://localhost:{STATUS_PORT}/setup")
