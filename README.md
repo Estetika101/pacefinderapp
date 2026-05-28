@@ -41,17 +41,21 @@ Listens for both Forza Motorsport (2023) and Forza Horizon 5 — auto-detected b
 
 ## Install
 
+<!-- AVAILABILITY-SYNC:install-start -->
+
 Pacefinder ships through four channels — pick the one that matches your machine.
 
 | Platform | Channel | How |
 |---|---|---|
 | **macOS** | TestFlight (App Store beta) | Request access via [pacefinder.app](https://pacefinder.app#install). Apple emails an invite; install the **TestFlight** app from the App Store, accept the invite, click **Install**. Auto-updates. |
-| **Linux x64** | AppImage | [`Pacefinder-0.7.2-x86_64.AppImage`](https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.2/Pacefinder-0.7.2-x86_64.AppImage). `chmod +x` and run. |
-| **Linux ARM (Raspberry Pi)** | AppImage | [`Pacefinder-0.7.2-aarch64.AppImage`](https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.2/Pacefinder-0.7.2-aarch64.AppImage). Same `chmod +x` flow. Pi 4 / Pi 5 only — Pi 3 is 32-bit. |
-| **Docker** (any OS) | GHCR | `docker run -p 5300:5300/udp -p 8000:8000 -v $(pwd)/data:/data ghcr.io/estetika101/pacefinder:0.7.2` |
+| **Linux x64** | AppImage | [`Pacefinder-0.7.3-x86_64.AppImage`](https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.3/Pacefinder-0.7.3-x86_64.AppImage). `chmod +x` and run. |
+| **Linux ARM (Raspberry Pi)** | AppImage | [`Pacefinder-0.7.3-aarch64.AppImage`](https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.3/Pacefinder-0.7.3-aarch64.AppImage). Same `chmod +x` flow. Pi 4 / Pi 5 only — Pi 3 is 32-bit. |
+| **Docker** (any OS) | GHCR | `docker run -p 5300:5300/udp -p 8000:8000 -v $(pwd)/data:/data ghcr.io/estetika101/pacefinder:0.7.3` |
 | **All** (power-user) | `git clone` + Python | See **Quick Start** below. Used by the Pi systemd service and for development. |
 
 All channels resolve to the same listener — same UDP port, same dashboard at `http://localhost:8000`.
+
+<!-- AVAILABILITY-SYNC:install-end -->
 
 ---
 
@@ -61,7 +65,7 @@ All channels resolve to the same listener — same UDP port, same dashboard at `
 ```bash
 git clone https://github.com/Estetika101/pacefinderapp
 cd pacefinderapp
-pip install -r requirements.txt   # one dep: platformdirs
+python3 -m pip install -r requirements.txt   # one dep: platformdirs
 python3 listener.py
 ```
 
@@ -69,7 +73,7 @@ python3 listener.py
 ```
 git clone https://github.com/Estetika101/pacefinderapp
 cd pacefinderapp
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python listener.py
 ```
 Python 3.9+ required — download from [python.org/downloads](https://python.org/downloads). Check "Add Python to PATH" during install.
