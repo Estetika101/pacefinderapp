@@ -163,6 +163,107 @@ def make_handler(ctx: dict):
     build_analysis_prompt  = ctx["build_analysis_prompt"]
     clear_race_ended       = ctx["clear_race_ended"]
 
+    def _pace_watchlist(direction):
+        """(track, car) combos whose recent 3 sessions diverge from the prior 3.
+
+        direction='worse' → recent slower (the regression watchlist);
+        direction='better' → recent faster (the "what's working" wins).
+        delta_s is always reported as a positive magnitude. Shared by
+        /home/regression-watchlist and /home/improvement-watchlist.
+        See docs/specs/home-actionable-and-celebrate.md.
+        """
+        with db_lock:
+            conn = db_connect()
+            try:
+                sess_rows = [dict(r) for r in conn.execute(
+                    "SELECT session_id, track, car_ordinal, car_class, car_pi, "
+                    "started_at, best_lap_time_s "
+                    "FROM sessions "
+                    "WHERE track IS NOT NULL AND track != '' AND track != 'unknown' "
+                    "  AND car_ordinal IS NOT NULL "
+                    "  AND best_lap_time_s IS NOT NULL "
+                    "ORDER BY track, car_ordinal, started_at ASC"
+                ).fetchall()]
+            finally:
+                conn.close()
+
+        from collections import defaultdict
+        combos = defaultdict(list)
+        for s in sess_rows:
+            combos[(s["track"], s["car_ordinal"])].append(s)
+
+        candidates = []
+        for (track, car_ord), seqs in combos.items():
+            if len(seqs) < 6:
+                continue
+            recent = seqs[-3:]
+            prior  = seqs[-6:-3]
+            rmean = sum(x["best_lap_time_s"] for x in recent) / 3.0
+            pmean = sum(x["best_lap_time_s"] for x in prior)  / 3.0
+            delta = rmean - pmean  # +ve = slower (worse), -ve = faster (better)
+            # ≥0.2s OR ≥1% of the prior mean (whichever is bigger) — guards
+            # tracks with very short laps where tiny absolute deltas flag.
+            thresh = max(0.2, pmean * 0.01)
+            magnitude = delta if direction == "worse" else -delta
+            if magnitude < thresh:
+                continue
+            sparkline = [x["best_lap_time_s"] for x in seqs[-6:]]
+            car_pi    = next((x["car_pi"]    for x in reversed(seqs) if x["car_pi"]    is not None), None)
+            car_class = next((x["car_class"] for x in reversed(seqs) if x["car_class"] is not None), None)
+            candidates.append({
+                "track": track,
+                "car_ordinal": car_ord,
+                "car_pi": car_pi,
+                "car_class": car_class,
+                "delta_s": round(magnitude, 3),
+                "recent_mean_s": round(rmean, 3),
+                "prior_mean_s":  round(pmean, 3),
+                "sparkline": sparkline,
+                "last_session_id": seqs[-1]["session_id"],
+                "session_count": len(seqs),
+            })
+
+        # Biggest mover first; cap so Home doesn't bloat.
+        candidates.sort(key=lambda c: c["delta_s"], reverse=True)
+        candidates = candidates[:3]
+
+        # Enrich: car name from FORZA_CARS + the track's overall PB lap
+        # (any car) so the row outline matches the track shape.
+        if candidates:
+            tracks_needed = {c["track"] for c in candidates}
+            with db_lock:
+                conn = db_connect()
+                try:
+                    placeholders = ",".join("?" for _ in tracks_needed)
+                    track_pb = {}
+                    if tracks_needed:
+                        pb_rows = conn.execute(
+                            f"SELECT s.track, s.session_id, l.lap_number "
+                            f"FROM sessions s JOIN laps l ON l.session_id=s.session_id "
+                            f"WHERE s.track IN ({placeholders}) "
+                            f"  AND s.best_lap_time_s IS NOT NULL "
+                            f"  AND l.lap_time_s IS NOT NULL "
+                            f"  AND ABS(l.lap_time_s - s.best_lap_time_s) < 0.001 "
+                            f"ORDER BY s.best_lap_time_s ASC",
+                            tuple(tracks_needed)
+                        ).fetchall()
+                    for r in pb_rows:
+                        track_pb.setdefault(r["track"], {
+                            "session_id": r["session_id"],
+                            "lap_number": r["lap_number"],
+                        })
+                finally:
+                    conn.close()
+            for c in candidates:
+                info = FORZA_CARS.get(int(c["car_ordinal"])) or {}
+                c["car_name"]     = info.get("name")
+                c["car_year"]     = info.get("year")
+                c["car_nickname"] = db_get_car_nickname(int(c["car_ordinal"]))
+                pb = track_pb.get(c["track"]) or {}
+                c["pb_session_id"] = pb.get("session_id")
+                c["pb_lap_number"] = pb.get("lap_number")
+        return candidates
+
     async def handle_status(reader, writer):
         # Per-request perf state — populated once we know the path.
         _perf_token = None
@@ -312,6 +413,7 @@ def make_handler(ctx: dict):
                         last_sess = recents[0] if recents else None
                         pb_here = None
                         pb_here_sid = None
+                        pb_track_any = None
                         if last_sess and last_sess.get("track") and last_sess.get("car_ordinal") is not None:
                             r = conn.execute(
                                 "SELECT session_id, best_lap_time_s "
@@ -323,6 +425,18 @@ def make_handler(ctx: dict):
                             if r:
                                 pb_here = r["best_lap_time_s"]
                                 pb_here_sid = r["session_id"]
+                        # Track record (any car) at this circuit — lets the hero
+                        # grade an all-cars best (the bigger celebration) above a
+                        # mere car PB. See docs/specs/home-actionable-and-celebrate.md.
+                        if last_sess and last_sess.get("track"):
+                            tr = conn.execute(
+                                "SELECT MIN(best_lap_time_s) AS pb "
+                                "FROM sessions "
+                                "WHERE track=? AND best_lap_time_s IS NOT NULL",
+                                (last_sess["track"],)
+                            ).fetchone()
+                            if tr:
+                                pb_track_any = tr["pb"]
                         if last_sess:
                             blr = conn.execute(
                                 "SELECT lap_number FROM laps "
@@ -390,6 +504,7 @@ def make_handler(ctx: dict):
                     "status": state.get("status") if isinstance(state, dict) else "idle",
                     "last_session": dict(last_sess) if last_sess else None,
                     "pb_at_track_s": pb_here,
+                    "pb_at_track_any_car_s": pb_track_any,
                     "top_circuits": circuits,
                     "top_cars": top_cars,
                     "recent_sessions": recents,
@@ -496,107 +611,19 @@ def make_handler(ctx: dict):
                                             json.dumps(worst).encode()))
 
             elif path == "/home/regression-watchlist":
-                # Surfaces (track, car) combos where the user's recent 3
-                # sessions are SLOWER than the prior 3 — i.e. they're
-                # getting worse. This is the page's "what should I work
-                # on?" answer; see docs/specs/home-regression-watchlist.md
-                # (brainstorm). Cheap: one SELECT + Python aggregation.
-                with db_lock:
-                    conn = db_connect()
-                    try:
-                        sess_rows = [dict(r) for r in conn.execute(
-                            "SELECT session_id, track, car_ordinal, car_class, car_pi, "
-                            "started_at, best_lap_time_s "
-                            "FROM sessions "
-                            "WHERE track IS NOT NULL AND track != '' AND track != 'unknown' "
-                            "  AND car_ordinal IS NOT NULL "
-                            "  AND best_lap_time_s IS NOT NULL "
-                            "ORDER BY track, car_ordinal, started_at ASC"
-                        ).fetchall()]
-                    finally:
-                        conn.close()
-
-                # Group by (track, car_ordinal), chronological
-                from collections import defaultdict
-                combos = defaultdict(list)
-                for s in sess_rows:
-                    combos[(s["track"], s["car_ordinal"])].append(s)
-
-                candidates = []
-                for (track, car_ord), seqs in combos.items():
-                    if len(seqs) < 6:
-                        continue
-                    recent = seqs[-3:]
-                    prior  = seqs[-6:-3]
-                    rmean = sum(x["best_lap_time_s"] for x in recent) / 3.0
-                    pmean = sum(x["best_lap_time_s"] for x in prior)  / 3.0
-                    delta = rmean - pmean
-                    # Slower by ≥0.2s OR ≥1% of the prior mean (whichever
-                    # is bigger) — guards against tracks with very short
-                    # laps where small absolute deltas would still flag.
-                    thresh = max(0.2, pmean * 0.01)
-                    if delta < thresh:
-                        continue
-                    # Last 6 best laps for the row sparkline (chronological)
-                    sparkline = [x["best_lap_time_s"] for x in seqs[-6:]]
-                    car_pi    = next((x["car_pi"]    for x in reversed(seqs) if x["car_pi"]    is not None), None)
-                    car_class = next((x["car_class"] for x in reversed(seqs) if x["car_class"] is not None), None)
-                    candidates.append({
-                        "track": track,
-                        "car_ordinal": car_ord,
-                        "car_pi": car_pi,
-                        "car_class": car_class,
-                        "delta_s": round(delta, 3),
-                        "recent_mean_s": round(rmean, 3),
-                        "prior_mean_s":  round(pmean, 3),
-                        "sparkline": sparkline,
-                        "last_session_id": seqs[-1]["session_id"],
-                        "session_count": len(seqs),
-                    })
-
-                # Worst regression first; cap so Home doesn't bloat.
-                candidates.sort(key=lambda c: c["delta_s"], reverse=True)
-                candidates = candidates[:3]
-
-                # Enrich: car name from FORZA_CARS + the track's overall PB
-                # lap (any car) so the row outline matches the track shape.
-                if candidates:
-                    tracks_needed = {c["track"] for c in candidates}
-                    with db_lock:
-                        conn = db_connect()
-                        try:
-                            placeholders = ",".join("?" for _ in tracks_needed)
-                            track_pb = {}
-                            if tracks_needed:
-                                pb_rows = conn.execute(
-                                    f"SELECT s.track, s.session_id, l.lap_number "
-                                    f"FROM sessions s JOIN laps l ON l.session_id=s.session_id "
-                                    f"WHERE s.track IN ({placeholders}) "
-                                    f"  AND s.best_lap_time_s IS NOT NULL "
-                                    f"  AND l.lap_time_s IS NOT NULL "
-                                    f"  AND ABS(l.lap_time_s - s.best_lap_time_s) < 0.001 "
-                                    f"ORDER BY s.best_lap_time_s ASC",
-                                    tuple(tracks_needed)
-                                ).fetchall()
-                            # Keep the FIRST row per track (= the overall PB)
-                            for r in pb_rows:
-                                track_pb.setdefault(r["track"], {
-                                    "session_id": r["session_id"],
-                                    "lap_number": r["lap_number"],
-                                })
-                        finally:
-                            conn.close()
-                    for c in candidates:
-                        info = FORZA_CARS.get(int(c["car_ordinal"])) or {}
-                        c["car_name"]     = info.get("name")
-                        c["car_year"]     = info.get("year")
-                        c["car_nickname"] = db_get_car_nickname(int(c["car_ordinal"]))
-                        pb = track_pb.get(c["track"]) or {}
-                        c["pb_session_id"] = pb.get("session_id")
-                        c["pb_lap_number"] = pb.get("lap_number")
-
+                # (track, car) combos where the recent 3 sessions are SLOWER
+                # than the prior 3 — the "what should I work on?" answer.
+                # See docs/specs/home-regression-watchlist.md (brainstorm).
                 writer.write(_http_response("200 OK", "application/json",
-                                            json.dumps(candidates).encode()))
+                                            json.dumps(_pace_watchlist("worse")).encode()))
+
+            elif path == "/home/improvement-watchlist":
+                # Mirror of the regression watchlist: (track, car) combos
+                # where the recent 3 sessions are FASTER than the prior 3 —
+                # the "what's working" wins. See
+                # docs/specs/home-actionable-and-celebrate.md §2.
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(_pace_watchlist("better")).encode()))
 
             elif path == "/setup":
                 writer.write(_http_response("200 OK", "text/html", SETUP_HTML.encode()))

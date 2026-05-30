@@ -92,9 +92,12 @@ let _all = [];
 let _tix = new Map();          // track name → {best_lap_time_s, spark_laps, trend}
 let _openF = null;             // which facet dropdown panel is open
 // Multi-select: each facet is an array of string values; [] = no filter.
-const F = {car:[], track:[], cond:[], type:[], review:false};
-const SORT_KEYS = ['date','track','car','lap'];
-function defaultDir(k){ return k==='date' ? 'desc' : 'asc'; }
+const F = {car:[], track:[], cond:[], type:[], review:false, podium:false};
+// 'finish' and 'gained' are URL-only sorts (no column header) used by the
+// Home results deep-links; 'podium' is a URL-only filter. See
+// docs/specs/home-actionable-and-celebrate.md §4.
+const SORT_KEYS = ['date','track','car','lap','finish','gained'];
+function defaultDir(k){ return (k==='date' || k==='gained') ? 'desc' : 'asc'; }
 let SORT = {key:'date', dir:'desc'};
 
 // Mirror of db/store.py _NEEDS_REVIEW_SQL — keep the two in sync.
@@ -111,15 +114,22 @@ function needsReview(s){
 
 function sortRows(rows){
   const k = SORT.key, mul = SORT.dir === 'asc' ? 1 : -1;
+  const NUM = (k==='lap' || k==='finish' || k==='gained');
   const val = s =>
     k==='date'  ? (s.started_at || '') :
     k==='track' ? (s.track || '').toLowerCase() :
     k==='car'   ? carName(s).toLowerCase() :
-                  (s.best_lap_time_s == null ? Infinity : s.best_lap_time_s);
+    k==='finish'? (s.finish_pos == null ? null : s.finish_pos) :
+    k==='gained'? ((s.grid_pos == null || s.finish_pos == null) ? null : (s.grid_pos - s.finish_pos)) :
+                  (s.best_lap_time_s == null ? null : s.best_lap_time_s);
   return rows.slice().sort((a,b)=>{
     const x = val(a), y = val(b);
-    if(k==='lap'){ if(x===Infinity && y!==Infinity) return 1;
-                   if(y===Infinity && x!==Infinity) return -1; }
+    // Numeric sorts push missing values to the end, regardless of dir.
+    if(NUM){
+      if(x == null && y == null) return 0;
+      if(x == null) return 1;
+      if(y == null) return -1;
+    }
     return x < y ? -1*mul : x > y ? 1*mul : 0;
   });
 }
@@ -129,6 +139,7 @@ function readURL(){
   const q = new URLSearchParams(location.search);
   FACETS.forEach(g => { const v=q.get(g); F[g] = v ? v.split(',').filter(Boolean) : []; });
   F.review = q.get('review') === '1' ? '1' : false;
+  F.podium = q.get('podium') === '1' ? '1' : false;
   const k = q.get('sort');
   SORT.key = SORT_KEYS.indexOf(k) >= 0 ? k : 'date';
   SORT.dir = (q.get('dir') === 'asc' || q.get('dir') === 'desc')
@@ -140,6 +151,7 @@ function writeURL(){
   const q = new URLSearchParams();
   FACETS.forEach(g => { if(F[g].length) q.set(g, F[g].join(',')); });
   if(F.review) q.set('review', '1');
+  if(F.podium) q.set('podium', '1');
   if(SORT.key !== 'date' || SORT.dir !== 'desc'){ q.set('sort', SORT.key); q.set('dir', SORT.dir); }
   if(PAGE > 1) q.set('page', PAGE);
   const s = q.toString();
@@ -161,9 +173,10 @@ function match(s){
     if(F[g].length && F[g].indexOf(String(facetVal(s,g))) < 0) return false;
   }
   if(F.review && !needsReview(s)) return false;
+  if(F.podium && !(s.finish_pos != null && s.finish_pos <= 3)) return false;
   return true;
 }
-function anyFilter(){ return F.review || FACETS.some(g => F[g].length); }
+function anyFilter(){ return F.review || F.podium || FACETS.some(g => F[g].length); }
 
 function uniq(getKey, getLabel){
   const m = new Map();
@@ -441,7 +454,7 @@ document.addEventListener('click', e=>{
     return;
   }
   if(e.target.closest('.fclear-all')){
-    FACETS.forEach(g=>F[g]=[]); F.review=false; _openF=null;
+    FACETS.forEach(g=>F[g]=[]); F.review=false; F.podium=false; _openF=null;
     resetPage(); writeURL(); render(); return; }
   const fd = e.target.closest('.fdrop-btn');
   if(fd){ _openF = (_openF===fd.dataset.fd) ? null : fd.dataset.fd; render(); return; }

@@ -53,50 +53,62 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     <a class="hl-cta primary" href="/dashboard">Open live dashboard &rarr;</a>
   </div>
 
-  <!-- Regression watchlist — (track, car) combos where the user's recent
-       3 sessions are slower than the prior 3. The "what should I work
-       on?" answer. Hidden when nothing's regressing — no "all good"
-       confetti. See /home/regression-watchlist. -->
-  <div class="watchlist" id="watchlist" style="display:none">
-    <div class="watchlist-head">
-      <h2>Where you're slipping</h2>
-      <span class="watchlist-sub">Recent sessions slower than your usual pace</span>
+  <!-- Ways to get sharper — opportunities (where time is leaking) paired
+       with wins (what's already improving). Positive reframe of the old
+       "where you're slipping" + "biggest leak". The whole section, and
+       each column, hides when it has nothing to show — no "all good"
+       confetti. See docs/specs/home-actionable-and-celebrate.md §2. -->
+  <section class="sharper" id="sharper" style="display:none">
+    <div class="sharper-head">
+      <h2>Ways to get sharper</h2>
+      <span class="sharper-sub">Where your time is going &mdash; and what's already working</span>
     </div>
-    <div class="watchlist-grid" id="watchlist-grid"></div>
-  </div>
-
-  <!-- Worst sector card — single biggest leak surfaced from the
-       theoretical-best aggregate across all sessions at a track.
-       Hidden when nothing exceeds the 0.3s threshold. See
-       /home/worst-sector. -->
-  <a class="leak-card" id="leak-card" href="#" style="display:none">
-    <div class="leak-outline track-outline" id="leak-outline"></div>
-    <div class="leak-body">
-      <div class="leak-eyebrow">Your biggest leak</div>
-      <div class="leak-title">
-        S<span id="leak-sector">—</span> at <span id="leak-track">—</span>
+    <div class="sharper-cols">
+      <!-- Opportunities: regression watchlist + the single biggest sector
+           leak. Recent 3 sessions slower than the prior 3, and the worst
+           sector vs theoretical. See /home/regression-watchlist and
+           /home/worst-sector. -->
+      <div class="sharper-col" id="opps-col" style="display:none">
+        <h3 class="sharper-col-h opp">Where the time is</h3>
+        <div class="watchlist-grid" id="watchlist-grid"></div>
+        <a class="leak-card" id="leak-card" href="#" style="display:none">
+          <div class="leak-outline track-outline" id="leak-outline"></div>
+          <div class="leak-body">
+            <div class="leak-eyebrow">Your biggest leak</div>
+            <div class="leak-title">
+              S<span id="leak-sector">&mdash;</span> at <span id="leak-track">&mdash;</span>
+            </div>
+            <div class="leak-stats">
+              <span class="leak-gap" id="leak-gap">+&mdash;</span>
+              <span class="leak-sub" id="leak-sub">on average across &mdash; sessions</span>
+            </div>
+          </div>
+          <div class="leak-arrow">&rarr;</div>
+        </a>
       </div>
-      <div class="leak-stats">
-        <span class="leak-gap" id="leak-gap">+—</span>
-        <span class="leak-sub" id="leak-sub">on average across — sessions</span>
+      <!-- Wins: recent 3 sessions faster than the prior 3 — the same
+           comparison as the watchlist, inverted. See
+           /home/improvement-watchlist. -->
+      <div class="sharper-col" id="wins-col" style="display:none">
+        <h3 class="sharper-col-h win">What's working</h3>
+        <div class="wins-grid" id="wins-grid"></div>
       </div>
     </div>
-    <div class="leak-arrow">→</div>
-  </a>
+  </section>
 
   <!-- Career stats (improvement-first; results gated; see docs/specs/home-stats.md) -->
   <div class="career-strip" id="career-strip" style="display:none">
     <div class="cs-stats">
-      <div class="cs-cell"><span class="cs-v muted" id="cs-total">&mdash;</span><span class="cs-l">Sessions</span></div>
-      <div class="cs-cell"><span class="cs-v muted" id="cs-laps">&mdash;</span><span class="cs-l">Laps</span></div>
-      <div class="cs-cell"><span class="cs-v muted" id="cs-circuits">&mdash;</span><span class="cs-l">Circuits</span></div>
-      <div class="cs-cell"><span class="cs-v muted" id="cs-cars">&mdash;</span><span class="cs-l">Cars</span></div>
-      <div class="cs-cell cs-trend-tally" id="cs-trend-tally" style="display:none">
+      <a class="cs-cell" href="/sessions"><span class="cs-v muted" id="cs-total">&mdash;</span><span class="cs-l">Sessions</span></a>
+      <a class="cs-cell" href="/sessions"><span class="cs-v muted" id="cs-laps">&mdash;</span><span class="cs-l">Laps</span></a>
+      <a class="cs-cell" href="/circuits"><span class="cs-v muted" id="cs-circuits">&mdash;</span><span class="cs-l">Circuits</span></a>
+      <a class="cs-cell" href="/cars"><span class="cs-v muted" id="cs-cars">&mdash;</span><span class="cs-l">Cars</span></a>
+      <a class="cs-cell cs-trend-tally" id="cs-trend-tally" href="/circuits" style="display:none">
         <span class="cs-v"><span class="t-up" id="cs-t-up">&mdash;</span>
           <span class="t-dn" id="cs-t-dn">&mdash;</span>
           <span class="t-fl" id="cs-t-fl">&mdash;</span></span>
         <span class="cs-l">Circuit progression</span>
-      </div>
+      </a>
     </div>
     <a class="cs-form" id="cs-form-link" href="/sessions?type=race,race_ai,race_online" title="See the races behind this trend">
       <span class="cs-trend fl" id="cs-trend">&mdash;</span>
@@ -104,11 +116,14 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     </a>
   </div>
 
-  <!-- Results tier — hidden unless there are real races (spec gate) -->
+  <!-- Results tier — hidden unless there are real races (spec gate).
+       Each stat deep-links to the races that back it: avg finish → races
+       by finishing position, pos gained → best comebacks, podium → just
+       the podiums. See docs/specs/home-actionable-and-celebrate.md §4. -->
   <div class="career-results" id="career-results" style="display:none">
-    <div class="cs-cell"><span class="cs-v blue" id="cs-finish">&mdash;</span><span class="cs-l">Avg Finish</span></div>
-    <div class="cs-cell"><span class="cs-v" id="cs-gained">&mdash;</span><span class="cs-l">Pos Gained</span></div>
-    <div class="cs-cell"><span class="cs-v green" id="cs-podium">&mdash;</span><span class="cs-l">Podium</span></div>
+    <a class="cs-cell" href="/sessions?type=race,race_ai,race_online&amp;sort=finish&amp;dir=asc" title="Races by finishing position"><span class="cs-v blue" id="cs-finish">&mdash;</span><span class="cs-l">Avg Finish</span></a>
+    <a class="cs-cell" href="/sessions?type=race,race_ai,race_online&amp;sort=gained&amp;dir=desc" title="Your best comebacks"><span class="cs-v" id="cs-gained">&mdash;</span><span class="cs-l">Pos Gained</span></a>
+    <a class="cs-cell" href="/sessions?type=race,race_ai,race_online&amp;podium=1" title="Your podium finishes"><span class="cs-v green" id="cs-podium">&mdash;</span><span class="cs-l">Podium</span></a>
     <span class="cs-results-sample" id="cs-results-sample"></span>
   </div>
 

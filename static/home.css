@@ -94,23 +94,38 @@ a{color:inherit;text-decoration:none}
   .leak-arrow{display:none}
 }
 
-/* ── Regression watchlist — "where you're slipping" ─────────────── */
-.watchlist{margin:var(--space-4) 0}
-.watchlist-head{
+/* ── Ways to get sharper — opportunities + wins side by side ─────── */
+.sharper{margin:var(--space-4) 0}
+.sharper-head{
   display:flex;align-items:baseline;justify-content:space-between;
   margin-bottom:var(--space-3);gap:var(--space-3);flex-wrap:wrap;
 }
-.watchlist-head h2{
+.sharper-head h2{
   font-size:var(--text-sm);font-weight:500;
   color:var(--color-text-tertiary);
   text-transform:uppercase;letter-spacing:0.08em;margin:0;
 }
-.watchlist-sub{font-size:11px;color:var(--color-text-quaternary)}
-.watchlist-grid{
-  display:grid;grid-template-columns:repeat(3,1fr);
-  gap:var(--space-3);
+.sharper-sub{font-size:11px;color:var(--color-text-quaternary)}
+.sharper-cols{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:var(--space-4);align-items:start;
 }
-@media(max-width:900px){.watchlist-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.sharper-cols{grid-template-columns:1fr}}
+.sharper-col{display:flex;flex-direction:column;gap:var(--space-3);min-width:0}
+.sharper-col-h{
+  margin:0;font-size:11px;font-weight:600;letter-spacing:0.06em;
+  text-transform:uppercase;color:var(--color-text-tertiary);
+  display:flex;align-items:center;gap:7px;
+}
+.sharper-col-h::before{
+  content:"";width:8px;height:8px;border-radius:2px;display:inline-block;
+}
+.sharper-col-h.opp::before{background:var(--color-red,#ef4444)}
+.sharper-col-h.win::before{background:var(--color-green,#22c55e)}
+.watchlist-grid,.wins-grid{display:flex;flex-direction:column;gap:var(--space-3)}
+/* Inside a half-width column the leak card uses the column gap, not its
+   own vertical margin, so it lines up with the watchlist cards. */
+.sharper .leak-card{margin:0}
 .wl-card{
   display:grid;grid-template-columns:80px 1fr auto;
   gap:var(--space-3);align-items:center;
@@ -145,6 +160,11 @@ a{color:inherit;text-decoration:none}
 }
 .wl-arrow{color:var(--color-text-quaternary);font-size:18px;align-self:center}
 .wl-card:hover .wl-arrow{color:var(--color-text-primary)}
+/* Win variant — recent pace faster than earlier. Green where the slip
+   card is red. */
+.wl-win{border-left-color:var(--color-green,#22c55e)}
+.wl-win:hover{border-color:var(--color-green,#22c55e)}
+.wl-win .wl-delta{color:var(--color-green,#22c55e)}
 
 /* ── Last-session hero (the page's lede) ────────────────────────── */
 .hero-last{
@@ -223,6 +243,24 @@ a{color:inherit;text-decoration:none}
   .hl-actions{flex-direction:row;flex-wrap:wrap}
   .hl-cta{flex:1;min-width:160px}
 }
+/* PB celebration — two tiers. A car PB here greens the time + border; a
+   track record (any car) escalates to the accent colour with a glow and
+   a one-shot pop. Neutral otherwise, so the celebration carries weight.
+   See docs/specs/home-actionable-and-celebrate.md §1. */
+.hero-last.pb{border-color:var(--color-green,#22c55e)}
+.hero-last.pb .hl-laptime{color:var(--color-green,#22c55e)}
+.hero-last.pb-track{
+  border-color:var(--color-accent);
+  box-shadow:0 0 0 1px var(--color-accent), 0 0 28px -8px var(--color-accent);
+}
+.hero-last.pb-track .hl-laptime{color:var(--color-accent)}
+.hero-last.pb .hl-laptime{
+  transform-origin:left center;
+  animation:pbPop .5s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes pbPop{0%{transform:scale(.94);opacity:.5}100%{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.hero-last.pb .hl-laptime{animation:none}}
+
 /* Empty state — no sessions on record yet */
 .hero-empty{
   padding:var(--space-6);margin:var(--space-4) 0;
@@ -249,6 +287,13 @@ a{color:inherit;text-decoration:none}
 }
 .cs-stats{display:flex;gap:var(--space-6);flex:1;flex-wrap:wrap}
 .cs-cell{display:flex;flex-direction:column;gap:3px;min-width:60px}
+/* Career counts + results stats are links into their detail pages. */
+a.cs-cell{
+  text-decoration:none;color:inherit;border-radius:6px;
+  padding:4px 8px;margin:-4px -8px;
+  transition:background-color .12s ease;
+}
+a.cs-cell:hover{background:var(--color-surface-2)}
 .cs-v{font-size:var(--text-lg);font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
 .cs-v.blue{color:var(--color-blue)}
 .cs-v.green{color:var(--color-green)}
