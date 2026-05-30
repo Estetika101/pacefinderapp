@@ -49,9 +49,10 @@ async function init(){
   try{d = await fetch('/home/data').then(r => r.json());}
   catch(e){ return; }  // nav.js owns the live status pill
   _tf = d.time_format || '24h';
-  renderHeroLast(d.last_session, d.pb_at_track_s, d.stats);
+  renderHeroLast(d.last_session, d.pb_at_track_s, d.pb_at_track_any_car_s, d.stats);
   loadWatchlist();
   loadWorstSector();
+  loadWins();
   loadCareer();
   renderTopCircuits(d.top_circuits || []);
   renderTopCars(d.top_cars || []);
@@ -61,7 +62,7 @@ async function init(){
 // Hero card at the top of Home — answers "what happened while I was
 // away?" and surfaces the single best CTA: jump into the trace you
 // just drove. Replaces the throat-clearing "Welcome back" strip.
-function renderHeroLast(last, pbAtTrack, stats){
+function renderHeroLast(last, pbAtTrack, pbAtTrackAny, stats){
   const hero = document.getElementById('hero-last');
   const empty = document.getElementById('hero-empty');
   if(!last || !last.session_id){
@@ -97,27 +98,33 @@ function renderHeroLast(last, pbAtTrack, stats){
   const cb = document.getElementById('hl-class-badge');
   if(cc){ cb.textContent = cc; cb.style.display = ''; }
   else { cb.style.display = 'none'; }
-  // Big lap time + ± vs the same car at this circuit
+  // Big lap time + PB grading. Two celebratory tiers: a track record
+  // (best ever here, any car) outranks a car PB here. Both light up the
+  // hero; anything slower stays neutral so the celebration means
+  // something. See docs/specs/home-actionable-and-celebrate.md §1.
   document.getElementById('hl-laptime').textContent = fmtLap(last.best_lap_time_s);
   const deltaEl = document.getElementById('hl-delta');
-  if(last.best_lap_time_s != null && pbAtTrack != null){
-    const d = last.best_lap_time_s - pbAtTrack;
-    if(Math.abs(d) < 0.005){
-      deltaEl.textContent = '= car PB here';
-      deltaEl.className = 'hl-delta same';
-    } else if(d < 0){
-      // New PB. The trophy framing matches the session-detail hero.
-      deltaEl.textContent = '★ New PB in this car here';
-      deltaEl.className = 'hl-delta gain';
-    } else {
-      deltaEl.textContent = '+' + d.toFixed(2) + 's vs your PB here';
-      deltaEl.className = 'hl-delta lost';
-    }
-  } else if(last.best_lap_time_s != null){
-    deltaEl.textContent = 'First session in this car here';
-    deltaEl.className = 'hl-delta';
-  } else {
+  const lap = last.best_lap_time_s;
+  const isTrackPB = lap != null && pbAtTrackAny != null && lap <= pbAtTrackAny + 0.005;
+  const isCarPB   = lap != null && pbAtTrack    != null && lap <= pbAtTrack    + 0.005;
+  const heroIsPB  = isTrackPB || isCarPB;
+  hero.classList.remove('pb', 'pb-track');
+  if(lap == null){
     deltaEl.textContent = 'No valid lap';
+    deltaEl.className = 'hl-delta';
+  } else if(isTrackPB){
+    deltaEl.textContent = '★ Track record here';
+    deltaEl.className = 'hl-delta gain';
+    hero.classList.add('pb', 'pb-track');
+  } else if(isCarPB){
+    deltaEl.textContent = '★ Car PB here';
+    deltaEl.className = 'hl-delta gain';
+    hero.classList.add('pb');
+  } else if(pbAtTrack != null){
+    deltaEl.textContent = '+' + (lap - pbAtTrack).toFixed(2) + 's vs your PB here';
+    deltaEl.className = 'hl-delta lost';
+  } else {
+    deltaEl.textContent = 'First session in this car here';
     deltaEl.className = 'hl-delta';
   }
   // Meta line: when + conditions
@@ -126,9 +133,14 @@ function renderHeroLast(last, pbAtTrack, stats){
   if(last.tyre_compound)     bits.push(last.tyre_compound);
   if(last.track_temp_c != null) bits.push(Math.round(last.track_temp_c) + '°C');
   document.getElementById('hl-meta').textContent = bits.join(' · ');
-  // CTAs
+  // CTAs — mood-driven primary. After a PB the natural next move is to
+  // savour the lap; otherwise it's to go hunt the time you left out
+  // there. Telemetry serves both (delta-vs-reference is where lost time
+  // shows up); only the framing changes.
   const sidQ = '?id=' + encodeURIComponent(last.session_id);
-  document.getElementById('hl-cta-telemetry').href = '/sessions/telemetry' + sidQ;
+  const primary = document.getElementById('hl-cta-telemetry');
+  primary.href = '/sessions/telemetry' + sidQ;
+  primary.textContent = heroIsPB ? 'Relive this lap →' : 'See where you lost time →';
   document.getElementById('hl-cta-session').href = '/sessions/session' + sidQ;
   // Kick the lazy outline loader now that the data-* are set.
   if(window.pfLoadMinis) window.pfLoadMinis(hero);
@@ -198,43 +210,66 @@ function renderRecent(recents){
   }).join('');
 }
 
-// ── Regression watchlist ─────────────────────────────────────────
-// "Where you're slipping" — async because it shouldn't block the
-// initial paint. Hides the whole section when nothing's regressing
-// (no fake "all good" card; that's gamification, not coaching).
+// ── Ways to get sharper ──────────────────────────────────────────
+// Opportunities (slipping + leak) paired with wins. Each loader is
+// async so it can't block the initial paint, and reveals its column +
+// the section only when it has real content — no fake "all good" card.
+function revealSharper(colId){
+  document.getElementById('sharper').style.display = '';
+  if(colId){ document.getElementById(colId).style.display = ''; }
+}
+// Renders the slipping/winning card markup shared by both columns.
+// `tone` is 'slip' (slower, red) or 'win' (faster, green).
+function paceCard(r, tone){
+  const carName = r.car_nickname || r.car_name || ('Car #' + r.car_ordinal);
+  const cc = pfCarClass(r.car_pi, r.car_class);
+  const cls = cc ? `<span class="class-badge">${cc}</span>` : '';
+  const outAttr = (r.pb_session_id && r.pb_lap_number != null)
+    ? ` data-sid="${escapeHtml(r.pb_session_id)}" data-lap="${r.pb_lap_number}"` : '';
+  const href = '/sessions/telemetry?id=' + encodeURIComponent(r.last_session_id);
+  const delta = tone === 'win'
+    ? `−${r.delta_s.toFixed(2)}s vs your earlier pace`
+    : `+${r.delta_s.toFixed(2)}s vs your earlier pace`;
+  return `<a href="${href}" class="wl-card wl-${tone}">
+    <div class="wl-outline track-outline"${outAttr}></div>
+    <div class="wl-body">
+      <div class="wl-name">${escapeHtml(r.track)}</div>
+      <div class="wl-meta">${escapeHtml(carName)} ${cls}</div>
+      ${renderSpark(r.sparkline, tone)}
+      <div class="wl-delta">${delta}</div>
+    </div>
+    <div class="wl-arrow">→</div>
+  </a>`;
+}
 async function loadWatchlist(){
   let rows;
   try{ rows = await fetch('/home/regression-watchlist').then(r => r.json()); }
   catch(e){ return; }
   if(!Array.isArray(rows) || rows.length === 0) return;
-  const wrap = document.getElementById('watchlist');
   const grid = document.getElementById('watchlist-grid');
-  grid.innerHTML = rows.map(r => {
-    const carDisplay = r.car_nickname || r.car_name || ('Car #' + r.car_ordinal);
-    const cc = pfCarClass(r.car_pi, r.car_class);
-    const cls = cc ? `<span class="class-badge">${cc}</span>` : '';
-    const outAttr = (r.pb_session_id && r.pb_lap_number != null)
-      ? ` data-sid="${escapeHtml(r.pb_session_id)}" data-lap="${r.pb_lap_number}"` : '';
-    const href = '/sessions/telemetry?id=' + encodeURIComponent(r.last_session_id);
-    return `<a href="${href}" class="wl-card">
-      <div class="wl-outline track-outline"${outAttr}></div>
-      <div class="wl-body">
-        <div class="wl-name">${escapeHtml(r.track)}</div>
-        <div class="wl-meta">${escapeHtml(carDisplay)} ${cls}</div>
-        ${renderSpark(r.sparkline)}
-        <div class="wl-delta">+${r.delta_s.toFixed(2)}s vs your earlier pace</div>
-      </div>
-      <div class="wl-arrow">→</div>
-    </a>`;
-  }).join('');
-  wrap.style.display = '';
+  grid.innerHTML = rows.map(r => paceCard(r, 'slip')).join('');
+  revealSharper('opps-col');
   if(window.pfLoadMinis) window.pfLoadMinis(grid);
 }
-// Compact red sparkline of last 6 best-lap times. Y inverted (lower
-// = faster = up), so a downward slope = improving, upward = the
-// regression we're flagging.
-function renderSpark(vals){
+// "What's working" — the regression query inverted (recent 3 faster
+// than the prior 3). Same gating: hidden when nothing's improving.
+async function loadWins(){
+  let rows;
+  try{ rows = await fetch('/home/improvement-watchlist').then(r => r.json()); }
+  catch(e){ return; }
+  if(!Array.isArray(rows) || rows.length === 0) return;
+  const grid = document.getElementById('wins-grid');
+  grid.innerHTML = rows.map(r => paceCard(r, 'win')).join('');
+  revealSharper('wins-col');
+  if(window.pfLoadMinis) window.pfLoadMinis(grid);
+}
+// Compact sparkline of last 6 best-lap times. Y inverted (lower =
+// faster = up), so a downward slope = improving, upward = the
+// regression we're flagging. Coloured by tone: red for slips, green
+// for wins.
+function renderSpark(vals, tone){
   if(!vals || vals.length < 2) return '<div class="wl-spark-empty"></div>';
+  const col = tone === 'win' ? 'var(--color-green,#22c55e)' : 'var(--color-red,#ef4444)';
   const w = 100, h = 26;
   const mn = Math.min(...vals), mx = Math.max(...vals);
   const rng = Math.max(mx - mn, 0.1);
@@ -244,8 +279,8 @@ function renderSpark(vals){
   const lastX = xs[xs.length - 1].toFixed(1);
   const lastY = ys[ys.length - 1].toFixed(1);
   return `<svg class="wl-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-    <polyline points="${pts}" fill="none" stroke="var(--color-red,#ef4444)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>
-    <circle cx="${lastX}" cy="${lastY}" r="2.4" fill="var(--color-red,#ef4444)"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>
+    <circle cx="${lastX}" cy="${lastY}" r="2.4" fill="${col}"/>
   </svg>`;
 }
 
@@ -277,6 +312,7 @@ async function loadWorstSector(){
   // driver's — the leak is across all of them.
   card.href = '/sessions/track?name=' + encodeURIComponent(w.track);
   card.style.display = '';
+  revealSharper('opps-col');
   if(window.pfLoadMinis) window.pfLoadMinis(card);
 }
 
