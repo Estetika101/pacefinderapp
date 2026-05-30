@@ -501,16 +501,27 @@ function paintCursor(xFrac, mouseEvent){
     lines.push(`@${(pos*100).toFixed(1)}%`);
   }
   if(_cursorLocked) lines.push('🔒 locked — Esc to release');
-  tip.textContent=lines.join('\\n');
+  tip.textContent=lines.join('\n');
   updateHud(pos);
+  // Show first so offsetWidth/Height reflect the real rendered size — the
+  // edge-clamp below relies on actual dimensions, not a fixed guess.
+  tip.style.display='block';
   if(mouseEvent){
-    tip.style.left=Math.min(mouseEvent.clientX+14,window.innerWidth-180)+'px';
-    tip.style.top=Math.max(8,mouseEvent.clientY-tip.offsetHeight-8)+'px';
+    const tipW=tip.offsetWidth, tipH=tip.offsetHeight, M=8;
+    // Prefer right of the cursor; flip to its left when the tip would
+    // spill past the viewport's right edge, then clamp to stay on-screen.
+    let left=mouseEvent.clientX+14;
+    if(left+tipW>window.innerWidth-M) left=mouseEvent.clientX-14-tipW;
+    left=Math.max(M,Math.min(left,window.innerWidth-tipW-M));
+    // Prefer above the cursor; drop below when there isn't room up top.
+    let top=mouseEvent.clientY-tipH-M;
+    if(top<M) top=mouseEvent.clientY+18;
+    top=Math.max(M,Math.min(top,window.innerHeight-tipH-M));
+    tip.style.left=left+'px'; tip.style.top=top+'px';
     _cursorTipX=tip.style.left; _cursorTipY=tip.style.top;
   } else if(_cursorTipX!=null){
     tip.style.left=_cursorTipX; tip.style.top=_cursorTipY;
   }
-  tip.style.display='block';
 }
 
 function lockCursorAt(xFrac, mouseEvent){
