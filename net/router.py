@@ -163,13 +163,14 @@ def make_handler(ctx: dict):
     build_analysis_prompt  = ctx["build_analysis_prompt"]
     clear_race_ended       = ctx["clear_race_ended"]
 
-    def _pace_watchlist(direction):
+    def _pace_watchlist(direction, min_sessions=6):
         """(track, car) combos whose recent 3 sessions diverge from the prior 3.
 
         direction='worse' → recent slower (the regression watchlist);
         direction='better' → recent faster (the "what's working" wins).
         delta_s is always reported as a positive magnitude. Shared by
-        /home/regression-watchlist and /home/improvement-watchlist.
+        /home/regression-watchlist, /home/improvement-watchlist and the
+        /home/tips engine (which lowers min_sessions to surface more).
         See docs/specs/home-actionable-and-celebrate.md.
         """
         with db_lock:
@@ -194,12 +195,16 @@ def make_handler(ctx: dict):
 
         candidates = []
         for (track, car_ord), seqs in combos.items():
-            if len(seqs) < 6:
+            if len(seqs) < min_sessions:
                 continue
             recent = seqs[-3:]
             prior  = seqs[-6:-3]
-            rmean = sum(x["best_lap_time_s"] for x in recent) / 3.0
-            pmean = sum(x["best_lap_time_s"] for x in prior)  / 3.0
+            if not prior:
+                continue
+            # Divide by the actual window sizes — with min_sessions < 6 the
+            # prior window can hold fewer than 3 sessions.
+            rmean = sum(x["best_lap_time_s"] for x in recent) / len(recent)
+            pmean = sum(x["best_lap_time_s"] for x in prior)  / len(prior)
             delta = rmean - pmean  # +ve = slower (worse), -ve = faster (better)
             # ≥0.2s OR ≥1% of the prior mean (whichever is bigger) — guards
             # tracks with very short laps where tiny absolute deltas flag.
@@ -263,6 +268,214 @@ def make_handler(ctx: dict):
                 c["pb_session_id"] = pb.get("session_id")
                 c["pb_lap_number"] = pb.get("lap_number")
         return candidates
+
+    def _track_pb_outlines(tracks):
+        """{track: {session_id, lap_number}} for each track's overall PB lap
+        (any car), so a tip card can render the matching mini outline."""
+        out = {}
+        tracks = [t for t in tracks if t]
+        if not tracks:
+            return out
+        with db_lock:
+            conn = db_connect()
+            try:
+                placeholders = ",".join("?" for _ in tracks)
+                rows = conn.execute(
+                    f"SELECT s.track, s.session_id, l.lap_number "
+                    f"FROM sessions s JOIN laps l ON l.session_id=s.session_id "
+                    f"WHERE s.track IN ({placeholders}) "
+                    f"  AND s.best_lap_time_s IS NOT NULL "
+                    f"  AND l.lap_time_s IS NOT NULL "
+                    f"  AND ABS(l.lap_time_s - s.best_lap_time_s) < 0.001 "
+                    f"ORDER BY s.best_lap_time_s ASC",
+                    tuple(tracks)
+                ).fetchall()
+            finally:
+                conn.close()
+        for r in rows:
+            out.setdefault(r["track"], {"session_id": r["session_id"],
+                                        "lap_number": r["lap_number"]})
+        return out
+
+    def _home_tips():
+        """Unified, ranked coaching tips for Home — up to 4 cards drawn from
+        several generators so the section reliably fills instead of showing
+        a lone leak. Deduped by track, biggest-time-at-stake first, with at
+        least one positive ("what's working") card kept when one exists.
+        See docs/specs/home-actionable-and-celebrate.md §2.
+        """
+        tips = []
+
+        def _car_label(ord_):
+            info = FORZA_CARS.get(int(ord_)) or {}
+            return (db_get_car_nickname(int(ord_)) or info.get("name")
+                    or ("Car #" + str(ord_)))
+
+        # 1 & 2 — pace regression (slip) and improvement (win). Lowered to
+        # ≥4 sessions so more combos qualify than the strict watchlists.
+        for c in _pace_watchlist("worse", min_sessions=4):
+            tips.append({
+                "kind": "slip", "tone": "slip", "track": c["track"],
+                "headline": c["track"], "car_label": _car_label(c["car_ordinal"]),
+                "car_pi": c.get("car_pi"), "car_class": c.get("car_class"),
+                "value": "+%.2fs" % c["delta_s"], "sub": "vs your earlier pace",
+                "sparkline": c.get("sparkline"),
+                "href": "/sessions/telemetry?id=" + str(c["last_session_id"]),
+                "pb_session_id": c.get("pb_session_id"),
+                "pb_lap_number": c.get("pb_lap_number"),
+                "score": c["delta_s"],
+            })
+        for c in _pace_watchlist("better", min_sessions=4):
+            tips.append({
+                "kind": "win", "tone": "win", "track": c["track"],
+                "headline": c["track"], "car_label": _car_label(c["car_ordinal"]),
+                "car_pi": c.get("car_pi"), "car_class": c.get("car_class"),
+                "value": "−%.2fs" % c["delta_s"], "sub": "vs your earlier pace",
+                "sparkline": c.get("sparkline"),
+                "href": "/sessions/telemetry?id=" + str(c["last_session_id"]),
+                "pb_session_id": c.get("pb_session_id"),
+                "pb_lap_number": c.get("pb_lap_number"),
+                "score": c["delta_s"],
+            })
+
+        # 3 — every sector leak (best sector vs theoretical), not just the
+        # single worst. 4 — gap to theoretical best per track. 5 — last run
+        # off your PB at a track. All track-level (no car).
+        with db_lock:
+            conn = db_connect()
+            try:
+                sector_rows = [dict(r) for r in conn.execute(
+                    "WITH session_best AS ( "
+                    "  SELECT s.track AS track, s.session_id AS session_id, "
+                    "         MIN(l.s1_time_s) AS bs1, MIN(l.s2_time_s) AS bs2, "
+                    "         MIN(l.s3_time_s) AS bs3 "
+                    "  FROM sessions s JOIN laps l ON l.session_id = s.session_id "
+                    "  WHERE s.track IS NOT NULL AND s.track != '' AND s.track != 'unknown' "
+                    "    AND l.s1_time_s IS NOT NULL AND l.s2_time_s IS NOT NULL "
+                    "    AND l.s3_time_s IS NOT NULL "
+                    "  GROUP BY s.track, s.session_id ) "
+                    "SELECT sb.track, AVG(sb.bs1) AS avg_bs1, AVG(sb.bs2) AS avg_bs2, "
+                    "       AVG(sb.bs3) AS avg_bs3, COUNT(*) AS session_count, "
+                    "       tr.theoretical_s1_s AS th1, tr.theoretical_s2_s AS th2, "
+                    "       tr.theoretical_s3_s AS th3 "
+                    "FROM session_best sb JOIN track_references tr "
+                    "  ON tr.track = sb.track AND tr.reference_type = 'theoretical' "
+                    "WHERE tr.theoretical_s1_s IS NOT NULL AND tr.theoretical_s2_s IS NOT NULL "
+                    "  AND tr.theoretical_s3_s IS NOT NULL "
+                    "GROUP BY sb.track HAVING session_count >= 3"
+                ).fetchall()]
+                gap_rows = [dict(r) for r in conn.execute(
+                    "SELECT s.track AS track, MIN(s.best_lap_time_s) AS best, "
+                    "       tr.theoretical_best_s AS th "
+                    "FROM sessions s JOIN track_references tr "
+                    "  ON tr.track = s.track AND tr.reference_type = 'theoretical' "
+                    "WHERE s.best_lap_time_s IS NOT NULL AND tr.theoretical_best_s IS NOT NULL "
+                    "GROUP BY s.track"
+                ).fetchall()]
+                # last run + track PB for off-PB (Python-grouped; no window fns
+                # so old SQLite on the Pi is fine).
+                offpb_src = [dict(r) for r in conn.execute(
+                    "SELECT track, session_id, started_at, best_lap_time_s "
+                    "FROM sessions "
+                    "WHERE track IS NOT NULL AND track != '' AND track != 'unknown' "
+                    "  AND best_lap_time_s IS NOT NULL "
+                    "ORDER BY track, started_at ASC"
+                ).fetchall()]
+            finally:
+                conn.close()
+
+        # 3 — worst sector per track (>0.30s)
+        for r in sector_rows:
+            best_sec = None
+            for n, avg_f, th_f in ((1, "avg_bs1", "th1"), (2, "avg_bs2", "th2"),
+                                   (3, "avg_bs3", "th3")):
+                gap = r[avg_f] - r[th_f]
+                if gap <= 0.30:
+                    continue
+                if best_sec is None or gap > best_sec[1]:
+                    best_sec = (n, gap)
+            if best_sec:
+                n, gap = best_sec
+                tips.append({
+                    "kind": "leak", "tone": "leak", "track": r["track"],
+                    "headline": "S%d at %s" % (n, r["track"]), "car_label": None,
+                    "value": "+%.2fs" % gap,
+                    "sub": "sector vs theoretical · %d sessions" % r["session_count"],
+                    "sparkline": None,
+                    "href": "/sessions/track?name=" + urllib.parse.quote(r["track"]),
+                    "score": round(gap, 3),
+                })
+
+        # 4 — gap to theoretical best (>0.50s)
+        for r in gap_rows:
+            gap = r["best"] - r["th"]
+            if gap <= 0.50:
+                continue
+            tips.append({
+                "kind": "gap", "tone": "leak", "track": r["track"],
+                "headline": r["track"], "car_label": None,
+                "value": "+%.2fs" % gap, "sub": "off your theoretical best",
+                "sparkline": None,
+                "href": "/sessions/track?name=" + urllib.parse.quote(r["track"]),
+                "score": round(gap, 3),
+            })
+
+        # 5 — last run off your PB at a track (>0.75s)
+        from collections import defaultdict as _dd
+        by_track = _dd(list)
+        for s in offpb_src:
+            by_track[s["track"]].append(s)
+        for track, seqs in by_track.items():
+            pb = min(x["best_lap_time_s"] for x in seqs)
+            last = seqs[-1]
+            gap = last["best_lap_time_s"] - pb
+            if gap <= 0.75:
+                continue
+            tips.append({
+                "kind": "offpb", "tone": "slip", "track": track,
+                "headline": track, "car_label": None,
+                "value": "+%.2fs" % gap, "sub": "last run, off your best here",
+                "sparkline": None,
+                "href": "/sessions/telemetry?id=" + str(last["session_id"]),
+                "score": round(gap, 3),
+            })
+
+        if not tips:
+            return []
+
+        # Dedupe by track (keep highest-scoring tip per track) for variety…
+        best_by_track = {}
+        for t in tips:
+            cur = best_by_track.get(t["track"])
+            if cur is None or t["score"] > cur["score"]:
+                best_by_track[t["track"]] = t
+        pool = sorted(best_by_track.values(), key=lambda t: t["score"], reverse=True)
+
+        top = pool[:4]
+        # …and guarantee at least one positive card when any win exists.
+        if not any(t["kind"] == "win" for t in top):
+            win = next((t for t in tips if t["kind"] == "win"), None)
+            if win:
+                # swap the lowest-scored slot (or the same-track tip) for it
+                drop = next((i for i, t in enumerate(top)
+                             if t["track"] == win["track"]), None)
+                if drop is None and len(top) >= 4:
+                    drop = len(top) - 1
+                if drop is not None:
+                    top[drop] = win
+                else:
+                    top.append(win)
+        top = top[:4]
+
+        # Outline enrichment for the track-level tips that don't carry one.
+        need = [t["track"] for t in top if not t.get("pb_session_id")]
+        outlines = _track_pb_outlines(set(need))
+        for t in top:
+            if not t.get("pb_session_id"):
+                o = outlines.get(t["track"]) or {}
+                t["pb_session_id"] = o.get("session_id")
+                t["pb_lap_number"] = o.get("lap_number")
+        return top
 
     async def handle_status(reader, writer):
         # Per-request perf state — populated once we know the path.
@@ -624,6 +837,13 @@ def make_handler(ctx: dict):
                 # docs/specs/home-actionable-and-celebrate.md §2.
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps(_pace_watchlist("better")).encode()))
+
+            elif path == "/home/tips":
+                # Unified "ways to get sharper" cards — up to 4, ranked,
+                # deduped by track, drawn from slips, wins, sector leaks,
+                # gap-to-theoretical and off-PB. See _home_tips().
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(_home_tips()).encode()))
 
             elif path == "/setup":
                 writer.write(_http_response("200 OK", "text/html", SETUP_HTML.encode()))

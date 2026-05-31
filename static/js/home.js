@@ -50,9 +50,7 @@ async function init(){
   catch(e){ return; }  // nav.js owns the live status pill
   _tf = d.time_format || '24h';
   renderHeroLast(d.last_session, d.pb_at_track_s, d.pb_at_track_any_car_s, d.stats);
-  loadWatchlist();
-  loadWorstSector();
-  loadWins();
+  loadTips();
   loadCareer();
   renderTopCircuits(d.top_circuits || []);
   renderTopCars(d.top_cars || []);
@@ -211,56 +209,43 @@ function renderRecent(recents){
 }
 
 // ── Ways to get sharper ──────────────────────────────────────────
-// Opportunities (slipping + leak) paired with wins. Each loader is
-// async so it can't block the initial paint, and reveals its column +
-// the section only when it has real content — no fake "all good" card.
-function revealSharper(){
+// Up to 4 ranked coaching tips from /home/tips (slips, sector leaks,
+// gap-to-theoretical, off-PB, and wins — deduped by track, biggest time
+// at stake first, with a win kept when one exists). One async fetch so
+// it can't block paint; the section stays hidden until there's a tip —
+// no fake "all good" card.
+async function loadTips(){
+  let tips;
+  try{ tips = await fetch('/home/tips').then(r => r.json()); }
+  catch(e){ return; }
+  if(!Array.isArray(tips) || tips.length === 0) return;
+  const grid = document.getElementById('tips-grid');
+  grid.innerHTML = tips.map(tipCard).join('');
   document.getElementById('sharper').style.display = '';
+  if(window.pfLoadMinis) window.pfLoadMinis(grid);
 }
-// Renders the slipping/winning card markup shared by both columns.
-// `tone` is 'slip' (slower, red) or 'win' (faster, green).
-function paceCard(r, tone){
-  const carName = r.car_nickname || r.car_name || ('Car #' + r.car_ordinal);
-  const cc = pfCarClass(r.car_pi, r.car_class);
-  const cls = cc ? `<span class="class-badge">${cc}</span>` : '';
-  const outAttr = (r.pb_session_id && r.pb_lap_number != null)
-    ? ` data-sid="${escapeHtml(r.pb_session_id)}" data-lap="${r.pb_lap_number}"` : '';
-  const href = '/sessions/telemetry?id=' + encodeURIComponent(r.last_session_id);
-  const delta = tone === 'win'
-    ? `−${r.delta_s.toFixed(2)}s vs your earlier pace`
-    : `+${r.delta_s.toFixed(2)}s vs your earlier pace`;
-  return `<a href="${href}" class="wl-card wl-${tone}">
+// One uniform card per tip. Tone drives the colour: red slip/off-PB,
+// amber leak/gap, green win. The server ships a ready headline, value
+// and sub-line, so this stays a dumb renderer.
+function tipCard(t){
+  const cls = t.tone === 'win' ? 'wl-win' : t.tone === 'leak' ? 'wl-leak' : '';
+  const cc = pfCarClass(t.car_pi, t.car_class);
+  const badge = cc ? `<span class="class-badge">${cc}</span>` : '';
+  const meta = t.car_label
+    ? `<div class="wl-meta">${escapeHtml(t.car_label)} ${badge}</div>` : '';
+  const outAttr = (t.pb_session_id && t.pb_lap_number != null)
+    ? ` data-sid="${escapeHtml(t.pb_session_id)}" data-lap="${t.pb_lap_number}"` : '';
+  const spark = t.sparkline ? renderSpark(t.sparkline, t.tone) : '';
+  return `<a href="${escapeHtml(t.href)}" class="wl-card ${cls}">
     <div class="wl-outline track-outline"${outAttr}></div>
     <div class="wl-body">
-      <div class="wl-name">${escapeHtml(r.track)}</div>
-      <div class="wl-meta">${escapeHtml(carName)} ${cls}</div>
-      ${renderSpark(r.sparkline, tone)}
-      <div class="wl-delta">${delta}</div>
+      <div class="wl-name">${escapeHtml(t.headline)}</div>
+      ${meta}
+      ${spark}
+      <div class="wl-delta">${escapeHtml(t.value)} <span class="wl-sub">${escapeHtml(t.sub)}</span></div>
     </div>
     <div class="wl-arrow">→</div>
   </a>`;
-}
-async function loadWatchlist(){
-  let rows;
-  try{ rows = await fetch('/home/regression-watchlist').then(r => r.json()); }
-  catch(e){ return; }
-  if(!Array.isArray(rows) || rows.length === 0) return;
-  const grid = document.getElementById('watchlist-grid');
-  grid.innerHTML = rows.map(r => paceCard(r, 'slip')).join('');
-  revealSharper();
-  if(window.pfLoadMinis) window.pfLoadMinis(grid);
-}
-// "What's working" — the regression query inverted (recent 3 faster
-// than the prior 3). Same gating: hidden when nothing's improving.
-async function loadWins(){
-  let rows;
-  try{ rows = await fetch('/home/improvement-watchlist').then(r => r.json()); }
-  catch(e){ return; }
-  if(!Array.isArray(rows) || rows.length === 0) return;
-  const grid = document.getElementById('wins-grid');
-  grid.innerHTML = rows.map(r => paceCard(r, 'win')).join('');
-  revealSharper();
-  if(window.pfLoadMinis) window.pfLoadMinis(grid);
 }
 // Compact sparkline of last 6 best-lap times. Y inverted (lower =
 // faster = up), so a downward slope = improving, upward = the
@@ -281,38 +266,6 @@ function renderSpark(vals, tone){
     <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>
     <circle cx="${lastX}" cy="${lastY}" r="2.4" fill="${col}"/>
   </svg>`;
-}
-
-// ── Worst sector card — single biggest leak ─────────────────────
-// Async; hidden when no sector exceeds the server's 0.3s threshold.
-// Deep-links into the track detail page so the user can scrub any
-// session there.
-async function loadWorstSector(){
-  let w;
-  try{ w = await fetch('/home/worst-sector').then(r => r.json()); }
-  catch(e){ return; }
-  if(!w || !w.track || !w.sector) return;
-  const card = document.getElementById('leak-card');
-  document.getElementById('leak-sector').textContent = w.sector;
-  document.getElementById('leak-track').textContent = w.track;
-  document.getElementById('leak-gap').textContent = '+' + w.avg_gap_s.toFixed(2) + 's';
-  document.getElementById('leak-sub').textContent =
-    'on average across ' + w.session_count + ' session' + (w.session_count === 1 ? '' : 's');
-  // Outline: the track's PB lap (any car, any session) — same target
-  // the watchlist + circuits page use. Speed-coloured via track_mini.
-  if(w.pb_session_id && w.pb_lap_number != null){
-    const out = document.getElementById('leak-outline');
-    out.dataset.sid = w.pb_session_id;
-    out.dataset.lap = w.pb_lap_number;
-  }
-  // CTA: land on the circuit detail. From there the user picks any
-  // session to scrub. Trying to deep-link a specific session was
-  // tempting but the choice "which session?" is genuinely the
-  // driver's — the leak is across all of them.
-  card.href = '/sessions/track?name=' + encodeURIComponent(w.track);
-  card.style.display = '';
-  revealSharper();
-  if(window.pfLoadMinis) window.pfLoadMinis(card);
 }
 
 // ── Career strip ──────────────────────────────────────────────────

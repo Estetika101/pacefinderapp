@@ -53,39 +53,17 @@ HOME_HTML_PRE = """<!DOCTYPE html>
     <a class="hl-cta primary" href="/dashboard">Open live dashboard &rarr;</a>
   </div>
 
-  <!-- Ways to get sharper — opportunities (where time is leaking) paired
-       with wins (what's already improving). Positive reframe of the old
-       "where you're slipping" + "biggest leak". The whole section, and
-       each column, hides when it has nothing to show — no "all good"
-       confetti. See docs/specs/home-actionable-and-celebrate.md §2. -->
+  <!-- Ways to get sharper — up to 4 ranked coaching tips from /home/tips
+       (slips, sector leaks, gap-to-theoretical, off-PB, and wins). One
+       flat grid of uniform cards, self-labelling by colour: red slip /
+       off-PB, amber leak / gap, green win. Hidden when there's nothing
+       to surface. See docs/specs/home-actionable-and-celebrate.md §2. -->
   <section class="sharper" id="sharper" style="display:none">
     <div class="sharper-head">
       <h2>Ways to get sharper</h2>
       <span class="sharper-sub">Where your time is going &mdash; and what's already working</span>
     </div>
-    <!-- One flat grid so every card — slips, the sector leak, and wins —
-         sits side by side and wraps, instead of stacking by group. Cards
-         are self-labelling by colour: red slip, amber leak, green win.
-         Sources: /home/regression-watchlist, /home/worst-sector,
-         /home/improvement-watchlist. -->
-    <div class="sharper-grid" id="sharper-grid">
-      <div class="watchlist-grid" id="watchlist-grid"></div>
-      <a class="leak-card" id="leak-card" href="#" style="display:none">
-        <div class="leak-outline track-outline" id="leak-outline"></div>
-        <div class="leak-body">
-          <div class="leak-eyebrow">Your biggest leak</div>
-          <div class="leak-title">
-            S<span id="leak-sector">&mdash;</span> at <span id="leak-track">&mdash;</span>
-          </div>
-          <div class="leak-stats">
-            <span class="leak-gap" id="leak-gap">+&mdash;</span>
-            <span class="leak-sub" id="leak-sub">on average across &mdash; sessions</span>
-          </div>
-        </div>
-        <div class="leak-arrow">&rarr;</div>
-      </a>
-      <div class="wins-grid" id="wins-grid"></div>
-    </div>
+    <div class="sharper-grid" id="tips-grid"></div>
   </section>
 
   <!-- Career stats (improvement-first; results gated; see docs/specs/home-stats.md) -->
