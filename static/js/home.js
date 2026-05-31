@@ -214,9 +214,8 @@ function renderRecent(recents){
 // Opportunities (slipping + leak) paired with wins. Each loader is
 // async so it can't block the initial paint, and reveals its column +
 // the section only when it has real content — no fake "all good" card.
-function revealSharper(colId){
+function revealSharper(){
   document.getElementById('sharper').style.display = '';
-  if(colId){ document.getElementById(colId).style.display = ''; }
 }
 // Renders the slipping/winning card markup shared by both columns.
 // `tone` is 'slip' (slower, red) or 'win' (faster, green).
@@ -248,7 +247,7 @@ async function loadWatchlist(){
   if(!Array.isArray(rows) || rows.length === 0) return;
   const grid = document.getElementById('watchlist-grid');
   grid.innerHTML = rows.map(r => paceCard(r, 'slip')).join('');
-  revealSharper('opps-col');
+  revealSharper();
   if(window.pfLoadMinis) window.pfLoadMinis(grid);
 }
 // "What's working" — the regression query inverted (recent 3 faster
@@ -260,7 +259,7 @@ async function loadWins(){
   if(!Array.isArray(rows) || rows.length === 0) return;
   const grid = document.getElementById('wins-grid');
   grid.innerHTML = rows.map(r => paceCard(r, 'win')).join('');
-  revealSharper('wins-col');
+  revealSharper();
   if(window.pfLoadMinis) window.pfLoadMinis(grid);
 }
 // Compact sparkline of last 6 best-lap times. Y inverted (lower =
@@ -312,7 +311,7 @@ async function loadWorstSector(){
   // driver's — the leak is across all of them.
   card.href = '/sessions/track?name=' + encodeURIComponent(w.track);
   card.style.display = '';
-  revealSharper('opps-col');
+  revealSharper();
   if(window.pfLoadMinis) window.pfLoadMinis(card);
 }
 

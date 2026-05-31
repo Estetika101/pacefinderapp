@@ -63,36 +63,28 @@ HOME_HTML_PRE = """<!DOCTYPE html>
       <h2>Ways to get sharper</h2>
       <span class="sharper-sub">Where your time is going &mdash; and what's already working</span>
     </div>
-    <div class="sharper-cols">
-      <!-- Opportunities: regression watchlist + the single biggest sector
-           leak. Recent 3 sessions slower than the prior 3, and the worst
-           sector vs theoretical. See /home/regression-watchlist and
-           /home/worst-sector. -->
-      <div class="sharper-col" id="opps-col" style="display:none">
-        <h3 class="sharper-col-h opp">Where the time is</h3>
-        <div class="watchlist-grid" id="watchlist-grid"></div>
-        <a class="leak-card" id="leak-card" href="#" style="display:none">
-          <div class="leak-outline track-outline" id="leak-outline"></div>
-          <div class="leak-body">
-            <div class="leak-eyebrow">Your biggest leak</div>
-            <div class="leak-title">
-              S<span id="leak-sector">&mdash;</span> at <span id="leak-track">&mdash;</span>
-            </div>
-            <div class="leak-stats">
-              <span class="leak-gap" id="leak-gap">+&mdash;</span>
-              <span class="leak-sub" id="leak-sub">on average across &mdash; sessions</span>
-            </div>
+    <!-- One flat grid so every card — slips, the sector leak, and wins —
+         sits side by side and wraps, instead of stacking by group. Cards
+         are self-labelling by colour: red slip, amber leak, green win.
+         Sources: /home/regression-watchlist, /home/worst-sector,
+         /home/improvement-watchlist. -->
+    <div class="sharper-grid" id="sharper-grid">
+      <div class="watchlist-grid" id="watchlist-grid"></div>
+      <a class="leak-card" id="leak-card" href="#" style="display:none">
+        <div class="leak-outline track-outline" id="leak-outline"></div>
+        <div class="leak-body">
+          <div class="leak-eyebrow">Your biggest leak</div>
+          <div class="leak-title">
+            S<span id="leak-sector">&mdash;</span> at <span id="leak-track">&mdash;</span>
           </div>
-          <div class="leak-arrow">&rarr;</div>
-        </a>
-      </div>
-      <!-- Wins: recent 3 sessions faster than the prior 3 — the same
-           comparison as the watchlist, inverted. See
-           /home/improvement-watchlist. -->
-      <div class="sharper-col" id="wins-col" style="display:none">
-        <h3 class="sharper-col-h win">What's working</h3>
-        <div class="wins-grid" id="wins-grid"></div>
-      </div>
+          <div class="leak-stats">
+            <span class="leak-gap" id="leak-gap">+&mdash;</span>
+            <span class="leak-sub" id="leak-sub">on average across &mdash; sessions</span>
+          </div>
+        </div>
+        <div class="leak-arrow">&rarr;</div>
+      </a>
+      <div class="wins-grid" id="wins-grid"></div>
     </div>
   </section>
 

@@ -106,28 +106,15 @@ a{color:inherit;text-decoration:none}
   text-transform:uppercase;letter-spacing:0.08em;margin:0;
 }
 .sharper-sub{font-size:11px;color:var(--color-text-quaternary)}
-/* Two labelled groups stacked vertically; within each group the cards
-   lay out side by side and wrap responsively. So the "where the time
-   is" cards (slip + leak) sit beside each other, as do the wins. */
-.sharper-cols{display:flex;flex-direction:column;gap:var(--space-6)}
-.sharper-col{
+/* One flat grid: every card (slips, the sector leak, wins) is a direct
+   grid item so they sit side by side and wrap, rather than stacking by
+   group. display:contents promotes the watchlist/wins children into
+   this grid so they share its tracks with the leak card. */
+.sharper-grid{
   display:grid;grid-template-columns:1fr 1fr;
-  gap:var(--space-3);align-items:start;min-width:0;
+  gap:var(--space-3);align-items:start;
 }
-@media(max-width:640px){.sharper-col{grid-template-columns:1fr}}
-.sharper-col-h{
-  grid-column:1 / -1;
-  margin:0;font-size:11px;font-weight:600;letter-spacing:0.06em;
-  text-transform:uppercase;color:var(--color-text-tertiary);
-  display:flex;align-items:center;gap:7px;
-}
-.sharper-col-h::before{
-  content:"";width:8px;height:8px;border-radius:2px;display:inline-block;
-}
-.sharper-col-h.opp::before{background:var(--color-red,#ef4444)}
-.sharper-col-h.win::before{background:var(--color-green,#22c55e)}
-/* display:contents so the slip/win cards become direct grid items of
-   the group — letting them sit beside the leak card in one row. */
+@media(max-width:640px){.sharper-grid{grid-template-columns:1fr}}
 .watchlist-grid,.wins-grid{display:contents}
 .sharper .leak-card{margin:0}
 .wl-card{
