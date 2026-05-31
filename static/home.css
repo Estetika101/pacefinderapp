@@ -151,11 +151,17 @@ a{color:inherit;text-decoration:none}
 }
 .wl-arrow{color:var(--color-text-quaternary);font-size:18px;align-self:center}
 .wl-card:hover .wl-arrow{color:var(--color-text-primary)}
-/* Win variant — recent pace faster than earlier. Green where the slip
-   card is red. */
+/* Tone variants. Default (slip / off-PB) is red — see .wl-card border.
+   Win = green, leak / gap = amber. */
 .wl-win{border-left-color:var(--color-green,#22c55e)}
 .wl-win:hover{border-color:var(--color-green,#22c55e)}
 .wl-win .wl-delta{color:var(--color-green,#22c55e)}
+.wl-leak{border-left-color:var(--color-amber,#fbbf24)}
+.wl-leak:hover{border-color:var(--color-amber,#fbbf24)}
+.wl-leak .wl-delta{color:var(--color-amber,#fbbf24)}
+/* Muted trailing clause after the coloured value (e.g. "vs your earlier
+   pace", "off your theoretical best"). */
+.wl-sub{color:var(--color-text-tertiary);font-weight:400;font-size:11px}
 
 /* ── Last-session hero (the page's lede) ────────────────────────── */
 .hero-last{
