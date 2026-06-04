@@ -425,9 +425,15 @@ function renderCards(){
     bad_shift: 'Bad shift',
   };
   if(_events && _events.length){
+    // _events arrives severity-DESC from the API, so the first few are the
+    // worst. Lead with those — a big "102 detected" reads as 102 failures
+    // and is more discouraging than useful. Surface the top 3 to work on
+    // and tuck the full count into the link.
+    const n = _events.length;
     const top = _events.slice(0, 3);
-    document.getElementById('card-loss-headline').innerHTML =
-      `<em>${_events.length}</em> event${_events.length === 1 ? '' : 's'} detected`;
+    document.getElementById('card-loss-headline').innerHTML = n <= 3
+      ? `<em>${n}</em> moment${n === 1 ? '' : 's'} to review`
+      : `Your <em>${top.length}</em> worst moments`;
     document.getElementById('card-loss-body').innerHTML = top.map(e => {
       const label = EVENT_LABELS[e.event_type] || e.event_type;
       const lap = e.lap_number != null ? `L${e.lap_number + 1}` : '';
@@ -440,7 +446,8 @@ function renderCards(){
       + (_sgame ? '&game=' + encodeURIComponent(_sgame) : '')
       + (_strack ? '&track=' + encodeURIComponent(_strack) : '')
       + '&events=1';
-    document.getElementById('card-loss-link').textContent = 'View all ' + _events.length + ' events →';
+    document.getElementById('card-loss-link').textContent =
+      n > 3 ? 'View all ' + n + ' events →' : 'Open in telemetry →';
     document.getElementById('card-loss-link').style.display = '';
   } else {
   const bestLap = _laps.find(l => l.lap_time_s != null && s.best_lap_time_s != null && Math.abs(l.lap_time_s - s.best_lap_time_s) < 0.001);
