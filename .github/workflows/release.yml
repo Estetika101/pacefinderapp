@@ -62,9 +62,9 @@ jobs:
     name: macOS .app (MAS)
     runs-on: macos-14   # Apple Silicon
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -313,9 +313,9 @@ jobs:
             arch:   aarch64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -409,7 +409,7 @@ jobs:
     name: Docker (multi-arch → GHCR)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
