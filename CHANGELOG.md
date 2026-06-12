@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.6-rc1 — Release pipeline on new action majors (2026-06-12)
+
+No runtime changes — this rc exists to validate the release pipeline after
+[#241](https://github.com/Estetika101/pacefinderapp/pull/241) bumped the
+publish-path actions across breaking majors (upload-artifact v7,
+download-artifact v8, gh-release v3, docker v4–v7). GitHub force-switches
+Node 20 actions to Node 24 on 2026-06-16; the old pins would have started
+failing then.
+
 ## v0.7.5 — Honest theoretical best (2026-06-12)
 
 One bug fix, found in the field:
