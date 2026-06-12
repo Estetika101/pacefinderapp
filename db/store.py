@@ -7,7 +7,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import MIN_VALID_LAP_S
+import statistics
+
+from config import MIN_VALID_LAP_S, SECTOR_OUTLIER_FRAC
 from net.perf import _TimedLock
 
 # ─── Module-level context (set by initialize()) ───────────────────────────────
@@ -1429,6 +1431,34 @@ def _sector_time_from_samples(samples: list, lo: float, hi: float) -> Optional[f
     return round(delta, 3) if delta > 0 else None
 
 
+def _split_rotated_laps(candidates: list) -> tuple:
+    """
+    Partition sector-time candidates into (kept, rejected) by comparing each
+    lap's sectors to the track's per-sector median.
+
+    distance_norm is anchored to a lap's *first sample*, so a trace that
+    starts mid-track (mid-race telemetry join, packet drop at the line)
+    rotates the sector windows while keeping Σsectors == lap_time — invisible
+    to the 5% sum gate. The rotated lap instead shows up as a per-sector
+    outlier vs every honest lap; one such lap at Barcelona donated a 27.95s
+    "S2" (real S2s: 37-40s) and inflated the theoretical-best gap by ~9s.
+
+    Each candidate is {"sec": [s1, s2, s3], ...}. Needs >= 3 candidates to
+    form a meaningful median; below that, everything is kept.
+    """
+    if len(candidates) < 3:
+        return candidates, []
+    medians = [statistics.median(c["sec"][i] for c in candidates) for i in range(3)]
+    kept, rejected = [], []
+    for c in candidates:
+        rotated = any(
+            abs(c["sec"][i] - medians[i]) > SECTOR_OUTLIER_FRAC * medians[i]
+            for i in range(3)
+        )
+        (rejected if rotated else kept).append(c)
+    return kept, rejected
+
+
 def _stitch_sector_samples(
     s1_samples: list, s2_samples: list, s3_samples: list,
     s1_t: float, s2_t: float,
@@ -1538,6 +1568,10 @@ def update_track_references(track: str, game: str):
     # (sector sum within 5% of lap_time_s); failing laps stay NULL.
     per_lap_writes: list[tuple] = []
 
+    # Pass 1 — measure sectors for every lap that survives the Σ≈lap gate.
+    # Samples are dropped after measuring (a track can hold hundreds of
+    # laps; the Pi can't keep them all); the three winners re-fetch below.
+    candidates: list[dict] = []
     for row in rows:
         lap_data = _db_get_lap_samples(row["session_id"], row["lap_number"])
         if not lap_data or not lap_data["samples"]:
@@ -1565,18 +1599,52 @@ def update_track_references(track: str, game: str):
                 f"(probably partial / glitched samples)"
             )
             continue
-        per_lap_writes.append(
-            (round(sec_times[0], 3), round(sec_times[1], 3), round(sec_times[2], 3),
-             row["session_id"], row["lap_number"])
+        candidates.append({
+            "session_id": row["session_id"],
+            "lap": row["lap_number"],
+            "sec": sec_times,
+        })
+
+    # Pass 2 — drop rotated laps (see _split_rotated_laps). Rejected laps
+    # get their stored sectors NULLed so a previously-poisoned value can't
+    # linger in session detail views.
+    candidates, rotated = _split_rotated_laps(candidates)
+    for c in rotated:
+        _log.info(
+            f"track_references: skipping {c['session_id']} L{c['lap']} "
+            f"— sectors {[round(s, 2) for s in c['sec']]} are outliers vs the "
+            f"track median (rotated distance_norm, likely mid-track trace start)"
         )
-        for i, st in enumerate(sec_times):
+        per_lap_writes.append((None, None, None, c["session_id"], c["lap"]))
+
+    for c in candidates:
+        per_lap_writes.append(
+            (round(c["sec"][0], 3), round(c["sec"][1], 3), round(c["sec"][2], 3),
+             c["session_id"], c["lap"])
+        )
+        for i, st in enumerate(c["sec"]):
             if best_s[i] is None or st < best_s[i]:
                 best_s[i] = st
                 best_meta[i] = {
-                    "session_id": row["session_id"],
-                    "lap": row["lap_number"],
-                    "samples": samples,
+                    "session_id": c["session_id"],
+                    "lap": c["lap"],
+                    "samples": None,
                 }
+
+    # Re-fetch samples for the (up to three) winning laps — needed by the
+    # stitched theoretical trace below. On the rare re-fetch miss, drop that
+    # winner; the all(best_meta) gate below then skips the theoretical write
+    # while per-lap sectors and event detection still flush normally.
+    for i, meta in enumerate(best_meta):
+        if meta is None:
+            continue
+        lap_data = _db_get_lap_samples(meta["session_id"], meta["lap"])
+        if lap_data and lap_data["samples"]:
+            meta["samples"] = lap_data["samples"]
+        else:
+            _log.warning(f"track_references: samples for {meta['session_id']} "
+                         f"L{meta['lap']} unavailable on re-fetch")
+            best_meta[i] = None
 
     if per_lap_writes:
         with _db_lock:
