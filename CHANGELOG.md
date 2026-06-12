@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.5 — Honest theoretical best (2026-06-12)
+
+One bug fix, found in the field:
+
+- **Track references: guard theoretical best against rotated lap traces** ([#242](https://github.com/Estetika101/pacefinderapp/pull/242)). `distance_norm` is anchored to a lap's first recorded sample, so a trace that starts mid-track (mid-race telemetry join, packet drop at the line) rotates the sector windows while keeping Σsectors == lap_time — invisible to the 5% sum gate. One such lap at Barcelona donated a 27.95s "S2" (real S2s: 37–40s) and showed **+9.958s off theoretical** on a lap that was really +0.9s off. Laps whose sectors deviate >20% from the track's per-sector median are now excluded from sector references and their stored sectors cleared. Existing data heals automatically the next time each track's references recompute (any session close at that track).
+
 ## v0.7.4 — Home tells you what to work on (2026-06-11)
 
 The dashboard home stops being a stats wall and starts coaching:
