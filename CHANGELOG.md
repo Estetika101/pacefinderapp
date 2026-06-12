@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.7.4 — Home tells you what to work on (2026-06-11)
+
+The dashboard home stops being a stats wall and starts coaching:
+
+- **Tip engine** ([#238](https://github.com/Estetika101/pacefinderapp/pull/238)) — up to 4 ranked "ways to get sharper" cards on Home, drawn from your own session history, flattened into one card grid ([#237](https://github.com/Estetika101/pacefinderapp/pull/237)).
+- **PB celebration + actionable stats** ([#234](https://github.com/Estetika101/pacefinderapp/pull/234)) — personal bests get noticed; the headline stats now point somewhere.
+- **Layout polish** ([#235](https://github.com/Estetika101/pacefinderapp/pull/235), [#236](https://github.com/Estetika101/pacefinderapp/pull/236)) — hero padding, side-by-side "where the time is" leak cards at an even 50/50 split, edge-aware tooltips on telemetry.
+- **Session detail fixes** ([#239](https://github.com/Estetika101/pacefinderapp/pull/239)) — empty Car Context resolved, events headline calmed.
+- **Listener: friendly port-in-use error** ([#233](https://github.com/Estetika101/pacefinderapp/pull/233)) — when the dashboard port is taken, you're told what to do instead of getting a traceback.
+- **Docs + CI** ([#231](https://github.com/Estetika101/pacefinderapp/pull/231), [#240](https://github.com/Estetika101/pacefinderapp/pull/240)) — ARCHITECTURE.md and CONTRIBUTING.md land; runner-setup actions bumped to latest majors.
+
 ## v0.7.3 — DM Mono web font + screenshot pipeline (2026-05-25)
 
 Two-line hotfix after v0.7.2:
