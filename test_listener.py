@@ -623,6 +623,48 @@ async def _run_watchdog_once():
             L.state["game"]   = None
 
 
+def test_rotated_sector_guard():
+    """A rotated lap trace (distance_norm anchored mid-track) must not donate
+    sector times to the theoretical best. Regression for the Barcelona case:
+    one lap with sectors (35.42, 27.95, 39.40) — the track's normal shape
+    (~29, ~38, ~36) rotated by two thirds — donated a 27.95s "S2" and pushed
+    the theoretical-best gap from ~1s to ~10s. Σsectors == lap_time held, so
+    only the per-sector median guard can catch it."""
+    from db.store import _split_rotated_laps
+    print("\n[rotated-lap sector guard]")
+
+    def cand(sid, lap, sec):
+        return {"session_id": sid, "lap": lap, "sec": sec}
+
+    honest = [
+        cand("s1", 1, [29.142, 38.570, 36.039]),
+        cand("s1", 2, [29.500, 37.826, 35.628]),
+        cand("s1", 3, [28.576, 39.321, 36.392]),
+        cand("s2", 5, [29.173, 39.016, 35.630]),
+        cand("s2", 7, [29.285, 37.017, 36.287]),
+        cand("s3", 6, [29.415, 37.059, 35.407]),
+    ]
+    rotated_lap = cand("s2", 6, [35.421, 27.950, 39.395])
+
+    kept, rejected = _split_rotated_laps(honest + [rotated_lap])
+    check("rotated lap rejected", rejected == [rotated_lap],
+          f"rejected={[(c['session_id'], c['lap']) for c in rejected]}")
+    check("honest laps all kept", kept == honest, f"kept={len(kept)}/6")
+
+    theo = sum(min(c["sec"][i] for c in kept) for i in range(3))
+    check("theoretical from kept laps is sane (~101s, not ~92s)",
+          100.5 < theo < 101.5, f"theo={theo:.3f}")
+
+    # Below 3 candidates there is no meaningful median — keep everything.
+    few = [honest[0], rotated_lap]
+    kept_few, rejected_few = _split_rotated_laps(few)
+    check("guard inert under 3 candidates", kept_few == few and not rejected_few)
+
+    # All-honest set passes through untouched.
+    kept_all, rejected_all = _split_rotated_laps(honest)
+    check("no false positives on honest laps", kept_all == honest and not rejected_all)
+
+
 # ── live UDP tests (requires running listener) ────────────────────────────────
 
 PORTS = {"forza_motorsport": 5300, "acc": 9996, "f1": 20777}
@@ -841,6 +883,7 @@ def main():
     test_final_lap_abandoned_not_recovered()
     test_game_switching()
     test_tyre_temps_per_game()
+    test_rotated_sector_guard()
 
     print(f"\n{'═'*44}")
     print(f"  Pipeline: {PASS} passed  {FAIL} failed")

@@ -93,3 +93,11 @@ LOG_LEVEL         = logging.INFO
 # the session-close filter and the theoretical-best calculation. 20s is shorter
 # than any real circuit lap, so anything under it is structurally suspect.
 MIN_VALID_LAP_S = 20.0
+
+# Max fractional deviation of a lap's sector time from the track's per-sector
+# median before the lap is treated as rotated (distance_norm anchored to a
+# mid-track first sample instead of the start/finish line) and excluded from
+# sector references. Rotation preserves Σsectors == lap_time, so the 5% sum
+# gate can't catch it; a rotated lap instead shows ~20-30% per-sector skew,
+# while honest hot laps stay within a few percent of the median.
+SECTOR_OUTLIER_FRAC = 0.20
