@@ -665,6 +665,29 @@ def test_rotated_sector_guard():
     check("no false positives on honest laps", kept_all == honest and not rejected_all)
 
 
+def test_friendly_anthropic_errors():
+    """Spotter errors must tell the driver what to do, not echo urllib.
+    Regression for the modal showing "✗ API error: HTTP Error 401:
+    Unauthorized" on a revoked key."""
+    from net.api import friendly_anthropic_error
+    print("\n[friendly anthropic errors]")
+
+    msg401 = friendly_anthropic_error(401)
+    check("401 names the key and where to fix it",
+          "API key" in msg401 and "Setup" in msg401, msg401)
+    check("401 drops the raw urllib phrasing", "HTTP Error" not in msg401)
+    check("403 points at permissions",
+          "access" in friendly_anthropic_error(403))
+    check("400 + credit detail points at billing",
+          "credits" in friendly_anthropic_error(400, "Your credit balance is too low"))
+    check("429 says wait and retry",
+          "rate limit" in friendly_anthropic_error(429).lower())
+    check("529 reads as overloaded",
+          "overloaded" in friendly_anthropic_error(529))
+    check("unknown codes keep Anthropic's own detail",
+          "model not found" in friendly_anthropic_error(404, "model not found"))
+
+
 # ── live UDP tests (requires running listener) ────────────────────────────────
 
 PORTS = {"forza_motorsport": 5300, "acc": 9996, "f1": 20777}
@@ -884,6 +907,7 @@ def main():
     test_game_switching()
     test_tyre_temps_per_game()
     test_rotated_sector_guard()
+    test_friendly_anthropic_errors()
 
     print(f"\n{'═'*44}")
     print(f"  Pipeline: {PASS} passed  {FAIL} failed")

@@ -1,5 +1,6 @@
 import json
 import struct
+import urllib.error as _urllib_err
 import urllib.request as _urllib_req
 from pathlib import Path
 from typing import Optional
@@ -212,6 +213,32 @@ def build_track_tip_prompt(track: str, stats: dict) -> str:
     )
 
 
+def friendly_anthropic_error(code: int, detail: str = "") -> str:
+    """
+    Translate an Anthropic API HTTP status into a message a driver can act
+    on. `detail` is Anthropic's own error message when the body had one —
+    used to disambiguate 400s and appended where it helps.
+    """
+    if code == 401:
+        return ("Anthropic rejected the API key — it may be mistyped, revoked, "
+                "or expired. Paste a fresh key from console.anthropic.com → "
+                "API Keys into Setup → AI Analysis.")
+    if code == 403:
+        return ("The API key doesn't have access to this model. Check the key's "
+                "workspace permissions at console.anthropic.com.")
+    if code == 400 and "credit" in detail.lower():
+        return ("Your Anthropic account is out of credits — top up at "
+                "console.anthropic.com → Billing, then re-run the analysis.")
+    if code == 429:
+        return ("Anthropic rate limit hit — wait a minute and re-run the "
+                "analysis.")
+    if code == 529 or code >= 500:
+        return ("Anthropic's servers are overloaded right now — try again in "
+                "a few minutes.")
+    base = f"Anthropic API returned HTTP {code}"
+    return f"{base}: {detail}" if detail else f"{base}."
+
+
 def call_claude_api(prompt: str, api_key: str, model: str) -> str:
     if not api_key:
         raise ValueError("Anthropic API key not set — add it in Setup → AI Analysis")
@@ -227,6 +254,21 @@ def call_claude_api(prompt: str, api_key: str, model: str) -> str:
     req.add_header("x-api-key", api_key)
     req.add_header("anthropic-version", "2023-06-01")
     req.add_header("content-type", "application/json")
-    with _urllib_req.urlopen(req, timeout=45) as resp:
-        data = json.loads(resp.read())
+    # ValueError carries a driver-readable message: the router returns it
+    # verbatim as the modal's error line (same contract as the key-missing
+    # message above), instead of urllib's "HTTP Error 401: Unauthorized".
+    try:
+        with _urllib_req.urlopen(req, timeout=45) as resp:
+            data = json.loads(resp.read())
+    except _urllib_err.HTTPError as exc:
+        detail = ""
+        try:
+            detail = json.loads(exc.read()).get("error", {}).get("message", "")
+        except Exception:
+            pass
+        raise ValueError(friendly_anthropic_error(exc.code, detail)) from exc
+    except _urllib_err.URLError as exc:
+        raise ValueError("Couldn't reach api.anthropic.com — check this "
+                         "machine's internet connection and re-run the "
+                         "analysis.") from exc
     return data["content"][0]["text"]
