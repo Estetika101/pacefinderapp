@@ -10,6 +10,6 @@ dist
 packaging
 docs
 analysis
-bench_baseline*.json
+bench/
 *.db
 simtelemetry.config.json

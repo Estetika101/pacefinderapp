@@ -6,11 +6,11 @@ Seeds a deterministic synthetic SQLite DB in a temp dir and times the
 hot DB / JSON paths the audit flagged. Stdlib only; no Pi required.
 
 Usage:
-  python3 bench_perf.py               # run, print table
-  python3 bench_perf.py --baseline    # save current numbers to bench_baseline.json
-  python3 bench_perf.py --check       # compare against baseline; nonzero exit on regression
-  python3 bench_perf.py --check --threshold 0.30  # tolerate up to +30% median drift
-  python3 bench_perf.py --sessions 500 --tracks 25  # bigger synthetic dataset
+  python3 bench/bench_perf.py               # run, print table
+  python3 bench/bench_perf.py --baseline    # save current numbers to bench_baseline.json
+  python3 bench/bench_perf.py --check       # compare against baseline; nonzero exit on regression
+  python3 bench/bench_perf.py --check --threshold 0.30  # tolerate up to +30% median drift
+  python3 bench/bench_perf.py --sessions 500 --tracks 25  # bigger synthetic dataset
 
 The numbers are NOT Pi numbers — they're whatever the runner machine
 delivers. The point is *relative* tracking: detect regressions in the
@@ -31,7 +31,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
 from db import store
