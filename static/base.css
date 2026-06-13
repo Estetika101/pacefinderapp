@@ -98,3 +98,13 @@
   .btn-nextlap{background:var(--color-surface-2);border:1px solid var(--surface-bd);color:var(--color-text-secondary);font-family:inherit;font-size:var(--text-xs);padding:7px var(--space-3);border-radius:var(--radius-sm);cursor:pointer}
   .btn-nextlap:hover{border-color:var(--color-text-secondary);color:#ccc}
   .inject-err{font-size:var(--text-xs);color:var(--color-red);margin-top:10px;min-height:1em}
+  /* version banner */
+  .pf-vbanner{position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,#1e3a5f,#2d5a8a);border-bottom:2px solid var(--color-green);z-index:10000}
+  .pf-vb-content{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-3) var(--space-4);max-width:1200px;margin:0 auto}
+  .pf-vb-text{font-size:var(--text-sm);color:#ccc}
+  .pf-vb-text strong{color:var(--color-green)}
+  .pf-vb-current{font-size:var(--text-xs);color:var(--color-text-secondary);margin-left:var(--space-2)}
+  .pf-vb-btn{background:var(--color-green);color:var(--color-bg);padding:6px 16px;border-radius:var(--radius-sm);font-weight:var(--fw-bold);font-size:var(--text-sm);white-space:nowrap}
+  .pf-vb-btn:hover{background:#16a34a}
+  .pf-vb-close{background:none;border:none;color:#999;font-size:16px;cursor:pointer;padding:0 var(--space-2);min-width:auto}
+  .pf-vb-close:hover{color:#ddd}

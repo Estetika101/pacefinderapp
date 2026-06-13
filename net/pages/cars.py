@@ -20,6 +20,7 @@ CAR_INDEX_HTML_PRE = """<!DOCTYPE html>
 <div id="pf-nav"></div>
 <script src="/static/js/_safe.js"></script>
 <script src="/static/js/nav.js"></script>
+<script src="/static/js/version-banner.js"></script>
 <div class="page">
 
   <a href="/sessions" class="crumb">&larr; All sessions</a>

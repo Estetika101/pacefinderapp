@@ -2383,6 +2383,12 @@ def make_handler(ctx: dict):
             elif path == "/health":
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
 
+            elif path == "/version":
+                app_version = ctx.get("app_version", "unknown")
+                payload = {"version": app_version}
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(payload).encode()))
+
             else:
                 writer.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nNot Found")
 

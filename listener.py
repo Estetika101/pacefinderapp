@@ -6,6 +6,8 @@ Saves raw archives and structured JSON sessions to USB storage.
 Exposes local web status server at http://pi.local:8000
 """
 
+APP_VERSION = "0.7.6-rc1"
+
 import asyncio
 import collections
 import json
@@ -401,6 +403,7 @@ async def main(demo_mode: bool = False):
         "state": state,
         "last_parsed": last_parsed,
         "config": config,
+        "app_version": APP_VERSION,
         "log": log,
         "PORTS": PORTS,
         "active_sessions": active_sessions,
