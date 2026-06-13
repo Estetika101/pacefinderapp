@@ -160,6 +160,8 @@ What runs on a `v*` tag:
 
 Tags with a `-` suffix (e.g. `v0.7.2-rc1`, `v0.8.0-beta2`) reach App Store Connect via the same path — that's how TestFlight builds are populated. Apple's three-integer `CFBundleShortVersionString` requirement is honored by stripping the suffix in CI: `0.7.2-rc1` becomes short version `0.7.2 (build N)` where `N = GITHUB_RUN_NUMBER`. Pre-release and final tags can therefore share a short version; the build number keeps them distinct.
 
+On the GitHub side, a `-` tag publishes as a **pre-release** (`release.yml` sets `prerelease: ${{ contains(github.ref_name, '-') }}`), so it never takes the **Latest** slot and `releases/latest` keeps pointing at the last stable tag. The availability-sync skill and `gh release view` both rely on this — they advertise the latest stable release, never an rc.
+
 ### Secrets
 
 Nine repo secrets live at **Settings → Secrets and variables → Actions**. They're consumed only by the macOS job; Linux + Docker rely on `GITHUB_TOKEN` for GHCR. Full list and how-to-obtain in the comment block at the top of `.github/workflows/release.yml`. The Apple credentials are owned by **apple@estetika.org** (Apple Developer team `2MRMLK5999`). Rotate the App Store Connect API key by revoking + regenerating with **App Manager** role and updating `APP_STORE_CONNECT_API_KEY_ID` + `APP_STORE_CONNECT_API_KEY_P8` — the Issuer ID stays the same.
