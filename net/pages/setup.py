@@ -180,22 +180,22 @@ body{
 <!-- AVAILABILITY-SYNC:install-start -->
 <div class="section">
   <div class="section-title">Install Pacefinder on another machine</div>
-  <div class="hint" style="margin-bottom:14px">Latest release: <b>v0.7.3</b>. Same listener everywhere — UDP port 5300, dashboard on :8000.</div>
+  <div class="hint" style="margin-bottom:14px">Latest release: <b>v0.7.5</b>. Same listener everywhere — UDP port 5300, dashboard on :8000.</div>
   <div class="step"><b>macOS</b> — <a href="https://pacefinder.app#install" target="_blank" style="color:var(--color-green)">request beta access via pacefinder.app</a>. We'll email a TestFlight invite; install the TestFlight app from the Mac App Store, accept the invite, and Pacefinder auto-updates from there.</div>
   <div class="step"><b>Linux x86_64</b> — download the AppImage and run it:</div>
   <div class="code-block">curl -L -o Pacefinder.AppImage \
-  https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.3/Pacefinder-0.7.3-x86_64.AppImage
+  https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.5/Pacefinder-0.7.5-x86_64.AppImage
 chmod +x Pacefinder.AppImage
 ./Pacefinder.AppImage</div>
   <div class="step"><b>Raspberry Pi 4 / Pi 5</b> — aarch64 AppImage, same flow:</div>
   <div class="code-block">curl -L -o Pacefinder.AppImage \
-  https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.3/Pacefinder-0.7.3-aarch64.AppImage
+  https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.5/Pacefinder-0.7.5-aarch64.AppImage
 chmod +x Pacefinder.AppImage
 ./Pacefinder.AppImage</div>
   <div class="step"><b>Docker</b> (any OS, multi-arch):</div>
   <div class="code-block">docker run --rm -p 5300:5300/udp -p 8000:8000 \
   -v "$(pwd)/pacefinder-data:/data" \
-  ghcr.io/estetika101/pacefinder:0.7.3</div>
+  ghcr.io/estetika101/pacefinder:0.7.5</div>
   <div class="step" style="margin-top:14px;font-size:.75rem;color:var(--color-text-muted)">For development from source see <a href="https://github.com/Estetika101/pacefinderapp#quick-start-from-source" target="_blank" style="color:var(--color-green)">the Quick Start in the README</a>.</div>
 </div>
 <!-- AVAILABILITY-SYNC:install-end -->
