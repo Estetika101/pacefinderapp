@@ -1,11 +1,25 @@
 import os
 import sys
 import json
+import platform
 import urllib.request
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+
+
+def _appimage_arch() -> str:
+    """Map the host machine to the AppImage arch suffix in release asset names.
+
+    Must key on the CPU architecture, not pointer width — a 64-bit Raspberry
+    Pi is aarch64, and bitness alone (sys.maxsize) would mislabel it x86_64
+    and hand it the wrong binary.
+    """
+    machine = platform.machine().lower()
+    if machine in ("aarch64", "arm64"):
+        return "aarch64"
+    return "x86_64"
 
 
 def detect_deployment():
@@ -59,9 +73,7 @@ def get_update_info():
 
     # Find appropriate asset for deployment method
     if deployment == 'appimage':
-        # Try to detect architecture
-        arch = 'x86_64' if sys.maxsize > 2**32 else 'aarch64'
-        asset_name = f'Pacefinder-{latest["tag_name"].lstrip("v")}-{arch}.AppImage'
+        asset_name = f'Pacefinder-{latest["tag_name"].lstrip("v")}-{_appimage_arch()}.AppImage'
         for asset in latest.get('assets', []):
             if asset['name'] == asset_name:
                 info['download_url'] = asset['browser_download_url']

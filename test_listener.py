@@ -688,6 +688,33 @@ def test_friendly_anthropic_errors():
           "model not found" in friendly_anthropic_error(404, "model not found"))
 
 
+def test_updater_arch_and_version():
+    """The AppImage auto-updater must pick the asset by CPU architecture, not
+    pointer width — a 64-bit Pi is aarch64, and bitness alone would hand it the
+    x86_64 binary. Also: APP_VERSION must default to a non-release sentinel when
+    the build-time _version.py is absent, so source/docker runs never pose as a
+    real release."""
+    import platform as _pf
+    from net.updater import _appimage_arch
+    print("\n[updater arch + version]")
+
+    real = _pf.machine()
+    try:
+        _pf.machine = lambda: "aarch64"
+        check("aarch64 host → aarch64 asset", _appimage_arch() == "aarch64")
+        _pf.machine = lambda: "arm64"
+        check("arm64 host → aarch64 asset", _appimage_arch() == "aarch64")
+        _pf.machine = lambda: "x86_64"
+        check("x86_64 host → x86_64 asset", _appimage_arch() == "x86_64")
+    finally:
+        _pf.machine = lambda: real
+
+    # No _version.py committed → listener falls back to the dev sentinel.
+    import listener
+    check("APP_VERSION defaults to 'dev' without a build stamp",
+          listener.APP_VERSION == "dev", f"got {listener.APP_VERSION!r}")
+
+
 # ── live UDP tests (requires running listener) ────────────────────────────────
 
 PORTS = {"forza_motorsport": 5300, "acc": 9996, "f1": 20777}
@@ -908,6 +935,7 @@ def main():
     test_tyre_temps_per_game()
     test_rotated_sector_guard()
     test_friendly_anthropic_errors()
+    test_updater_arch_and_version()
 
     print(f"\n{'═'*44}")
     print(f"  Pipeline: {PASS} passed  {FAIL} failed")

@@ -6,7 +6,13 @@ Saves raw archives and structured JSON sessions to USB storage.
 Exposes local web status server at http://pi.local:8000
 """
 
-APP_VERSION = "0.7.6-rc1"
+# Stamped at build time by release.yml (writes _version.py before PyInstaller,
+# from the release tag). Falls back to "dev" for source / docker / systemd runs
+# so the updater never claims to be a real release it isn't.
+try:
+    from _version import APP_VERSION  # generated at build; gitignored
+except ImportError:
+    APP_VERSION = "dev"
 
 import asyncio
 import collections
