@@ -70,15 +70,15 @@ confidence.
 Hot back-end paths are tracked with a real bench, not vibes:
 
 ```bash
-python3 bench_perf.py            # run + print table
-python3 bench_perf.py --baseline # save current numbers as baseline
-python3 bench_perf.py --check    # compare vs baseline; nonzero on regression
+python3 bench/bench_perf.py            # run + print table
+python3 bench/bench_perf.py --baseline # save current numbers as baseline
+python3 bench/bench_perf.py --check    # compare vs baseline; nonzero on regression
 ```
 
 Seeds a deterministic synthetic DB in a temp dir (no Pi required) and times
 the audit-flagged hot paths: `_db_tracks_index`, `_db_sessions_list(2000)`,
 career KPIs, recent, needs-review, new-since. Reports median + p95 + payload
-bytes per op. The baseline lives at [`bench_baseline.json`](./bench_baseline.json).
+bytes per op. The baseline lives at [`bench_baseline.json`](./bench/bench_baseline.json).
 
 **Numbers are not Pi numbers** — they reflect the runner's CPU/SQLite. The
 point is *relative tracking*: a fresh `--check` on the same machine catches
@@ -100,7 +100,7 @@ change is expected to grow (e.g. wider query for a new feature).
 - [ ] `python3 test_listener.py` — every check green
 - [ ] `py_compile` / `node --check` clean for every touched file
 - [ ] Regression test added for any bug fix (proven to fail without the fix)
-- [ ] `python3 bench_perf.py --check` clean *if your change touches a
+- [ ] `python3 bench/bench_perf.py --check` clean *if your change touches a
       benched hot path* (else not required)
 - [ ] CHANGELOG entry for user-facing changes
 - [ ] One concern per PR

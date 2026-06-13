@@ -140,7 +140,7 @@
   // Floating bottom-right card showing median + p95 + last request from
   // /debug/perf. Data is already collected by net/perf.py for every
   // request; this just surfaces it so you spot regressions live without
-  // re-running bench_perf.py or grepping logs. See docs/specs/...
+  // re-running bench/bench_perf.py or grepping logs. See docs/specs/...
   var _perfTimer = null, _perfHud = null;
   function mountPerfHud(){
     if(_perfHud) return;
