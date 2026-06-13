@@ -65,13 +65,18 @@
     const updateBtnText = updateData.deployment === 'appimage' ? 'Update now' : 'View release';
     const updateBtnHref = updateData.download_url || updateData.release_url;
 
+    // Use button element for one-click updates, anchor for others
+    const btnElement = updateData.deployment === 'appimage'
+      ? `<button class="pf-vb-btn" onclick="handleUpdateClick(event, '${updateData.deployment}'); return false;" data-url="${updateBtnHref}">${updateBtnText}</button>`
+      : `<a href="${updateBtnHref}" target="_blank" class="pf-vb-btn" onclick="return handleUpdateClick(event, '${updateData.deployment}')">${updateBtnText}</a>`;
+
     banner.innerHTML = `
       <div class="pf-vb-content">
         <span class="pf-vb-text">
           New version available: <strong>${latestVersion}</strong>
           <span class="pf-vb-current">(running ${currentVersion})</span>
         </span>
-        <a href="${updateBtnHref}" target="_blank" class="pf-vb-btn" onclick="return handleUpdateClick(event, '${updateData.deployment}')">${updateBtnText}</a>
+        ${btnElement}
         <button class="pf-vb-close" aria-label="Dismiss" title="Dismiss">✕</button>
       </div>
     `;
@@ -86,16 +91,68 @@
   }
 
   window.handleUpdateClick = function(event, deployment) {
+    event.preventDefault();
+
     if (deployment === 'appimage') {
-      // For AppImage, guide user to download page
-      // In a future enhancement, could implement in-app download/restart
-      return true;
+      const banner = document.getElementById('pf-version-banner');
+      const content = banner.querySelector('.pf-vb-content');
+      const btn = banner.querySelector('.pf-vb-btn');
+      const closeBtn = banner.querySelector('.pf-vb-close');
+
+      // Show loading state
+      btn.disabled = true;
+      closeBtn.style.display = 'none';
+      content.querySelector('.pf-vb-text').textContent = 'Downloading update...';
+
+      // Get download URL from button data attribute
+      const downloadUrl = btn.getAttribute('data-url');
+
+      // Trigger update
+      fetch('/update/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ download_url: downloadUrl })
+      }).then(r => r.json()).then(result => {
+        if (result.success) {
+          content.querySelector('.pf-vb-text').textContent = 'Update applied. Waiting for restart...';
+          // Poll for server to come back up
+          pollForRestart();
+        } else {
+          content.querySelector('.pf-vb-text').textContent = 'Update failed: ' + (result.error || 'Unknown error');
+          btn.disabled = false;
+          closeBtn.style.display = '';
+        }
+      }).catch(err => {
+        content.querySelector('.pf-vb-text').textContent = 'Update error: ' + err.message;
+        btn.disabled = false;
+        closeBtn.style.display = '';
+      });
+      return false;
     } else if (deployment === 'docker') {
-      // Guide to release page with Docker instructions
-      return true;
+      // Open release page in new tab
+      window.open(event.currentTarget.href, '_blank');
+      return false;
     }
     return true;
   };
+
+  function pollForRestart() {
+    const checkInterval = setInterval(async () => {
+      try {
+        const response = await fetch('/health', { method: 'GET' });
+        if (response.ok) {
+          clearInterval(checkInterval);
+          // Server is back, reload the page
+          location.reload();
+        }
+      } catch (e) {
+        // Server still down, keep polling
+      }
+    }, 1000); // Check every second
+
+    // Stop polling after 2 minutes
+    setTimeout(() => clearInterval(checkInterval), 120000);
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', checkForUpdates);
