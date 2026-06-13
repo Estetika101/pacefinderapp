@@ -42,36 +42,36 @@
       const currentData = await currentResp.json();
       const currentVersion = currentData.version;
 
-      const latestResp = await fetch(
-        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
-        { headers: { Accept: 'application/vnd.github.v3+json' } }
-      );
-      if (!latestResp.ok) return;
-      const latestData = await latestResp.json();
-      const latestVersion = latestData.tag_name;
+      const updateResp = await fetch('/update/check');
+      if (!updateResp.ok) return;
+      const updateData = await updateResp.json();
 
-      if (compareVersions(currentVersion, latestVersion) < 0) {
-        showBanner(currentVersion, latestVersion, latestData.html_url);
+      if (updateData.update_available && compareVersions(currentVersion, updateData.latest_version) < 0) {
+        showBanner(currentVersion, updateData.latest_version, updateData);
       }
     } catch (e) {
-      // Silently fail if GitHub API is unreachable or version check fails
+      // Silently fail if update check fails
     }
   }
 
-  function showBanner(currentVersion, latestVersion, releaseUrl) {
+  function showBanner(currentVersion, latestVersion, updateData) {
     const existing = document.getElementById('pf-version-banner');
-    if (existing) return; // Already shown
+    if (existing) return;
 
     const banner = document.createElement('div');
     banner.id = 'pf-version-banner';
     banner.className = 'pf-vbanner';
+
+    const updateBtnText = updateData.deployment === 'appimage' ? 'Update now' : 'View release';
+    const updateBtnHref = updateData.download_url || updateData.release_url;
+
     banner.innerHTML = `
       <div class="pf-vb-content">
         <span class="pf-vb-text">
           New version available: <strong>${latestVersion}</strong>
           <span class="pf-vb-current">(running ${currentVersion})</span>
         </span>
-        <a href="${releaseUrl}" target="_blank" class="pf-vb-btn">Update</a>
+        <a href="${updateBtnHref}" target="_blank" class="pf-vb-btn" onclick="return handleUpdateClick(event, '${updateData.deployment}')">${updateBtnText}</a>
         <button class="pf-vb-close" aria-label="Dismiss" title="Dismiss">✕</button>
       </div>
     `;
@@ -85,9 +85,22 @@
     document.body.insertBefore(banner, document.body.firstChild);
   }
 
+  window.handleUpdateClick = function(event, deployment) {
+    if (deployment === 'appimage') {
+      // For AppImage, guide user to download page
+      // In a future enhancement, could implement in-app download/restart
+      return true;
+    } else if (deployment === 'docker') {
+      // Guide to release page with Docker instructions
+      return true;
+    }
+    return true;
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', checkForUpdates);
   } else {
     checkForUpdates();
   }
 })();
+

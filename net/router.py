@@ -2389,6 +2389,12 @@ def make_handler(ctx: dict):
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps(payload).encode()))
 
+            elif path == "/update/check":
+                from net.updater import get_update_info
+                info = get_update_info()
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(info).encode()))
+
             else:
                 writer.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nNot Found")
 
