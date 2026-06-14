@@ -2399,15 +2399,14 @@ def make_handler(ctx: dict):
                 from net.updater import perform_update
                 try:
                     body = raw_body.decode('utf-8')
-                    data = json.loads(body)
+                    data = json.loads(body) if body.strip() else {}
+                    # download_url is required for AppImage only; the systemd
+                    # path (git pull + restart) needs none, so don't gate on it
+                    # here — perform_update branches by deployment and validates.
                     download_url = data.get('download_url', '')
-                    if not download_url:
-                        writer.write(_http_response("400 Bad Request", "application/json",
-                                                    json.dumps({'success': False, 'error': 'No download URL provided'}).encode()))
-                    else:
-                        result = perform_update(download_url)
-                        writer.write(_http_response("200 OK", "application/json",
-                                                    json.dumps(result).encode()))
+                    result = perform_update(download_url)
+                    writer.write(_http_response("200 OK", "application/json",
+                                                json.dumps(result).encode()))
                 except Exception as e:
                     writer.write(_http_response("500 Internal Server Error", "application/json",
                                                 json.dumps({'success': False, 'error': str(e)}).encode()))

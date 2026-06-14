@@ -2,6 +2,10 @@
   const REPO_OWNER = 'Estetika101';
   const REPO_NAME = 'pacefinderapp';
 
+  // Set in showBanner; read by handleUpdateClick for deployment-specific data
+  // (download_url, needs_sudo, restart_command).
+  let currentUpdate = null;
+
   function compareVersions(current, latest) {
     const parseVersion = (v) => {
       const parts = v.replace(/^v/, '').split(/[-.]/).map(p => {
@@ -55,6 +59,7 @@
   }
 
   function showBanner(currentVersion, latestVersion, updateData) {
+    currentUpdate = updateData;
     const existing = document.getElementById('pf-version-banner');
     if (existing) return;
 
@@ -62,11 +67,13 @@
     banner.id = 'pf-version-banner';
     banner.className = 'pf-vbanner';
 
-    const updateBtnText = updateData.deployment === 'appimage' ? 'Update now' : 'View release';
+    // AppImage and systemd both support one-click apply; docker/dev link out.
+    const oneClick = updateData.can_auto_update &&
+                     (updateData.deployment === 'appimage' || updateData.deployment === 'systemd');
+    const updateBtnText = oneClick ? 'Update now' : 'View release';
     const updateBtnHref = updateData.download_url || updateData.release_url;
 
-    // Use button element for one-click updates, anchor for others
-    const btnElement = updateData.deployment === 'appimage'
+    const btnElement = oneClick
       ? `<button class="pf-vb-btn" onclick="handleUpdateClick(event, '${updateData.deployment}'); return false;" data-url="${updateBtnHref}">${updateBtnText}</button>`
       : `<a href="${updateBtnHref}" target="_blank" class="pf-vb-btn" onclick="return handleUpdateClick(event, '${updateData.deployment}')">${updateBtnText}</a>`;
 
@@ -119,6 +126,55 @@
           pollForRestart();
         } else {
           content.querySelector('.pf-vb-text').textContent = 'Update failed: ' + (result.error || 'Unknown error');
+          btn.disabled = false;
+          closeBtn.style.display = '';
+        }
+      }).catch(err => {
+        content.querySelector('.pf-vb-text').textContent = 'Update error: ' + err.message;
+        btn.disabled = false;
+        closeBtn.style.display = '';
+      });
+      return false;
+    } else if (deployment === 'systemd') {
+      const banner = document.getElementById('pf-version-banner');
+      const content = banner.querySelector('.pf-vb-content');
+      const btn = banner.querySelector('.pf-vb-btn');
+      const closeBtn = banner.querySelector('.pf-vb-close');
+      const restartCmd = (currentUpdate && currentUpdate.restart_command) ||
+                         'sudo systemctl restart pacefinder';
+
+      // Warn up front when finishing will need admin rights, so the restart
+      // step isn't a surprise — and so the user knows it's on them.
+      if (currentUpdate && currentUpdate.needs_sudo) {
+        const ok = window.confirm(
+          'This pulls the latest code, but restarting the service needs admin ' +
+          'rights. Once it finishes you\'ll need to run:\n\n  ' + restartCmd +
+          '\n\nContinue?');
+        if (!ok) return false;
+      }
+
+      btn.disabled = true;
+      closeBtn.style.display = 'none';
+      content.querySelector('.pf-vb-text').textContent = 'Updating (git pull)…';
+
+      fetch('/update/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      }).then(r => r.json()).then(result => {
+        const text = content.querySelector('.pf-vb-text');
+        if (result.success && result.needs_manual_restart) {
+          // Code is updated; the restart is the user's to run. Show the exact
+          // command, keep it on screen, and stop the spinner.
+          text.innerHTML = 'Updated. Finish with: <code class="pf-vb-cmd">' +
+            (result.restart_command || restartCmd) + '</code>';
+          btn.style.display = 'none';
+          closeBtn.style.display = '';
+        } else if (result.success) {
+          text.textContent = 'Update applied. Waiting for restart…';
+          pollForRestart();
+        } else {
+          text.textContent = 'Update failed: ' + (result.error || 'Unknown error');
           btn.disabled = false;
           closeBtn.style.display = '';
         }
