@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.7.6-rc2 — Auto-updater validation (2026-06-14)
+
+Pre-release dry run for the in-app update checker + auto-updater ([#250](https://github.com/Estetika101/pacefinderapp/pull/250)). First build to carry it, so it exercises the full path through the pipeline:
+
+- Confirms the updater compiles into the AppImage / Mac artifacts.
+- Confirms the build-time version stamp (`_version.py`, written by `release.yml`) reports a real version instead of `dev`.
+- The updater itself: script-based AppImage swap + relaunch with SHA-256 verification against GitHub's asset digest, and a systemd `git pull` + restart path (automatic when running as root, otherwise it surfaces the exact `sudo systemctl restart pacefinder` to run).
+
+Test the AppImage self-update on real hardware from this build before promoting to a stable v0.7.6.
+
 ## v0.7.6-rc1 — Release pipeline on new action majors (2026-06-12)
 
 No runtime changes — this rc exists to validate the release pipeline after
