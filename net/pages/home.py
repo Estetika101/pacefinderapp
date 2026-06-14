@@ -19,6 +19,7 @@ HOME_HTML_PRE = """<!DOCTYPE html>
 <div id="pf-nav"></div>
 <script src="/static/js/_safe.js"></script>
 <script src="/static/js/nav.js"></script>
+<script src="/static/js/version-banner.js"></script>
 <div class="page">
 
   <!-- Last session hero — answers "what happened while I was away?"

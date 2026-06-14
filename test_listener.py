@@ -688,6 +688,80 @@ def test_friendly_anthropic_errors():
           "model not found" in friendly_anthropic_error(404, "model not found"))
 
 
+def test_updater_arch_and_version():
+    """The AppImage auto-updater must pick the asset by CPU architecture, not
+    pointer width — a 64-bit Pi is aarch64, and bitness alone would hand it the
+    x86_64 binary. Also: APP_VERSION must default to a non-release sentinel when
+    the build-time _version.py is absent, so source/docker runs never pose as a
+    real release."""
+    import platform as _pf
+    from net.updater import _appimage_arch
+    print("\n[updater arch + version]")
+
+    real = _pf.machine()
+    try:
+        _pf.machine = lambda: "aarch64"
+        check("aarch64 host → aarch64 asset", _appimage_arch() == "aarch64")
+        _pf.machine = lambda: "arm64"
+        check("arm64 host → aarch64 asset", _appimage_arch() == "aarch64")
+        _pf.machine = lambda: "x86_64"
+        check("x86_64 host → x86_64 asset", _appimage_arch() == "x86_64")
+    finally:
+        _pf.machine = lambda: real
+
+    # No _version.py committed → listener falls back to the dev sentinel.
+    import listener
+    check("APP_VERSION defaults to 'dev' without a build stamp",
+          listener.APP_VERSION == "dev", f"got {listener.APP_VERSION!r}")
+
+
+def test_updater_apply_paths():
+    """Script-based auto-update: systemd advertises one-click + a sudo warning,
+    SHA verification reads GitHub's asset digest, and unsupported deployments
+    refuse cleanly."""
+    from net import updater
+    print("\n[updater apply paths]")
+
+    fake_release = {
+        "tag_name": "v0.7.5",
+        "html_url": "https://example/r",
+        "assets": [{
+            "name": "Pacefinder-0.7.5-x86_64.AppImage",
+            "browser_download_url": "https://example/dl",
+            "digest": "sha256:abc123",
+        }],
+    }
+    orig_detect, orig_latest = updater.detect_deployment, updater.get_latest_release_info
+    try:
+        updater.get_latest_release_info = lambda: fake_release
+
+        updater.detect_deployment = lambda: "systemd"
+        info = updater.get_update_info()
+        check("systemd advertises one-click auto-update", info.get("can_auto_update") is True)
+        check("systemd reports needs_sudo as a bool", isinstance(info.get("needs_sudo"), bool))
+        check("systemd surfaces the restart command",
+              "systemctl restart" in info.get("restart_command", ""))
+
+        updater.detect_deployment = lambda: "dev"
+        r = updater.perform_update("")
+        check("unsupported deployment refuses", r.get("success") is False)
+    finally:
+        updater.detect_deployment, updater.get_latest_release_info = orig_detect, orig_latest
+
+    # Digest parsing + hashing.
+    check("asset digest parsed from sha256: prefix",
+          updater._asset_sha256(fake_release, "https://example/dl") == "abc123")
+    check("missing asset → no digest",
+          updater._asset_sha256(fake_release, "https://nope") is None)
+    import tempfile as _tf, os as _os, hashlib as _hl
+    fd, p = _tf.mkstemp()
+    try:
+        _os.write(fd, b"pacefinder"); _os.close(fd)
+        check("_sha256 matches hashlib", updater._sha256(p) == _hl.sha256(b"pacefinder").hexdigest())
+    finally:
+        _os.unlink(p)
+
+
 # ── live UDP tests (requires running listener) ────────────────────────────────
 
 PORTS = {"forza_motorsport": 5300, "acc": 9996, "f1": 20777}
@@ -908,6 +982,8 @@ def main():
     test_tyre_temps_per_game()
     test_rotated_sector_guard()
     test_friendly_anthropic_errors()
+    test_updater_arch_and_version()
+    test_updater_apply_paths()
 
     print(f"\n{'═'*44}")
     print(f"  Pipeline: {PASS} passed  {FAIL} failed")

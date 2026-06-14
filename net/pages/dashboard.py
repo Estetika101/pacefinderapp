@@ -262,6 +262,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <script>Perf.autoReport('/');</script>
 <script src="/static/js/class.js"></script>
 <script src="/static/js/dashboard.js"></script>
+<script src="/static/js/version-banner.js"></script>
 </body>
 </html>
 """

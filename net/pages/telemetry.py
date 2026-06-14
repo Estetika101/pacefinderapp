@@ -198,6 +198,7 @@ html.embed .track-map-wrap{top:0}
 <div id="pf-nav"></div>
 <script src="/static/js/_safe.js"></script>
 <script src="/static/js/nav.js"></script>
+<script src="/static/js/version-banner.js"></script>
 <script>
 // Embedded in the session-detail iframe: nav.js hides #pf-nav itself;
 // here we also drop the in-iframe breadcrumb/subnav (the parent page

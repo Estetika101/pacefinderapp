@@ -92,6 +92,8 @@ jobs:
           echo "PACEFINDER_VERSION=$v"          >> "$GITHUB_ENV"
           echo "PACEFINDER_VERSION_SHORT=$short" >> "$GITHUB_ENV"
           echo "PACEFINDER_BUILD=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          # Stamp the version into the frozen build (imported by listener.py).
+          printf 'APP_VERSION = "%s"\n' "$v" > _version.py
 
       - name: PyInstaller build
         # The spec reads PACEFINDER_VERSION_SHORT for CFBundleShortVersionString
@@ -343,6 +345,8 @@ jobs:
             v="0.0.0-${GITHUB_SHA::7}"
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
+          # Stamp the version into the frozen build (imported by listener.py).
+          printf 'APP_VERSION = "%s"\n' "$v" > _version.py
 
       - name: PyInstaller build
         run: pyinstaller pacefinder.spec --clean --noconfirm

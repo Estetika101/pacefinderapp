@@ -105,6 +105,7 @@ body{
 <body>
 <div id="pf-nav"></div>
 <script src="/static/js/nav.js"></script>
+<script src="/static/js/version-banner.js"></script>
 
 <!-- ── Point your game here ──────────────────────────────────────── -->
 <div class="section">

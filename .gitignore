@@ -16,3 +16,6 @@ data/*
 !data/fm8_*.csv
 CLAUDE.md
 .claude/
+
+# Build-time version stamp written by release.yml
+/_version.py

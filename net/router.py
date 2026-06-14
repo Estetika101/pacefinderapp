@@ -2383,6 +2383,34 @@ def make_handler(ctx: dict):
             elif path == "/health":
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
 
+            elif path == "/version":
+                app_version = ctx.get("app_version", "unknown")
+                payload = {"version": app_version}
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(payload).encode()))
+
+            elif path == "/update/check":
+                from net.updater import get_update_info
+                info = get_update_info()
+                writer.write(_http_response("200 OK", "application/json",
+                                            json.dumps(info).encode()))
+
+            elif path == "/update/apply" and method == "POST":
+                from net.updater import perform_update
+                try:
+                    body = raw_body.decode('utf-8')
+                    data = json.loads(body) if body.strip() else {}
+                    # download_url is required for AppImage only; the systemd
+                    # path (git pull + restart) needs none, so don't gate on it
+                    # here — perform_update branches by deployment and validates.
+                    download_url = data.get('download_url', '')
+                    result = perform_update(download_url)
+                    writer.write(_http_response("200 OK", "application/json",
+                                                json.dumps(result).encode()))
+                except Exception as e:
+                    writer.write(_http_response("500 Internal Server Error", "application/json",
+                                                json.dumps({'success': False, 'error': str(e)}).encode()))
+
             else:
                 writer.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nNot Found")
 
