@@ -218,20 +218,14 @@ chmod +x Pacefinder.AppImage
   </div>
 
   <div class="autostart-panel" id="panel-linux">
-    <div class="step">Copy the service file and enable it with systemd:</div>
-    <div class="code-block">sudo cp pacefinder.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable pacefinder
-sudo systemctl start pacefinder</div>
+    <div class="step">From the cloned repo, run <b>install-pi.sh</b> once. It stamps your actual clone path + user into the systemd unit, installs <code>platformdirs</code> if missing, migrates off the old <code>simtelemetry</code> unit name if present, enables the service, and verifies the dashboard responds before exiting.</div>
+    <div class="code-block">./install-pi.sh</div>
     <div class="step">Check status: <span style="font-family:monospace;color:#888">sudo systemctl status pacefinder</span></div>
     <div class="step">View logs: <span style="font-family:monospace;color:#888">sudo journalctl -u pacefinder -f</span></div>
     <div class="step" style="margin-top:14px;font-size:.75rem;color:var(--color-text-muted)">
-      <b>Already installed under the old <code>simtelemetry</code> name?</b> Migrate once:
+      Prefer to do it by hand? <code>pacefinder.service</code> assumes you cloned to <code>/home/pi/pacefinderapp</code> as user <code>pi</code> — edit <code>WorkingDirectory</code>/<code>ExecStart</code>/<code>User</code> first if that's not your setup, then:
     </div>
-    <div class="code-block">sudo systemctl stop simtelemetry
-sudo systemctl disable simtelemetry
-sudo rm /etc/systemd/system/simtelemetry.service
-sudo cp pacefinder.service /etc/systemd/system/
+    <div class="code-block">sudo cp pacefinder.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable pacefinder
 sudo systemctl start pacefinder</div>

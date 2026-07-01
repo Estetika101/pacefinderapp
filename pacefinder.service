@@ -3,8 +3,10 @@ Description=Pacefinder UDP Listener
 After=network.target local-fs.target
 # Listener falls back to local storage if USB isn't mounted, so no hard USB dep.
 
-# Adjust WorkingDirectory + ExecStart paths below if you cloned the repo
-# somewhere other than /home/pi/pacefinderapp.
+# Manual copy-paste template — assumes you cloned to /home/pi/pacefinderapp
+# and run as user "pi". If either differs, edit WorkingDirectory/ExecStart/User
+# below, OR just run ./install-pi.sh instead, which stamps these automatically
+# and verifies the service comes up.
 [Service]
 Type=simple
 User=pi
