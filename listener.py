@@ -20,6 +20,7 @@ import json
 import logging
 import shutil
 import socket
+import subprocess
 import threading
 import urllib.parse
 import struct
@@ -44,6 +45,8 @@ from net.pages.home import HOME_HTML_PRE
 from net.pages.events import SESSION_EVENTS_HTML
 from net.pages.telemetry import TELEMETRY_HTML
 from net.pages.debug import DEBUG_RAW_HTML, DEBUG_PERF_HTML
+from net.pages.f1 import F1_LIVE_HTML, F1_RAW_HTML
+from net import f1_state as _f1_state
 from net.router import make_handler
 from net.api import (
     build_inject_packets as _build_inject_packets_core,
@@ -191,6 +194,34 @@ def _get_local_ips() -> list:
     except Exception:
         pass
     return ips
+
+# ─── Build-version stamp (F1 dip-toes screens) ────────────────────────────────
+
+def _git_short_sha() -> str:
+    """Best-effort git short SHA so the F1 footer proves we're looking at
+    the same build as the branch. Returns 'unknown' if we're not in a git
+    checkout (e.g. PyInstaller bundle)."""
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).parent, stderr=subprocess.DEVNULL, timeout=1,
+        )
+        sha = out.decode().strip()
+        dirty = subprocess.call(
+            ["git", "diff", "--quiet"],
+            cwd=Path(__file__).parent, stderr=subprocess.DEVNULL, timeout=1,
+        )
+        return sha + ("+dirty" if dirty else "")
+    except Exception:
+        return "unknown"
+
+_BUILD_SHA   = _git_short_sha()
+_BUILD_BOOT  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def _stamp_f1(html: str) -> str:
+    """Substitute {{VERSION}} + {{STARTED_AT}} in F1 page templates so the
+    footer reveals which build the browser is rendering."""
+    return html.replace("{{VERSION}}", _BUILD_SHA).replace("{{STARTED_AT}}", _BUILD_BOOT)
 
 # ─── Admin Packet Injection ───────────────────────────────────────────────────
 
@@ -385,20 +416,43 @@ async def main(demo_mode: bool = False):
     # UDP packets to these ports, and that's the *only* way to populate the
     # live dashboard for screenshots / smoke tests. Bind in demo mode too;
     # if a port's already in use (real game running) we log and continue.
+    # parse_f1 emits packet-type-tagged dicts; the live + raw F1 screens want
+    # a merged view across telemetry/lap_data/motion/car_status. Side-effect:
+    # update f1_state on every successful parse, return the dict untouched so
+    # the session pipeline downstream is unchanged. Also record every inbound
+    # packet-id + size in f1_state.note_raw so the raw screen surfaces what's
+    # flowing even for packet types parse_f1 doesn't yet handle (e.g. Event,
+    # Participants, FinalClassification, F1-25-format changes).
+    def _parse_f1_capture(data: bytes):
+        _f1_state.note_raw(data)
+        parsed = parse_f1(data)
+        if parsed:
+            _f1_state.update(parsed)
+        return parsed
+
     parsers = {
         "forza_motorsport": parse_forza,
         "acc":              parse_acc,
-        "f1":               parse_f1,
+        "f1":               _parse_f1_capture,
     }
 
     for game, port in PORTS.items():
+        # F1 frequently coexists with TrackTitan / SimHub / etc. on 20777.
+        # reuse_port lets multiple sockets bind the same UDP port, but the
+        # kernel only delivers a packet to all of them when it's broadcast
+        # (255.255.255.255 / subnet broadcast) — unicast still goes to one
+        # socket. The F1 game has a "UDP Broadcast Mode" toggle for this.
+        kwargs = {"local_addr": ("0.0.0.0", port)}
+        if game == "f1":
+            kwargs["reuse_port"] = True
         try:
             await loop.create_datagram_endpoint(
                 lambda g=game, p=parsers[game]: TelemetryProtocol(g, p, _debug_push),
-                local_addr=("0.0.0.0", port),
+                **kwargs,
             )
             state["bound_ports"][game] = port
-            log.info(f"Listening for {game} on UDP port {port}")
+            log.info(f"Listening for {game} on UDP port {port}"
+                     + (" (reuse_port — needs game broadcast mode to coexist)" if game == "f1" else ""))
         except OSError as e:
             log.error(f"Failed to bind {game} on port {port}: {e} — F1/ACC/Forza port conflict?")
 
@@ -431,6 +485,9 @@ async def main(demo_mode: bool = False):
         "TELEMETRY_HTML": TELEMETRY_HTML,
         "DEBUG_RAW_HTML": DEBUG_RAW_HTML,
         "DEBUG_PERF_HTML": DEBUG_PERF_HTML,
+        "F1_LIVE_HTML": _stamp_f1(F1_LIVE_HTML),
+        "F1_RAW_HTML": _stamp_f1(F1_RAW_HTML),
+        "f1_state_snapshot": _f1_state.snapshot,
         "get_local_ips": _get_local_ips,
         "disk_info": disk_info,
         "save_config": save_config,

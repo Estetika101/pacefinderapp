@@ -95,22 +95,11 @@ Logs: `~/Library/Logs/pacefinder.log`
 
 ### Linux / Pi
 ```bash
-sudo cp pacefinder.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable pacefinder
-sudo systemctl start pacefinder
+./install-pi.sh
 ```
+Stamps your actual clone path + user into the systemd unit, installs `platformdirs` if missing, migrates off the old `simtelemetry` unit name if present, enables the service, and verifies the dashboard responds before exiting. Safe to re-run.
 
-> **Already installed under the old `simtelemetry` name?** Migrate with:
-> ```bash
-> sudo systemctl stop simtelemetry
-> sudo systemctl disable simtelemetry
-> sudo rm /etc/systemd/system/simtelemetry.service
-> sudo cp pacefinder.service /etc/systemd/system/
-> sudo systemctl daemon-reload
-> sudo systemctl enable pacefinder
-> sudo systemctl start pacefinder
-> ```
+Prefer to do it by hand? See [Running as a Background Service](#running-as-a-background-service-linux--pi) below — but note the unit file assumes you cloned to `/home/pi/pacefinderapp`; edit `WorkingDirectory`/`ExecStart`/`User` if that's not your setup.
 
 ### Windows
 Open Task Scheduler → Create Basic Task → Trigger: At log on → Action: Start `pythonw.exe C:\path\to\listener.py`.
@@ -167,6 +156,12 @@ Default storage path is `./data/`. Change it in the setup page or edit `simtelem
 ---
 
 ## Running as a Background Service (Linux / Pi)
+
+```bash
+./install-pi.sh
+```
+
+Or by hand — the unit assumes you cloned to `/home/pi/pacefinderapp` as user `pi`; edit `WorkingDirectory`/`ExecStart`/`User` in `pacefinder.service` first if that's not your setup:
 
 ```bash
 sudo cp pacefinder.service /etc/systemd/system/
