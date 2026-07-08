@@ -443,7 +443,9 @@ async def main(demo_mode: bool = False):
         # (255.255.255.255 / subnet broadcast) — unicast still goes to one
         # socket. The F1 game has a "UDP Broadcast Mode" toggle for this.
         kwargs = {"local_addr": ("0.0.0.0", port)}
-        if game == "f1":
+        # SO_REUSEPORT doesn't exist on Windows — passing reuse_port=True there
+        # makes asyncio raise ValueError and crash startup, so gate on support.
+        if game == "f1" and hasattr(socket, "SO_REUSEPORT"):
             kwargs["reuse_port"] = True
         try:
             await loop.create_datagram_endpoint(
@@ -453,7 +455,7 @@ async def main(demo_mode: bool = False):
             state["bound_ports"][game] = port
             log.info(f"Listening for {game} on UDP port {port}"
                      + (" (reuse_port — needs game broadcast mode to coexist)" if game == "f1" else ""))
-        except OSError as e:
+        except (OSError, ValueError) as e:
             log.error(f"Failed to bind {game} on port {port}: {e} — F1/ACC/Forza port conflict?")
 
     if not demo_mode:
