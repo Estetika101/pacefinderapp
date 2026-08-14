@@ -16,8 +16,13 @@ COPY . .
 EXPOSE 5300/udp
 EXPOSE 8000/tcp
 
-# Default storage lives in /data so it can be bind-mounted from the host.
-ENV PYTHONUNBUFFERED=1
+# Default storage — and the config file itself — live in /data so both
+# survive a bind mount and container recreation. config.py reads
+# PACEFINDER_DATA_DIR to redirect CONFIG_FILE and the default storage_path
+# here; without it, root (this container's default user) can always mkdir
+# the Pi-only /mnt/usb/simtelemetry default, so the fallback that saves
+# non-root installs never triggers and data silently lands outside /data.
+ENV PYTHONUNBUFFERED=1 PACEFINDER_DATA_DIR=/data
 VOLUME ["/data"]
 
 CMD ["python", "listener.py"]

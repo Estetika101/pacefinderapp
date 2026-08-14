@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -10,15 +11,26 @@ from platformdirs import user_data_dir
 # this, and codesign rejects bundles that contain post-build modifications.
 # Source clones (Pi systemd service, dev macOS/Linux) keep the in-tree path
 # so existing setups don't need migration.
+#
+# The Docker image sets PACEFINDER_DATA_DIR=/data (its declared VOLUME) so
+# both the config file and the default storage_path below land on the bind
+# mount. Without this, CONFIG_FILE fell inside WORKDIR /app and the default
+# storage_path (/mnt/usb/simtelemetry, the Pi-USB default) was silently
+# mkdir-able by the container's root user — both invisible to `docker run -v
+# $(pwd)/data:/data` and wiped on every container recreation.
+_DOCKER_DATA_DIR = os.environ.get("PACEFINDER_DATA_DIR")
+
 if getattr(sys, "frozen", False):
     _USER_DATA = Path(user_data_dir("Pacefinder", appauthor=False))
     _USER_DATA.mkdir(parents=True, exist_ok=True)
     CONFIG_FILE = _USER_DATA / "simtelemetry.config.json"
+elif _DOCKER_DATA_DIR:
+    CONFIG_FILE = Path(_DOCKER_DATA_DIR) / "simtelemetry.config.json"
 else:
     CONFIG_FILE = Path(__file__).parent / "simtelemetry.config.json"
 
 DEFAULTS: dict = {
-    "storage_path":      "/mnt/usb/simtelemetry",
+    "storage_path":      _DOCKER_DATA_DIR or "/mnt/usb/simtelemetry",
     "session_timeout_s": 10,
     "idle_timeout_s":    30,
     "status_port":       8000,
