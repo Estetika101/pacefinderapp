@@ -762,6 +762,52 @@ def test_updater_apply_paths():
         _os.unlink(p)
 
 
+def test_docker_data_dir():
+    """Docker's container user is root, so the Pi-only /mnt/usb/simtelemetry
+    default is always mkdir-able inside the container's own ephemeral layer —
+    the PermissionError fallback that saves non-root AppImage/systemd installs
+    never triggers. PACEFINDER_DATA_DIR (set by the Dockerfile to /data, the
+    declared VOLUME) must redirect both the default storage_path and
+    CONFIG_FILE there, or every Docker install silently loses its data (and
+    its Setup-page config) on the next `docker run`.
+
+    Runs config.py in a subprocess per case — it computes CONFIG_FILE and
+    DEFAULTS at import time from the environment, so this is the only way to
+    observe both a with- and without-the-env-var boot without one polluting
+    the other's already-imported module state."""
+    import os as _os
+    import subprocess as _sp
+    import sys as _sys
+    import tempfile as _tf
+    print("\n[docker data dir]")
+
+    script = ("import config; "
+              "print(config.DEFAULTS['storage_path']); "
+              "print(config.CONFIG_FILE); "
+              "print(config.storage_path())")
+
+    with _tf.TemporaryDirectory() as tmp:
+        out = _sp.run([_sys.executable, "-c", script], cwd=".",
+                       env={**_os.environ, "PACEFINDER_DATA_DIR": tmp},
+                       capture_output=True, text=True, timeout=15)
+        lines = out.stdout.strip().splitlines()
+        check("docker-env subprocess ran cleanly", out.returncode == 0, out.stderr)
+        default_sp, cfg_file, resolved_sp = (lines + ["", "", ""])[:3]
+        check("default storage_path lands under PACEFINDER_DATA_DIR",
+              default_sp == tmp, default_sp)
+        check("CONFIG_FILE lands under PACEFINDER_DATA_DIR (survives container recreation)",
+              cfg_file.startswith(tmp), cfg_file)
+        check("storage_path() resolves inside the volume, not /mnt/usb",
+              resolved_sp == tmp, resolved_sp)
+
+    env_no_docker = {k: v for k, v in _os.environ.items() if k != "PACEFINDER_DATA_DIR"}
+    out2 = _sp.run([_sys.executable, "-c",
+                    "import config; print(config.DEFAULTS['storage_path'])"],
+                   cwd=".", env=env_no_docker, capture_output=True, text=True, timeout=15)
+    check("non-Docker default storage_path is untouched (no AppImage/systemd regression)",
+          out2.stdout.strip() == "/mnt/usb/simtelemetry", out2.stdout + out2.stderr)
+
+
 # ── live UDP tests (requires running listener) ────────────────────────────────
 
 PORTS = {"forza_motorsport": 5300, "acc": 9996, "f1": 20777}
@@ -984,6 +1030,7 @@ def main():
     test_friendly_anthropic_errors()
     test_updater_arch_and_version()
     test_updater_apply_paths()
+    test_docker_data_dir()
 
     print(f"\n{'═'*44}")
     print(f"  Pipeline: {PASS} passed  {FAIL} failed")
