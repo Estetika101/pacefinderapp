@@ -567,19 +567,20 @@ async def main(demo_mode: bool = False):
 
 
 def _maybe_open_browser_on_launch():
+    # macOS gets a proper launch dialog instead — see _run_with_cocoa_shell's
+    # _AppDelegate. webbrowser.open() shells out to `/usr/bin/open` under the
+    # hood, which the sandboxed MAS build can't fork/exec: confirmed dead on
+    # a real TestFlight build (no browser tab, nothing but a line in
+    # listener.log from the broad except below). NSWorkspace, used by the
+    # dialog, is the sandbox-safe way to open a URL.
+    if sys.platform == "darwin":
+        return
     # Only opens for frozen (PyInstaller) builds. Source clones — including the
-    # Pi systemd service — stay silent.
+    # Pi systemd service — stay silent. Linux AppImage already prints to a
+    # visible terminal on start, so this only needs to fire once, ever.
     if not getattr(sys, "frozen", False):
         return
-    # macOS has no window, Dock badge, or terminal — opening the app looks
-    # exactly like nothing happened (a TestFlight tester: "I can install but
-    # when I opened the application doesn't run"). So every launch opens the
-    # dashboard there, not just the first — it's the only launch feedback the
-    # app has. Other frozen builds (Linux AppImage) already print to a visible
-    # terminal on start, so they keep the original once-ever open via
-    # first_run_done, tracked below.
-    is_mac = sys.platform == "darwin"
-    if not is_mac and config.get("first_run_done"):
+    if config.get("first_run_done"):
         return
     try:
         import webbrowser, threading
@@ -587,12 +588,11 @@ def _maybe_open_browser_on_launch():
             1.0,
             lambda: webbrowser.open(f"http://localhost:{STATUS_PORT}/"),
         ).start()
-        if not is_mac and not config.get("first_run_done"):
-            cfg = {**config, "first_run_done": True}
-            config["first_run_done"] = True
-            save_config(cfg)
+        cfg = {**config, "first_run_done": True}
+        config["first_run_done"] = True
+        save_config(cfg)
     except Exception as e:
-        log.warning(f"browser open on launch failed: {e}")
+        log.warning(f"first-run browser open failed: {e}")
 
 
 def _run_with_cocoa_shell(demo_mode: bool):
@@ -608,12 +608,21 @@ def _run_with_cocoa_shell(demo_mode: bool):
     Only used for the frozen macOS build; dev/Linux/Windows/Docker runs never
     call this.
     """
-    import webbrowser
     from AppKit import (
         NSApplication, NSApplicationActivationPolicyRegular,
         NSMenu, NSMenuItem, NSLinkAttributeName,
+        NSAlert, NSButton, NSButtonTypeSwitch, NSAlertFirstButtonReturn,
+        NSWorkspace,
     )
-    from Foundation import NSObject, NSURL, NSMutableAttributedString
+    from Foundation import NSObject, NSURL, NSMutableAttributedString, NSMakeRect
+
+    def _open_dashboard():
+        # NSWorkspace, not webbrowser.open() — see _maybe_open_browser_on_launch
+        # for why the latter is dead under the sandbox. This is the one path
+        # both the menu item and the launch dialog's button use.
+        NSWorkspace.sharedWorkspace().openURL_(
+            NSURL.URLWithString_(f"http://localhost:{STATUS_PORT}/")
+        )
 
     # Target object for the menu bar's actions. PyObjC bridges an ObjC
     # selector "foo:" to a Python method named "foo_", so these method names
@@ -621,7 +630,7 @@ def _run_with_cocoa_shell(demo_mode: bool):
     # the `actions` local below, since app.run() blocks this frame open.
     class _MenuActions(NSObject):
         def openDashboard_(self, sender):
-            webbrowser.open(f"http://localhost:{STATUS_PORT}/")
+            _open_dashboard()
 
         def showAbout_(self, sender):
             # Version comes from the bundle's own CFBundleShortVersionString/
@@ -635,6 +644,35 @@ def _run_with_cocoa_shell(demo_mode: bool):
             NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(
                 {"Credits": credits}
             )
+
+    class _AppDelegate(NSObject):
+        # Fires once app.run() starts pumping events — the standard place to
+        # show launch-time UI, and guaranteed to run on the main thread (the
+        # listener itself runs on the background thread started below, which
+        # can never touch AppKit directly).
+        def applicationDidFinishLaunching_(self, notification):
+            if config.get("launch_dialog_dismissed"):
+                return
+            alert = NSAlert.alloc().init()
+            alert.setMessageText_("Pacefinder is running")
+            alert.setInformativeText_(
+                "Pacefinder listens for telemetry in the background and serves a "
+                f"live dashboard at localhost:{STATUS_PORT} — there's no app window "
+                "of its own. Reopen the dashboard anytime from the Pacefinder menu."
+            )
+            checkbox = NSButton.alloc().initWithFrame_(NSMakeRect(0, 0, 300, 18))
+            checkbox.setButtonType_(NSButtonTypeSwitch)
+            checkbox.setTitle_("Don't show this again")
+            alert.setAccessoryView_(checkbox)
+            alert.addButtonWithTitle_("Open Dashboard")
+            alert.addButtonWithTitle_("Close")
+            response = alert.runModal()
+            if checkbox.state():
+                cfg = {**config, "launch_dialog_dismissed": True}
+                config["launch_dialog_dismissed"] = True
+                save_config(cfg)
+            if response == NSAlertFirstButtonReturn:
+                _open_dashboard()
 
     def _run_listener():
         try:
@@ -655,6 +693,8 @@ def _run_with_cocoa_shell(demo_mode: bool):
     app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
 
     actions = _MenuActions.alloc().init()
+    delegate = _AppDelegate.alloc().init()
+    app.setDelegate_(delegate)
 
     main_menu = NSMenu.alloc().init()
     app_menu_item = NSMenuItem.alloc().init()
