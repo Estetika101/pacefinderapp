@@ -27,7 +27,15 @@ def _appimage_arch() -> str:
 
 
 def detect_deployment():
-    """Detect deployment method: 'appimage', 'docker', 'systemd', or 'dev'."""
+    """Detect deployment method: 'appimage', 'docker', 'systemd', 'mas', or 'dev'."""
+    # Frozen macOS build == the Mac App Store .app (release.yml's mac-app job
+    # is the only frozen-macOS distribution channel). MAS review prohibits
+    # self-updating / linking out to download a binary from outside the
+    # Store, so this must never be offered an update path — the App Store
+    # is the update mechanism.
+    if sys.platform == 'darwin' and getattr(sys, 'frozen', False):
+        return 'mas'
+
     # Check if running from .AppImage
     if os.environ.get('APPIMAGE'):
         return 'appimage'
@@ -88,6 +96,13 @@ def _asset_sha256(latest, download_url):
 def get_update_info():
     """Get update info including deployment method and available updates."""
     deployment = detect_deployment()
+
+    # MAS build: the App Store is the only sanctioned update path. Skip the
+    # GitHub round-trip entirely — there's nothing to do with the result,
+    # and no reason for the sandboxed app to phone home on every page load.
+    if deployment == 'mas':
+        return {'deployment': deployment, 'update_available': False}
+
     latest = get_latest_release_info()
 
     if not latest:
