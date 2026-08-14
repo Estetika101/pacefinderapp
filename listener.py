@@ -600,7 +600,33 @@ def _run_with_cocoa_shell(demo_mode: bool):
     Only used for the frozen macOS build; dev/Linux/Windows/Docker runs never
     call this.
     """
-    from AppKit import NSApplication, NSApplicationActivationPolicyRegular
+    import webbrowser
+    from AppKit import (
+        NSApplication, NSApplicationActivationPolicyRegular,
+        NSMenu, NSMenuItem, NSLinkAttributeName,
+    )
+    from Foundation import NSObject, NSURL, NSMutableAttributedString
+
+    # Target object for the menu bar's actions. PyObjC bridges an ObjC
+    # selector "foo:" to a Python method named "foo_", so these method names
+    # are load-bearing, not stylistic. Kept alive for the process lifetime by
+    # the `actions` local below, since app.run() blocks this frame open.
+    class _MenuActions(NSObject):
+        def openDashboard_(self, sender):
+            webbrowser.open(f"http://localhost:{STATUS_PORT}/")
+
+        def showAbout_(self, sender):
+            # Version comes from the bundle's own CFBundleShortVersionString/
+            # CFBundleVersion (stamped by release.yml) — the standard panel
+            # picks those up automatically without passing ApplicationVersion.
+            credits = NSMutableAttributedString.alloc().initWithString_("pacefinder.app")
+            credits.addAttribute_value_range_(
+                NSLinkAttributeName, NSURL.URLWithString_("https://pacefinder.app"),
+                (0, credits.length()),
+            )
+            NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(
+                {"Credits": credits}
+            )
 
     def _run_listener():
         try:
@@ -619,6 +645,37 @@ def _run_with_cocoa_shell(demo_mode: bool):
 
     app = NSApplication.sharedApplication()
     app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+
+    actions = _MenuActions.alloc().init()
+
+    main_menu = NSMenu.alloc().init()
+    app_menu_item = NSMenuItem.alloc().init()
+    main_menu.addItem_(app_menu_item)
+    app_menu = NSMenu.alloc().init()
+    app_menu_item.setSubmenu_(app_menu)
+
+    about_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+        "About Pacefinder", "showAbout:", "")
+    about_item.setTarget_(actions)
+    app_menu.addItem_(about_item)
+
+    app_menu.addItem_(NSMenuItem.separatorItem())
+
+    dashboard_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+        "Open Dashboard", "openDashboard:", "")
+    dashboard_item.setTarget_(actions)
+    app_menu.addItem_(dashboard_item)
+
+    app_menu.addItem_(NSMenuItem.separatorItem())
+
+    # No explicit target: nil-targeted actions travel the responder chain,
+    # which NSApplication terminates by default — same path Cmd+Q and the
+    # Dock's own right-click Quit already use.
+    quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+        "Quit Pacefinder", "terminate:", "q")
+    app_menu.addItem_(quit_item)
+
+    app.setMainMenu_(main_menu)
     app.activateIgnoringOtherApps_(True)
     app.run()
 
