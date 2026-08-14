@@ -560,19 +560,26 @@ async def main(demo_mode: bool = False):
     log.info(f"Admin     at http://localhost:{STATUS_PORT}/admin")
     log.info(f"Status API at http://localhost:{STATUS_PORT}/status")
 
-    _maybe_open_browser_on_first_run()
+    _maybe_open_browser_on_launch()
 
     async with server:
         await server.serve_forever()
 
 
-def _maybe_open_browser_on_first_run():
+def _maybe_open_browser_on_launch():
     # Only opens for frozen (PyInstaller) builds. Source clones — including the
-    # Pi systemd service — stay silent. After a successful open, the flag is
-    # persisted so subsequent launches don't re-open the browser.
+    # Pi systemd service — stay silent.
     if not getattr(sys, "frozen", False):
         return
-    if config.get("first_run_done"):
+    # macOS has no window, Dock badge, or terminal — opening the app looks
+    # exactly like nothing happened (a TestFlight tester: "I can install but
+    # when I opened the application doesn't run"). So every launch opens the
+    # dashboard there, not just the first — it's the only launch feedback the
+    # app has. Other frozen builds (Linux AppImage) already print to a visible
+    # terminal on start, so they keep the original once-ever open via
+    # first_run_done, tracked below.
+    is_mac = sys.platform == "darwin"
+    if not is_mac and config.get("first_run_done"):
         return
     try:
         import webbrowser, threading
@@ -580,11 +587,12 @@ def _maybe_open_browser_on_first_run():
             1.0,
             lambda: webbrowser.open(f"http://localhost:{STATUS_PORT}/"),
         ).start()
-        cfg = {**config, "first_run_done": True}
-        config["first_run_done"] = True
-        save_config(cfg)
+        if not is_mac and not config.get("first_run_done"):
+            cfg = {**config, "first_run_done": True}
+            config["first_run_done"] = True
+            save_config(cfg)
     except Exception as e:
-        log.warning(f"first-run browser open failed: {e}")
+        log.warning(f"browser open on launch failed: {e}")
 
 
 def _run_with_cocoa_shell(demo_mode: bool):
