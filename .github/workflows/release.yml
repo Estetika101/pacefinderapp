@@ -474,7 +474,7 @@ jobs:
             echo "## Install"
             echo
             echo "### macOS — TestFlight"
-            echo "Public TestFlight link: _coming once external testing opens_. Currently invite-only for internal testers — see [pacefinder.app](https://pacefinder.app#install) to request access."
+            echo "[Join the TestFlight beta](https://testflight.apple.com/join/QcgNMdFT). Install the **TestFlight** app from the Mac App Store if you don't have it, open the link, and tap **Install**."
             echo
             echo "### Linux x86_64 (Intel/AMD)"
             echo '```sh'

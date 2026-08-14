@@ -182,7 +182,7 @@ body{
 <div class="section">
   <div class="section-title">Install Pacefinder on another machine</div>
   <div class="hint" style="margin-bottom:14px">Latest release: <b>v0.7.5</b>. Same listener everywhere — UDP port 5300, dashboard on :8000.</div>
-  <div class="step"><b>macOS</b> — <a href="https://pacefinder.app#install" target="_blank" style="color:var(--color-green)">request beta access via pacefinder.app</a>. We'll email a TestFlight invite; install the TestFlight app from the Mac App Store, accept the invite, and Pacefinder auto-updates from there.</div>
+  <div class="step"><b>macOS</b> — <a href="https://testflight.apple.com/join/QcgNMdFT" target="_blank" style="color:var(--color-green)">join the TestFlight beta</a>. Install the TestFlight app from the Mac App Store if you don't have it, open the link, and tap Install — Pacefinder auto-updates from there.</div>
   <div class="step"><b>Linux x86_64</b> — download the AppImage and run it:</div>
   <div class="code-block">curl -L -o Pacefinder.AppImage \
   https://github.com/Estetika101/pacefinderapp/releases/download/v0.7.5/Pacefinder-0.7.5-x86_64.AppImage
