@@ -30,6 +30,14 @@ hiddenimports = [
     "session.manager", "session.protocol", "session.watchdog",
 ]
 
+if IS_MAC:
+    # Hosts the minimal NSApplication shell (see listener.py's
+    # _run_with_cocoa_shell) that lets the frozen .app activate itself as a
+    # real foreground process — required for macOS to display the Local
+    # Network permission prompt at all; a plain asyncio process has nowhere
+    # for the system to attach that dialog to.
+    hiddenimports += ["AppKit", "Foundation", "objc"]
+
 # Reference CSVs (data/) and the static asset tree (static/) must travel with
 # the bundle — both are read at runtime via Path(__file__).parent / "<dir>".
 datas = [

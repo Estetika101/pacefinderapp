@@ -21,6 +21,7 @@ import logging
 import shutil
 import socket
 import subprocess
+import sys
 import threading
 import urllib.parse
 import struct
@@ -569,7 +570,6 @@ def _maybe_open_browser_on_first_run():
     # Only opens for frozen (PyInstaller) builds. Source clones — including the
     # Pi systemd service — stay silent. After a successful open, the flag is
     # persisted so subsequent launches don't re-open the browser.
-    import sys
     if not getattr(sys, "frozen", False):
         return
     if config.get("first_run_done"):
@@ -585,6 +585,42 @@ def _maybe_open_browser_on_first_run():
         save_config(cfg)
     except Exception as e:
         log.warning(f"first-run browser open failed: {e}")
+
+
+def _run_with_cocoa_shell(demo_mode: bool):
+    """Run the listener on a background thread under a minimal NSApplication
+    owning the main thread.
+
+    macOS only shows system TCC prompts (Local Network, etc.) to a process it
+    can treat as a real, activatable foreground app, and AppKit's run loop
+    must own the main thread to do that. Pacefinder itself is a plain asyncio
+    server with no UI — without this shell the frozen .app has nowhere for
+    the Local Network permission prompt to attach, so the socket bind blocks
+    on a decision the OS can never ask for and the Dock icon bounces forever.
+    Only used for the frozen macOS build; dev/Linux/Windows/Docker runs never
+    call this.
+    """
+    from AppKit import NSApplication, NSApplicationActivationPolicyRegular
+
+    def _run_listener():
+        try:
+            asyncio.run(main(demo_mode=demo_mode))
+        finally:
+            # main() only returns on shutdown or a fatal startup error (e.g.
+            # dashboard port already in use) — either way, take the Cocoa
+            # shell down with it rather than leaving an activated app in the
+            # Dock with a dead listener behind it. NSApplication calls must
+            # happen on the main thread, hence the dispatch.
+            NSApplication.sharedApplication().performSelectorOnMainThread_withObject_waitUntilDone_(
+                "terminate:", None, False
+            )
+
+    threading.Thread(target=_run_listener, daemon=True, name="pacefinder-listener").start()
+
+    app = NSApplication.sharedApplication()
+    app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+    app.activateIgnoringOtherApps_(True)
+    app.run()
 
 
 if __name__ == "__main__":
@@ -603,4 +639,7 @@ if __name__ == "__main__":
     if _args.port:
         STATUS_PORT = _args.port
 
-    asyncio.run(main(demo_mode=_args.demo))
+    if sys.platform == "darwin" and getattr(sys, "frozen", False):
+        _run_with_cocoa_shell(demo_mode=_args.demo)
+    else:
+        asyncio.run(main(demo_mode=_args.demo))
