@@ -117,14 +117,20 @@ _DEMO_DB_PATH_REF: list = [None]  # mutable ref; set by --demo flag; overrides s
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 
-# Bootstrap log dir before logger is configured; use default path if storage
-# doesn't exist yet so the process doesn't crash on first run.
-_log_dir = Path(config["storage_path"]) / "logs"
+# Bootstrap log dir before logger is configured. Goes through storage_path()
+# rather than the raw config value — the configured storage_path defaults to
+# a Pi/USB mount point (/mnt/usb/simtelemetry) that doesn't exist on Mac/
+# Windows dev boxes or the frozen macOS build, and storage_path() already
+# knows how to fall back to a writable per-user data dir when that happens.
+# Reading the raw value here previously meant listener.log silently never
+# got created on any macOS install — StreamHandler output from a windowed
+# (non-console) .app goes nowhere the user can see.
+_log_dir = storage_path() / "logs"
 try:
     _log_dir.mkdir(parents=True, exist_ok=True)
     _log_handler = logging.FileHandler(_log_dir / "listener.log")
 except OSError:
-    _log_handler = logging.StreamHandler()  # fallback if path isn't mounted yet
+    _log_handler = logging.StreamHandler()  # last resort if even the fallback dir isn't writable
 
 logging.basicConfig(
     level=LOG_LEVEL,

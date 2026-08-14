@@ -110,5 +110,14 @@ if IS_MAC:
             # that's the standard authentication/data-transfer exemption
             # under Category 5, Part 2 of the U.S. EAR.
             "ITSAppUsesNonExemptEncryption": False,
+            # Required for macOS Local Network Privacy. Pacefinder binds UDP
+            # 5300 to receive telemetry from a console/PC on the LAN and
+            # serves the dashboard over TCP 8000 to other LAN devices —
+            # without this string macOS never shows the permission prompt,
+            # so those connections silently never arrive.
+            "NSLocalNetworkUsageDescription":
+                "Pacefinder listens on your local network for telemetry from "
+                "your racing game and serves the live dashboard to other "
+                "devices on the network.",
         },
     )
