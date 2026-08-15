@@ -877,6 +877,7 @@ def test_analytics_module():
     allow-list, and must send the right payload shape when actually enabled
     and configured. Verified end-to-end against a throwaway local HTTP
     server capturing what fire-and-forget send() actually transmits."""
+    import asyncio
     import http.server
     import threading as _threading
     import time as _time
@@ -932,6 +933,20 @@ def test_analytics_module():
         _config.config["analytics_enabled"] = False
         analytics.track("app_launch")
         check("disabled: nothing sent even though endpoint is set", not _wait_for(1, timeout=0.3), sent)
+
+        _config.config["analytics_enabled"] = True
+        sent.clear()
+        orig_interval = analytics.HEARTBEAT_INTERVAL_S
+        try:
+            analytics.HEARTBEAT_INTERVAL_S = 0.05
+            asyncio.run(asyncio.wait_for(analytics.heartbeat_loop(), timeout=0.5))
+        except asyncio.TimeoutError:
+            pass  # heartbeat_loop() never returns by design; the timeout is expected
+        finally:
+            analytics.HEARTBEAT_INTERVAL_S = orig_interval
+        check("heartbeat_loop fires a heartbeat event", _wait_for(1, timeout=1.0), sent)
+        if sent:
+            check("heartbeat payload carries the event name", sent[0].get("event") == "heartbeat", sent[0])
     finally:
         server.shutdown()
         analytics.ANALYTICS_ENDPOINT = orig_endpoint

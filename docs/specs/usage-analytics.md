@@ -22,25 +22,25 @@ A short, explicit allow-list — never a generic pass-through event name. Every 
 - **`telemetry_viewed`** — fired when the Full Telemetry page loads for a session. Signals whether the deeper analysis surface gets used at all, separate from just glancing at Overview.
 - **`spotter_used`** — fired when the Claude-powered post-race analysis is requested. Adoption signal for that specific feature.
 - **`error`** — fired on a caught, unexpected exception in the listener (startup failures, session-save failures, DB errors). Fields: `error_type` (the exception class name, e.g. `OSError`), `context` (a short fixed label for where it happened, e.g. `session_close`, `track_reference_update` — from a fixed set defined at each call site, never an f-string built from the exception itself). The exception message and traceback are **not** sent — they can contain local file paths (`/Users/petervanaller/...`), which is enough to deanonymize an install. `error_type` + `context` is enough to tell us something is breaking and roughly where, without shipping anyone's filesystem layout.
+- **`heartbeat`** — fired every `HEARTBEAT_INTERVAL_S` (10 minutes) for as long as the process is alive, via an asyncio background task (`analytics.heartbeat_loop()`, alongside `session_watchdog()`). Every other event is one-shot, so without this there's no way to tell "launched once and still running" from "launched once, long gone" — the app can run unattended for days on a Pi. No extra fields. Powers the dashboard's "currently online" / "active in the last 24h" figures: an install counts as online if it has *any* event (heartbeat or otherwise) within 2x the interval, tolerating one missed beat.
 
 ## Scope
 - Setup page toggle (default on), config field `analytics_enabled`.
 - `analytics_id` generation + persistence in config.
 - A small `analytics.py` module in the listener: fire-and-forget POST, silent no-op on failure, silent no-op when disabled.
-- Call sites for the five events above.
+- Call sites for the events above, plus `analytics.heartbeat_loop()` scheduled from listener.py's main().
 - New Postgres DB (Neon) + `POST /api/analytics/event` route in `pacefindermarketing`, behind the same spam-guard rate limiting already used for `/api/feedback`.
 - `/privacy` page on the marketing site updated to disclose this (mirroring the existing Umami disclosure pattern).
 
 ## Out of scope
-- Any dashboard/UI to *view* the collected analytics (a follow-up once data exists to look at).
 - Track names, car names/ordinals, lap times, sector times, or any telemetry sample data.
 - IP-address persistence beyond Vercel's own transient edge logs.
 - Retrying/queuing failed sends.
-- Per-event opt-out granularity — it's one toggle, all five events or none.
+- Per-event opt-out granularity — it's one toggle, all events or none.
 
 ## Cross-repo work
-- `pacefinderapp`: `analytics.py`, Setup page toggle, `config.py` fields, call sites at the five event locations, this spec.
-- `pacefinder` (marketing): new Neon Postgres DB, `POST /api/analytics/event` route, spam-guard rate limiting on it, `/privacy` page update.
+- `pacefinderapp`: `analytics.py` (including `heartbeat_loop()`), Setup page toggle, `config.py` fields, call sites at each event location, this spec.
+- `pacefinder` (marketing): Neon Postgres DB, `POST /api/analytics/event` route, spam-guard rate limiting on it, `/privacy` page update, and a password-gated dashboard at `stats.pacefinder.app` (`src/app/stats/`, `src/proxy.ts`) showing distinct/online/24h-active installs, launches over time, sessions by game, feature adoption, and recent errors — live-updating via 15s client-side polling.
 
 ## Open questions
 - Exact retention window for raw events in Postgres (30/90/365 days? no expiry?) — deferred until there's a reason to care about storage cost.

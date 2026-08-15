@@ -397,6 +397,7 @@ async def main(demo_mode: bool = False):
     if not demo_mode:
         import analytics
         analytics.track("app_launch")
+        asyncio.create_task(analytics.heartbeat_loop())
     ensure_storage()
     _db_initialize(_DEMO_DB_PATH_REF, storage_path, FORZA_TRACKS, FORZA_CARS, log)
     _db_init()

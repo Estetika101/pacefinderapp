@@ -8,6 +8,7 @@ timeout, so a slow or failed collector can never block the caller. Silently
 a no-op whenever config["analytics_enabled"] is False or ANALYTICS_ENDPOINT
 is unset — call sites never need to check state themselves.
 """
+import asyncio
 import json
 import logging
 import sys
@@ -31,9 +32,18 @@ ANALYTICS_ENDPOINT = "https://pacefinder.app/api/analytics/event"
 
 # Explicit allow-list — never a generic pass-through event name. Adding a
 # new event means updating this set *and* the spec.
-_ALLOWED_EVENTS = {"app_launch", "session_saved", "telemetry_viewed", "spotter_used", "error"}
+_ALLOWED_EVENTS = {"app_launch", "session_saved", "telemetry_viewed", "spotter_used", "error", "heartbeat"}
 
 _SEND_TIMEOUT_S = 3
+
+# Every other event is one-shot — app_launch fires once at startup, and
+# nothing fires again if the user just leaves the dashboard open for hours,
+# which is normal for a background listener (especially on a Pi left
+# running 24/7). Without a periodic signal, "still running right now" is
+# unanswerable from the event stream alone. 10 minutes balances that against
+# event volume for a process that can run indefinitely; the dashboard treats
+# anything within 2x this window as "online" to tolerate a missed beat.
+HEARTBEAT_INTERVAL_S = 600
 
 
 def track(event: str, **fields):
@@ -55,6 +65,15 @@ def track(event: str, **fields):
         **fields,
     }
     threading.Thread(target=_send, args=(payload,), daemon=True).start()
+
+
+async def heartbeat_loop():
+    """Background task: fires a heartbeat event every HEARTBEAT_INTERVAL_S
+    for as long as the process is alive. Run as an asyncio task from
+    listener.py's main(), alongside session_watchdog()."""
+    while True:
+        await asyncio.sleep(HEARTBEAT_INTERVAL_S)
+        track("heartbeat")
 
 
 def _send(payload: dict):
