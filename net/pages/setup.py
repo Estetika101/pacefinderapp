@@ -50,6 +50,15 @@ body{
 }
 .copy-btn:hover { background: var(--color-surface); }
 .copy-btn.copied { background: var(--color-surface); color: var(--color-green); }
+.key-input-wrap { position: relative; }
+.key-input-wrap input { padding-right: 56px; }
+.key-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--color-text-tertiary);
+  font-size: var(--text-xs); font-family: inherit; padding: 4px 8px;
+  border-radius: var(--radius-sm); cursor: pointer;
+}
+.key-toggle:hover { color: var(--color-text-primary); background: var(--color-surface); }
 .game-strings { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
 .game-string-row {
   display: flex; align-items: center; gap: 8px;
@@ -249,8 +258,11 @@ sudo systemctl start pacefinder</div>
   <div class="section-title">AI Analysis</div>
   <div class="field">
     <label>Anthropic API key — used for post-session race analysis</label>
-    <input type="password" id="anthropic_api_key" placeholder="sk-ant-…" autocomplete="off">
-    <div class="hint">Get a key at console.anthropic.com. Stored locally in simtelemetry.config.json.</div>
+    <div class="key-input-wrap">
+      <input type="password" id="anthropic_api_key" placeholder="sk-ant-…" autocomplete="off">
+      <button type="button" class="key-toggle" id="key-toggle" onclick="toggleKeyVisibility()">Show</button>
+    </div>
+    <div class="hint">Get a key at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>. Stored locally in simtelemetry.config.json.</div>
   </div>
   <div class="field">
     <label>Model</label>
@@ -344,6 +356,13 @@ async function loadIps() {
   }
 }
 
+function toggleKeyVisibility() {
+  const el = document.getElementById('anthropic_api_key');
+  const btn = document.getElementById('key-toggle');
+  const showing = el.type === 'text';
+  el.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? 'Show' : 'Hide';
+}
 function copyIp(ip, btn) { copyText(ip, btn); }
 function copyText(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
