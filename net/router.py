@@ -130,6 +130,7 @@ def make_handler(ctx: dict):
     disk_info              = ctx["disk_info"]
     save_config            = ctx["save_config"]
     storage_path           = ctx["storage_path"]
+    resolve_storage_path   = ctx["resolve_storage_path"]
     effective_tracks       = ctx["effective_tracks"]
     FM2023_TRACKS          = ctx["FM2023_TRACKS"]
     FORZA_CARS             = ctx["FORZA_CARS"]
@@ -874,16 +875,23 @@ def make_handler(ctx: dict):
                     writer.write(_http_response("400 Bad Request", "application/json", err))
                 else:
                     new_path = str(incoming.get("storage_path", config["storage_path"])).strip()
-                    # Validate: try to create subdirs
+                    # Validate via the same fallback contract storage_path() already
+                    # uses at runtime — resolve_storage_path() only raises if BOTH
+                    # the requested path and the per-user fallback are unusable.
+                    # Used to hard-fail whenever the requested/default path wasn't
+                    # writable, even for a user who never touched this field —
+                    # e.g. a source-install Mac inheriting the Pi-only
+                    # /mnt/usb/simtelemetry default blocked saving anything else,
+                    # like just entering an Anthropic API key.
                     try:
-                        test = Path(new_path)
+                        resolved = resolve_storage_path(new_path)
                         for sub in ["raw", "sessions", "logs"]:
-                            (test / sub).mkdir(parents=True, exist_ok=True)
+                            (resolved / sub).mkdir(parents=True, exist_ok=True)
                     except OSError as exc:
                         err = json.dumps({"error": f"Cannot create storage path: {exc}"}).encode()
                         writer.write(_http_response("400 Bad Request", "application/json", err))
                     else:
-                        config["storage_path"]      = new_path
+                        config["storage_path"]      = str(resolved)
                         config["session_timeout_s"] = int(incoming.get("session_timeout_s", config["session_timeout_s"]))
                         if "ports" in incoming:
                             config["ports"].update({

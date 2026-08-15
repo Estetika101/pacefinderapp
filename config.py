@@ -85,9 +85,17 @@ config = load_config()
 _LOCAL_FALLBACK = Path(user_data_dir("Pacefinder", appauthor=False))
 
 
-def storage_path() -> Path:
-    """Return the active storage root, falling back to the per-user data dir if the configured path is unavailable."""
-    p = Path(config["storage_path"])
+def resolve_storage_path(candidate: str) -> Path:
+    """Resolve a candidate storage path, creating it if needed and falling back
+    to the per-user data dir if it can't be created/used (e.g. the Pi-only
+    default /mnt/usb/simtelemetry on a Mac/Windows/dev box). Shared by
+    storage_path() (the configured default) and the /config POST handler (a
+    user-submitted candidate) so runtime and settings-save agree on what
+    counts as a usable path — settings-save used to hard-fail on exactly the
+    case runtime already tolerates silently, blocking a Setup save (e.g. just
+    entering an Anthropic API key) on a storage_path field the user never
+    touched."""
+    p = Path(candidate)
     if p.exists():
         return p
     try:
@@ -96,6 +104,11 @@ def storage_path() -> Path:
     except OSError:
         _LOCAL_FALLBACK.mkdir(parents=True, exist_ok=True)
         return _LOCAL_FALLBACK
+
+
+def storage_path() -> Path:
+    """Return the active storage root, falling back to the per-user data dir if the configured path is unavailable."""
+    return resolve_storage_path(config["storage_path"])
 
 
 PORTS             = config["ports"]

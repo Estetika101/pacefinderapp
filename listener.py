@@ -68,7 +68,7 @@ from session.manager import (
 from session.protocol import TelemetryProtocol
 from session.watchdog import session_watchdog, _clear_race_ended
 from config import (
-    load_config, save_config, config, storage_path,
+    load_config, save_config, config, storage_path, resolve_storage_path,
     PORTS, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, STATUS_PORT, LOG_LEVEL,
 )
 from db.store import (
@@ -501,6 +501,7 @@ async def main(demo_mode: bool = False):
         "disk_info": disk_info,
         "save_config": save_config,
         "storage_path": storage_path,
+        "resolve_storage_path": resolve_storage_path,
         "effective_tracks": _effective_tracks,
         "FM2023_TRACKS": FM2023_TRACKS,
         "FORZA_CARS": FORZA_CARS,

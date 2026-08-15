@@ -386,6 +386,16 @@ async function openFinish(editSid){
   }
 
   try {
+    // Track list fetched independently of this session's own row —
+    // /sessions/track-options has no dependency on _foSid resolving to
+    // anything, so the dropdown still has real options to offer even if
+    // something about this specific session's confirm-data lookup comes
+    // back thin. Reported: "the circuit list doesn't exist... impossible
+    // to save the race" — confirm-data's track_list was empty though the
+    // fallback source (same merged FM2023_TRACKS + FORZA_TRACKS + learned
+    // ordinals) is always populated.
+    const trackOptionsPromise = fetch('/sessions/track-options').then(r=>r.json()).catch(()=>[]);
+
     // Load session metadata + track list
     const cd = await fetch('/sessions/confirm-data?id='+encodeURIComponent(_foSid)).then(r=>r.json());
     const cur = cd.session;
@@ -418,10 +428,12 @@ async function openFinish(editSid){
       $('fo-stats').style.display='none';
     }
 
-    // Track dropdown
+    // Track dropdown — fall back to the independent track-options fetch if
+    // confirm-data's own track_list came back thin for any reason.
     const sel=$('fo-track');
     sel.innerHTML='<option value="">— Unknown —</option>';
-    (cd.track_list||[]).forEach(t=>{
+    const trackList = (cd.track_list && cd.track_list.length) ? cd.track_list : await trackOptionsPromise;
+    (trackList||[]).forEach(t=>{
       const o=document.createElement('option');
       o.value=t;o.textContent=t;
       if(t===cur.track)o.selected=true;

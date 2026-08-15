@@ -822,6 +822,33 @@ def test_docker_data_dir():
           out2.stdout.strip() == "/mnt/usb/simtelemetry", out2.stdout + out2.stderr)
 
 
+def test_resolve_storage_path_fallback():
+    """/config POST used to hard-fail whenever config["storage_path"] wasn't
+    writable, even when the user wasn't trying to change it — reported by a
+    source-install Mac user who couldn't save an Anthropic API key because
+    the untouched, Pi-only /mnt/usb/simtelemetry default (still sitting in
+    their config) failed mkdir with "Operation not permitted". resolve_
+    storage_path() must silently fall back instead of raising, matching what
+    storage_path() already does at runtime — the same contract, just made
+    reusable for an arbitrary candidate instead of only config's own value."""
+    import tempfile
+    from pathlib import Path
+    import config
+    print("\n[storage path fallback]")
+
+    resolved = config.resolve_storage_path("/mnt/usb/simtelemetry")
+    check("unwritable candidate falls back instead of raising",
+          resolved.exists(), resolved)
+    check("fallback is the per-user data dir, not the broken candidate",
+          str(resolved) != "/mnt/usb/simtelemetry", resolved)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        writable = Path(tmp) / "storage"
+        resolved2 = config.resolve_storage_path(str(writable))
+        check("a genuinely writable candidate is used as-is, not redirected",
+              resolved2 == writable, resolved2)
+
+
 # ── live UDP tests (requires running listener) ────────────────────────────────
 
 PORTS = {"forza_motorsport": 5300, "acc": 9996, "f1": 20777}
@@ -1045,6 +1072,7 @@ def main():
     test_updater_arch_and_version()
     test_updater_apply_paths()
     test_docker_data_dir()
+    test_resolve_storage_path_fallback()
 
     print(f"\n{'═'*44}")
     print(f"  Pipeline: {PASS} passed  {FAIL} failed")
