@@ -60,8 +60,13 @@
   .browse-panel{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-top:var(--space-2)}
   .browse-toolbar{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--color-border-subtle);gap:var(--space-2)}
   .breadcrumb{font-size:var(--text-xs);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-  .crumb{color:var(--color-text-secondary);cursor:pointer}.crumb:hover{color:var(--n-100)}
-  .crumb-sep{color:var(--surface-bd)}.crumb-cur{color:var(--color-text-secondary)}
+  /* padding turns each segment (notably the lone "/" root) into a real hit
+     target instead of a single-glyph-wide span; the hover background makes
+     that target visible, same affordance .dir-item already has below. */
+  .crumb{color:var(--color-text-secondary);cursor:pointer;display:inline-block;padding:6px 10px;margin:-6px -2px;border-radius:4px;min-width:14px;text-align:center}
+  .crumb:hover{color:var(--n-100);background:#0f0f1e}
+  .crumb-sep{color:var(--surface-bd)}
+  .crumb-cur{color:var(--color-text-secondary);display:inline-block;padding:6px 10px;margin:-6px -2px}
   .btn-use{background:#13132a;border:1px solid #2a2a5a;color:#5a5acc;font-family:inherit;font-size:var(--text-xs);padding:5px 10px;border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap}
   .btn-use:hover{background:#1e1e48;color:#9999ee}
   .dir-list{max-height:200px;overflow-y:auto}
