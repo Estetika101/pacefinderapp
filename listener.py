@@ -8,11 +8,15 @@ Exposes local web status server at http://pi.local:8000
 
 # Stamped at build time by release.yml (writes _version.py before PyInstaller,
 # from the release tag). Falls back to "dev" for source / docker / systemd runs
-# so the updater never claims to be a real release it isn't.
+# so the updater never claims to be a real release it isn't. APP_BUILD is the
+# CI run number (GITHUB_RUN_NUMBER) — same one that becomes CFBundleVersion
+# on the Mac build, so the Settings page and TestFlight's own "X.Y.Z (NN)"
+# agree, useful for matching a bug report's screenshot to an exact build.
 try:
-    from _version import APP_VERSION  # generated at build; gitignored
+    from _version import APP_VERSION, APP_BUILD  # generated at build; gitignored
 except ImportError:
     APP_VERSION = "dev"
+    APP_BUILD = ""
 
 import asyncio
 import collections
@@ -477,6 +481,7 @@ async def main(demo_mode: bool = False):
         "last_parsed": last_parsed,
         "config": config,
         "app_version": APP_VERSION,
+        "app_build": APP_BUILD,
         "log": log,
         "PORTS": PORTS,
         "active_sessions": active_sessions,

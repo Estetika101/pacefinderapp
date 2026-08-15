@@ -308,6 +308,7 @@ sudo systemctl start pacefinder</div>
 
 <button class="btn" id="save-btn" onclick="save()">Save</button>
 <div class="toast" id="toast"></div>
+<div class="hint" id="app-version-footer" style="margin-top:24px;text-align:center"></div>
 
 <script>
 // ── OS tab detection ─────────────────────────────────────────────────────────
@@ -561,11 +562,21 @@ async function save() {
   btn.disabled = false;
 }
 
+async function loadVersionFooter() {
+  try {
+    const d = await fetch('/version').then(r => r.json());
+    const el = document.getElementById('app-version-footer');
+    if (!el || !d.version) return;
+    el.textContent = 'Pacefinder ' + d.version + (d.build ? ' (' + d.build + ')' : '');
+  } catch (e) { /* footer is cosmetic — fail silently */ }
+}
+
 // ── init ─────────────────────────────────────────────────────────────────────
 setOsTab(detectOs());
 loadIps();
 pollUdp();
 load();
+loadVersionFooter();
 </script>
 </body>
 </html>

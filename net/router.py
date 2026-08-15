@@ -2411,7 +2411,8 @@ def make_handler(ctx: dict):
 
             elif path == "/version":
                 app_version = ctx.get("app_version", "unknown")
-                payload = {"version": app_version}
+                app_build   = ctx.get("app_build", "")
+                payload = {"version": app_version, "build": app_build}
                 writer.write(_http_response("200 OK", "application/json",
                                             json.dumps(payload).encode()))
 
