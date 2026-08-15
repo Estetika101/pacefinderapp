@@ -24,11 +24,10 @@ except ImportError:
 
 log = logging.getLogger("pacefinder")
 
-# Left unset until the collector (pacefindermarketing repo, Neon-backed
-# POST /api/analytics/event) actually exists — see docs/specs/
-# usage-analytics.md's "open questions". Every send silently no-ops until
-# this is filled in, so this module is safe to wire up ahead of that.
-ANALYTICS_ENDPOINT = ""
+# pacefindermarketing repo's POST /api/analytics/event — Neon-backed,
+# verified live (docs/specs/usage-analytics.md). Still gated by
+# config["analytics_enabled"] (default True, opt-out) on every call.
+ANALYTICS_ENDPOINT = "https://pacefinder.app/api/analytics/event"
 
 # Explicit allow-list — never a generic pass-through event name. Adding a
 # new event means updating this set *and* the spec.
