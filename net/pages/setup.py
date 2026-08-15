@@ -294,6 +294,18 @@ sudo systemctl start pacefinder</div>
   </div>
 </div>
 
+<!-- ── Privacy ────────────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-title">Privacy</div>
+  <div class="field">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <input type="checkbox" id="analytics_enabled" style="width:auto;margin:0">
+      Share anonymous usage data
+    </label>
+    <div class="hint">Helps us see how many people race with Pacefinder and where it breaks — app launches, session counts, and feature usage. Never track names, car names, lap times, or any telemetry data. <a href="https://pacefinder.app/privacy" target="_blank" rel="noopener noreferrer">What's sent, exactly</a>.</div>
+  </div>
+</div>
+
 <button class="btn" id="save-btn" onclick="save()">Save</button>
 <div class="toast" id="toast"></div>
 
@@ -503,6 +515,7 @@ async function load() {
   if (d.anthropic_model) modelSel.value = d.anthropic_model;
   document.getElementById('time_format').value = (d.time_format === '12h') ? '12h' : '24h';
   document.getElementById('debug_mode').checked = !!d.debug_mode;
+  document.getElementById('analytics_enabled').checked = d.analytics_enabled !== false;
   renderDisk(d.disk);
   if (d.storage_path) validatePath(d.storage_path);
 }
@@ -530,6 +543,7 @@ async function save() {
     anthropic_model:   document.getElementById('anthropic_model').value,
     time_format:       document.getElementById('time_format').value,
     debug_mode:        document.getElementById('debug_mode').checked,
+    analytics_enabled: document.getElementById('analytics_enabled').checked,
   };
   // Only send the key when the user actually typed one — blank means
   // "keep existing." Server treats "" as no-op, null as explicit clear.

@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
+import analytics
 from net.perf import _perf_ctx, _perf_ring, _perf_client_ring, _PERF_LOG_THRESHOLD_MS
 
 
@@ -916,6 +917,8 @@ def make_handler(ctx: dict):
                             config["time_format"] = tf if tf in ("12h", "24h") else "24h"
                         if "debug_mode" in incoming:
                             config["debug_mode"] = bool(incoming["debug_mode"])
+                        if "analytics_enabled" in incoming:
+                            config["analytics_enabled"] = bool(incoming["analytics_enabled"])
                         save_config(config)
                         msg = "Saved."
                         if incoming.get("ports") and incoming["ports"] != PORTS:
@@ -1054,6 +1057,7 @@ def make_handler(ctx: dict):
                                                 "Location: " + loc + "\r\n"))
 
             elif path == "/sessions/telemetry":
+                analytics.track("telemetry_viewed")
                 writer.write(_http_response("200 OK", "text/html", TELEMETRY_HTML.encode()))
 
             elif path == "/sessions/data":
@@ -2157,6 +2161,7 @@ def make_handler(ctx: dict):
                                                     json.dumps({"ok": True, "deleted": deleted}).encode()))
 
             elif path == "/analyze":
+                analytics.track("spotter_used")
                 qs = {k: urllib.parse.unquote_plus(v)
                       for pair in query_string.split("&") if "=" in pair
                       for k, v in [pair.split("=", 1)]}

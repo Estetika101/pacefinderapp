@@ -394,6 +394,9 @@ async def main(demo_mode: bool = False):
     global _listener_started_at
     _listener_started_at = time.time()
     _started_at[0] = _listener_started_at
+    if not demo_mode:
+        import analytics
+        analytics.track("app_launch")
     ensure_storage()
     _db_initialize(_DEMO_DB_PATH_REF, storage_path, FORZA_TRACKS, FORZA_CARS, log)
     _db_init()

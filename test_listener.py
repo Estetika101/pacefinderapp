@@ -849,6 +849,95 @@ def test_resolve_storage_path_fallback():
               resolved2 == writable, resolved2)
 
 
+def test_analytics_id_persists():
+    """analytics_id must be generated once and persisted, not regenerated on
+    every run — otherwise the (opt-out) collector can never tell distinct
+    installs apart from repeat launches of the same one."""
+    import os as _os
+    import subprocess as _sp
+    import sys as _sys
+    import tempfile as _tf
+    print("\n[analytics id]")
+
+    script = "import config; print(config.config['analytics_id'])"
+    with _tf.TemporaryDirectory() as tmp:
+        env = {**_os.environ, "PACEFINDER_DATA_DIR": tmp}
+        out1 = _sp.run([_sys.executable, "-c", script], cwd=".", env=env,
+                        capture_output=True, text=True, timeout=15)
+        out2 = _sp.run([_sys.executable, "-c", script], cwd=".", env=env,
+                        capture_output=True, text=True, timeout=15)
+        id1, id2 = out1.stdout.strip(), out2.stdout.strip()
+        check("analytics_id generated (a real uuid4)", len(id1) == 36, repr(id1) + out1.stderr)
+        check("analytics_id stable across restarts", id1 == id2 and id1 != "",
+              f"{id1!r} vs {id2!r}")
+
+
+def test_analytics_module():
+    """Analytics must never surface an error, must respect the event
+    allow-list, and must send the right payload shape when actually enabled
+    and configured. Verified end-to-end against a throwaway local HTTP
+    server capturing what fire-and-forget send() actually transmits."""
+    import http.server
+    import threading as _threading
+    import time as _time
+    import analytics
+    import config as _config
+    print("\n[analytics]")
+
+    sent = []
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            length = int(self.headers.get('Content-Length', 0))
+            sent.append(json.loads(self.rfile.read(length)))
+            self.send_response(200)
+            self.end_headers()
+        def log_message(self, *a): pass
+
+    server = http.server.HTTPServer(('127.0.0.1', 0), _Handler)
+    port = server.server_address[1]
+    server_thread = _threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    def _wait_for(n, timeout=2.0):
+        deadline = _time.time() + timeout
+        while _time.time() < deadline:
+            if len(sent) >= n:
+                return True
+            _time.sleep(0.02)
+        return False
+
+    orig_endpoint = analytics.ANALYTICS_ENDPOINT
+    orig_enabled = _config.config.get("analytics_enabled")
+    try:
+        analytics.ANALYTICS_ENDPOINT = f"http://127.0.0.1:{port}/event"
+        _config.config["analytics_enabled"] = True
+
+        analytics.track("not_a_real_event")
+        check("unknown event is dropped, not sent", not _wait_for(1, timeout=0.3), sent)
+
+        analytics.track("app_launch")
+        got = _wait_for(1)
+        check("allowed event actually sent", got, sent)
+        if got:
+            payload = sent[0]
+            check("payload carries analytics_id", bool(payload.get("analytics_id")), payload)
+            check("payload carries the event name", payload.get("event") == "app_launch", payload)
+            check("payload carries platform/deployment/app_version",
+                  all(k in payload for k in ("platform", "deployment", "app_version")), payload)
+            check("payload never carries track/car/lap-time fields",
+                  not any(k in payload for k in ("track", "car", "lap_time_s", "session_id")), payload)
+
+        sent.clear()
+        _config.config["analytics_enabled"] = False
+        analytics.track("app_launch")
+        check("disabled: nothing sent even though endpoint is set", not _wait_for(1, timeout=0.3), sent)
+    finally:
+        server.shutdown()
+        analytics.ANALYTICS_ENDPOINT = orig_endpoint
+        _config.config["analytics_enabled"] = orig_enabled
+
+
 # ── live UDP tests (requires running listener) ────────────────────────────────
 
 PORTS = {"forza_motorsport": 5300, "acc": 9996, "f1": 20777}
@@ -1073,6 +1162,8 @@ def main():
     test_updater_apply_paths()
     test_docker_data_dir()
     test_resolve_storage_path_fallback()
+    test_analytics_id_persists()
+    test_analytics_module()
 
     print(f"\n{'═'*44}")
     print(f"  Pipeline: {PASS} passed  {FAIL} failed")

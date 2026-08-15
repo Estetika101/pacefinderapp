@@ -882,6 +882,15 @@ class Session:
         # the Pi) — single SQLite transaction with the laps in laps_summary.
         _db_write_session(session_data)
 
+        import analytics
+        duration_s = (datetime.now() - self.started_at).total_seconds()
+        analytics.track(
+            "session_saved",
+            game=self.game,
+            lap_count=len(self.completed_laps),
+            duration_s=round(duration_s, 1),
+        )
+
         # Background: per-sample compression (gzip + INSERT per lap), JSON
         # file mirrors, and track-reference rebuild. These together can take
         # 5–30s on the Pi for a multi-lap race; running them on a daemon
@@ -909,10 +918,13 @@ def _close_finalize_async(session_id: str, completed_laps: list,
     """The slow tail of session.close() — runs on a daemon thread so the
     main close call returns immediately. Order: lap_samples write
     (gzipped), JSON file mirrors, then track-references rebuild."""
+    import analytics
+
     try:
         _store_session_lap_samples(session_id, completed_laps)
     except Exception as e:
         _log.error(f"close_finalize: lap_samples write failed for {session_id}: {e}")
+        analytics.track("error", error_type=type(e).__name__, context="lap_samples_write")
 
     try:
         sp = storage_path()
@@ -924,11 +936,13 @@ def _close_finalize_async(session_id: str, completed_laps: list,
             json.dump([lap.to_dict() for lap in completed_laps], f, indent=2)
     except OSError as e:
         _log.error(f"close_finalize: JSON file write failed for {session_id}: {e}")
+        analytics.track("error", error_type=type(e).__name__, context="session_json_write")
 
     try:
         _update_track_references_bg(track, game)
     except Exception as e:
         _log.error(f"close_finalize: track_references update failed for {session_id}: {e}")
+        analytics.track("error", error_type=type(e).__name__, context="track_reference_update")
 
     _log.info(f"Session finalised (async): {session_id}")
 

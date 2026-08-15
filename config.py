@@ -53,6 +53,11 @@ DEFAULTS: dict = {
     # Set to True the first time a frozen (PyInstaller) build auto-opens the
     # dashboard in the user's browser. Subsequent launches don't.
     "first_run_done":    False,
+    # Anonymous, opt-out usage analytics (app launches, sessions saved,
+    # feature usage, error rates) — never track/car/lap-time data or
+    # anything else that describes what someone actually did on track.
+    # See docs/specs/usage-analytics.md.
+    "analytics_enabled": True,
 }
 
 
@@ -76,6 +81,17 @@ def save_config(cfg: dict):
 
 
 config = load_config()
+
+# analytics_id: a random UUID generated once per install, never derived from
+# hostname/MAC/hardware — exists only so the (opt-out) usage-analytics
+# collector can tell "1 install racing 50 times" from "50 installs racing
+# once". Deliberately not in DEFAULTS (a shared default would defeat the
+# point); generated lazily here and persisted immediately so it's stable
+# across restarts. See docs/specs/usage-analytics.md.
+if not config.get("analytics_id"):
+    import uuid
+    config["analytics_id"] = str(uuid.uuid4())
+    save_config(config)
 
 # Per-user, per-OS data dir. Used when the configured storage_path is
 # unavailable — e.g. the Pi USB isn't mounted, or a fresh Mac/Windows install
