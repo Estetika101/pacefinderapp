@@ -38,8 +38,8 @@ SESSION_EVENTS_HTML = """<!DOCTYPE html>
 
   <div class="filters">
     <span class="filter-label">Show</span>
-    <span class="chip on" data-show="all">All laps</span>
-    <span class="chip" data-show="worst">Worst 5</span>
+    <span class="chip" data-show="all">Show all</span>
+    <span class="chip on" data-show="worst">Top 8</span>
     <span class="filter-sep">&middot;</span>
     <span class="filter-label">Type</span>
     <span class="chip on" data-type="">All</span>

@@ -664,6 +664,20 @@ def test_rotated_sector_guard():
     kept_all, rejected_all = _split_rotated_laps(honest)
     check("no false positives on honest laps", kept_all == honest and not rejected_all)
 
+    # Two laps rotated the same way (e.g. the same mid-session telemetry-join
+    # point recurring) must both still be caught, not just one. A single
+    # non-iterative pass computes its median across everyone including both
+    # outliers; iterating — recomputing the median after each round — is
+    # what guarantees this rather than leaving it to how far the outliers
+    # happen to sit from the honest cluster in this particular dataset.
+    rotated_lap_2 = cand("s2", 8, [35.600, 28.100, 39.200])
+    kept_multi, rejected_multi = _split_rotated_laps(honest + [rotated_lap, rotated_lap_2])
+    check("multiple same-direction rotated laps both rejected",
+          set(id(c) for c in rejected_multi) == {id(rotated_lap), id(rotated_lap_2)},
+          f"rejected={[(c['session_id'], c['lap']) for c in rejected_multi]}")
+    check("honest laps still all kept alongside the double rotation",
+          kept_multi == honest, f"kept={len(kept_multi)}/6")
+
 
 def test_friendly_anthropic_errors():
     """Spotter errors must tell the driver what to do, not echo urllib.

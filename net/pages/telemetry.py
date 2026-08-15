@@ -18,10 +18,18 @@ a{color:inherit;text-decoration:none}
 .tb-nav a.cur{color:var(--color-text-primary);border-bottom:1px solid var(--color-text-secondary)}
 .breadcrumb{font-size:var(--text-xs);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.08em;padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--color-border)}
 .breadcrumb a{color:var(--color-text-tertiary)}.breadcrumb a:hover{color:var(--color-text-primary)}
-.subnav{display:flex;align-items:center;gap:2px;padding:6px var(--space-4);border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.subnav{display:flex;align-items:center;gap:2px;padding:6px var(--space-4) 0;flex-wrap:wrap}
 .subnav-item{font-size:var(--text-sm);color:var(--color-text-tertiary);text-decoration:none;padding:8px 14px;border-radius:6px;transition:color 120ms,background 120ms}
 .subnav-item:hover{color:var(--color-text-primary);background:var(--color-surface)}
 .subnav-item.active{color:var(--color-text-primary);background:var(--color-surface);box-shadow:inset 0 -2px 0 var(--color-accent)}
+/* Nested under "Full telemetry" — Mistakes & opportunities is a modal
+   reached from this page, not a sibling destination, so it's demoted to a
+   smaller, indented row attached directly beneath the main tabs rather
+   than a third co-equal tab. */
+.subnav-sub{display:flex;align-items:center;gap:2px;padding:0 var(--space-4) 8px;border-bottom:1px solid var(--color-border)}
+.subnav-sub-item{font-size:var(--text-xs);color:var(--color-text-tertiary);background:none;border:none;cursor:pointer;font:inherit;text-decoration:none;padding:4px 14px 4px 26px;border-radius:6px;position:relative;transition:color 120ms,background 120ms}
+.subnav-sub-item::before{content:'\21B3';position:absolute;left:10px;color:var(--color-text-quaternary)}
+.subnav-sub-item:hover{color:var(--color-text-primary);background:var(--color-surface)}
 .tele-layout{display:flex;min-height:calc(100vh - 90px);gap:8px;padding:8px}
 .ctrl-col{width:220px;flex-shrink:0;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--sp-3) var(--sp-4);overflow-y:auto;position:sticky;top:58px;max-height:calc(100vh - 66px);align-self:flex-start}
 /* Right-side HUD column — cockpit-style live readouts driven by paintCursor.
@@ -209,6 +217,8 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
   if(bc) bc.style.display='none';
   const sn=document.getElementById('tele-subnav');
   if(sn) sn.style.display='none';
+  const sns=document.getElementById('tele-subnav-sub');
+  if(sns) sns.style.display='none';
 }
 </script>
 <div class="breadcrumb" id="tele-breadcrumb">
@@ -221,7 +231,9 @@ if(new URLSearchParams(location.search).get('embed')==='1'){
 <div class="subnav" id="tele-subnav">
   <a class="subnav-item" id="link-overview" href="#">Overview</a>
   <span class="subnav-item active">Full telemetry</span>
-  <button class="subnav-item" id="link-mistakes" style="background:none;border:none;cursor:pointer;font:inherit">Mistakes &amp; opportunities</button>
+</div>
+<div class="subnav-sub" id="tele-subnav-sub">
+  <button class="subnav-sub-item" id="link-mistakes">Mistakes &amp; opportunities</button>
 </div>
 <div class="mo-ovl" id="mo-ovl">
   <div class="mo-card">

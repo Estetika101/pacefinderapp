@@ -1444,18 +1444,37 @@ def _split_rotated_laps(candidates: list) -> tuple:
     "S2" (real S2s: 37-40s) and inflated the theoretical-best gap by ~9s.
 
     Each candidate is {"sec": [s1, s2, s3], ...}. Needs >= 3 candidates to
-    form a meaningful median; below that, everything is kept.
+    form a meaningful median; below that, everything is kept — with exactly
+    2, the "median" is just their midpoint, so both candidates sit at an
+    identical distance from it and the check can never selectively catch
+    just one of them (confirmed numerically: extending this to N=2 doesn't
+    add real protection, it's mathematically all-or-nothing).
+
+    Rejection is iterative: a single pass computes the median across every
+    candidate, including other outliers, so multiple laps rotated the same
+    way (plausible — e.g. the same mid-session telemetry-join point
+    recurring across a session) can shift the median toward their own
+    cluster and dodge detection. Re-check what's left after each round
+    until a round catches nothing new.
     """
     if len(candidates) < 3:
         return candidates, []
-    medians = [statistics.median(c["sec"][i] for c in candidates) for i in range(3)]
-    kept, rejected = [], []
-    for c in candidates:
-        rotated = any(
-            abs(c["sec"][i] - medians[i]) > SECTOR_OUTLIER_FRAC * medians[i]
-            for i in range(3)
-        )
-        (rejected if rotated else kept).append(c)
+
+    kept = list(candidates)
+    rejected: list = []
+    while len(kept) >= 3:
+        medians = [statistics.median(c["sec"][i] for c in kept) for i in range(3)]
+        still_kept, newly_rejected = [], []
+        for c in kept:
+            rotated = any(
+                abs(c["sec"][i] - medians[i]) > SECTOR_OUTLIER_FRAC * medians[i]
+                for i in range(3)
+            )
+            (newly_rejected if rotated else still_kept).append(c)
+        if not newly_rejected:
+            break
+        kept = still_kept
+        rejected.extend(newly_rejected)
     return kept, rejected
 
 

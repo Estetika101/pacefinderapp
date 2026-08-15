@@ -13,7 +13,7 @@ function escapeHtml(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,
 
 const _id = new URLSearchParams(location.search).get('id') || '';
 let _events = [], _track = [], _sel = null;
-let _fShow = 'all', _fType = '', _fSort = 'severity';
+let _fShow = 'worst', _fType = '', _fSort = 'severity';
 // Track-outline transform (set in drawTrack), maps a sample's
 // distance_norm → svg x/y so markers land on the line.
 let _xform = null;
@@ -95,7 +95,7 @@ function visibleEvents(){
   let ev = _events.slice();
   if(_fType) ev = ev.filter(e => e.event_type === _fType);
   if(_fShow === 'worst'){
-    ev = ev.slice().sort((a,b)=>b.severity-a.severity).slice(0,5);
+    ev = ev.slice().sort((a,b)=>b.severity-a.severity).slice(0,8);
   }
   if(_fSort === 'severity') ev.sort((a,b)=>b.severity-a.severity);
   else if(_fSort === 'lap') ev.sort((a,b)=>(a.lap_number-b.lap_number)||(b.severity-a.severity));
