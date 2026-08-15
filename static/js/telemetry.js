@@ -855,6 +855,11 @@ async function onLapToggle(lapN,checked){
   if(checked){
     if(_selectedLaps.length>=4)_selectedLaps.shift();
     _selectedLaps.push(lapN);
+    // Only once a 2nd lap joins the overlay — one selected lap is just
+    // viewing a lap, not comparing laps.
+    if(_selectedLaps.length===2){
+      fetch('/feature-used',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({feature:'lap_compare'})});
+    }
     if(!_lapSamples[lapN])await fetchLap(lapN);
   }else{
     _selectedLaps=_selectedLaps.filter(n=>n!==lapN);
@@ -868,6 +873,7 @@ async function onLapToggle(lapN,checked){
   updateMaxT();renderLapList();renderAll();
 }
 async function onRefChange(){
+  fetch('/feature-used',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({feature:'reference_set'})});
   const newType=$('ref-sel').value;
   // Special case: "Lap from another session…" opens a picker. The actual
   // _refType isn't applied until the user picks a lap (csPickLap fires).

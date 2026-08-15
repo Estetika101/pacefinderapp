@@ -930,23 +930,74 @@ def test_analytics_module():
                   not any(k in payload for k in ("track", "car", "lap_time_s", "session_id")), payload)
 
         sent.clear()
+        analytics.track("page_viewed", page="not_a_real_page")
+        check("unknown page is dropped, not sent", not _wait_for(1, timeout=0.3), sent)
+
+        sent.clear()
+        analytics.track("page_viewed", page="home")
+        got_page = _wait_for(1)
+        check("page_viewed with an allowed page is sent", got_page, sent)
+        if got_page:
+            check("page_viewed payload carries the page", sent[0].get("page") == "home", sent[0])
+
+        sent.clear()
+        analytics.track("feature_used", feature="not_a_real_feature")
+        check("unknown feature is dropped, not sent", not _wait_for(1, timeout=0.3), sent)
+
+        sent.clear()
+        analytics.track("feature_used", feature="deepdive")
+        got_feature = _wait_for(1)
+        check("feature_used with an allowed feature is sent", got_feature, sent)
+        if got_feature:
+            check("feature_used payload carries the feature", sent[0].get("feature") == "deepdive", sent[0])
+
+        sent.clear()
+        analytics.track("error", error_type="OSError", context="not_a_real_context")
+        check("unknown error context is dropped, not sent", not _wait_for(1, timeout=0.3), sent)
+
+        sent.clear()
+        analytics.track("error", error_type="OSError", context="udp_bind")
+        got_error = _wait_for(1)
+        check("error with an allowed context is sent", got_error, sent)
+        if got_error:
+            payload = sent[0]
+            check("error payload carries error_type/context", payload.get("error_type") == "OSError"
+                  and payload.get("context") == "udp_bind", payload)
+
+        sent.clear()
+        analytics.track("app_launch")
+        got_envelope = _wait_for(1)
+        check("v2 envelope present", got_envelope, sent)
+        if got_envelope:
+            payload = sent[0]
+            check("envelope carries schema_v/ts/arch/py_version",
+                  all(k in payload for k in ("schema_v", "ts", "arch", "py_version")), payload)
+            check("schema_v is 2", payload.get("schema_v") == 2, payload)
+            check("platform is never win32 (normalised to windows)", payload.get("platform") != "win32", payload)
+
+        sent.clear()
         _config.config["analytics_enabled"] = False
         analytics.track("app_launch")
         check("disabled: nothing sent even though endpoint is set", not _wait_for(1, timeout=0.3), sent)
 
         _config.config["analytics_enabled"] = True
         sent.clear()
+        import listener as _listener
         orig_interval = analytics.HEARTBEAT_INTERVAL_S
         try:
             analytics.HEARTBEAT_INTERVAL_S = 0.05
-            asyncio.run(asyncio.wait_for(analytics.heartbeat_loop(), timeout=0.5))
+            asyncio.run(asyncio.wait_for(_listener._analytics_heartbeat_loop(), timeout=0.5))
         except asyncio.TimeoutError:
-            pass  # heartbeat_loop() never returns by design; the timeout is expected
+            pass  # the loop never returns by design; the timeout is expected
         finally:
             analytics.HEARTBEAT_INTERVAL_S = orig_interval
-        check("heartbeat_loop fires a heartbeat event", _wait_for(1, timeout=1.0), sent)
+        check("_analytics_heartbeat_loop fires a heartbeat event", _wait_for(1, timeout=1.0), sent)
         if sent:
-            check("heartbeat payload carries the event name", sent[0].get("event") == "heartbeat", sent[0])
+            payload = sent[0]
+            check("heartbeat payload carries the event name", payload.get("event") == "heartbeat", payload)
+            check("heartbeat payload carries capture_ok/udp_rejected/session_active/uptime_s",
+                  all(k in payload for k in ("capture_ok", "udp_rejected", "session_active", "uptime_s")),
+                  payload)
     finally:
         server.shutdown()
         analytics.ANALYTICS_ENDPOINT = orig_endpoint

@@ -400,11 +400,27 @@ async def main(demo_mode: bool = False):
     _started_at[0] = _listener_started_at
     if not demo_mode:
         import analytics
-        analytics.track("app_launch")
-        asyncio.create_task(analytics.heartbeat_loop())
+        # Cumulative, not per-launch — sends are fire-and-forget with no
+        # retry (correctly: analytics must never block a race from saving),
+        # so any single count is silently a lower bound with no way to know
+        # by how much. A cumulative counter is self-healing: nine dropped
+        # sends out of ten and the tenth still carries the true total.
+        config["analytics_launches_total"] = config.get("analytics_launches_total", 0) + 1
+        save_config(config)
+        analytics.track("app_launch", launches_total=config["analytics_launches_total"])
+        asyncio.create_task(_analytics_heartbeat_loop())
     ensure_storage()
     _db_initialize(_DEMO_DB_PATH_REF, storage_path, FORZA_TRACKS, FORZA_CARS, log)
     _db_init()
+    if not demo_mode and not config.get("analytics_first_packet_sent"):
+        # Seed rather than let an upgrade fire first_packet years late: an
+        # install with prior recorded sessions has obviously captured
+        # telemetry before, even though this specific flag didn't exist yet
+        # when it did. Keeps the first activation-funnel cohort honest
+        # instead of spiking it with false negatives-turned-positives.
+        if _db_career_kpis().get("total_sessions", 0) > 0:
+            config["analytics_first_packet_sent"] = True
+            save_config(config)
     load_forza_reference_data()
     # FORZA_CARS is populated by load_forza_reference_data(); SESSION_DETAIL_HTML
     # was computed at module-import time when the dict was still empty. Rebuild
@@ -472,6 +488,9 @@ async def main(demo_mode: bool = False):
                      + (" (reuse_port — needs game broadcast mode to coexist)" if game == "f1" else ""))
         except (OSError, ValueError) as e:
             log.error(f"Failed to bind {game} on port {port}: {e} — F1/ACC/Forza port conflict?")
+            if not demo_mode:
+                import analytics
+                analytics.track("error", error_type=type(e).__name__, context="udp_bind", fatal=False)
 
     if not demo_mode:
         asyncio.create_task(session_watchdog())
@@ -563,6 +582,9 @@ async def main(demo_mode: bool = False):
             )
         else:
             log.error(f"Could not start the dashboard server on port {STATUS_PORT}: {e}")
+        if not demo_mode:
+            import analytics
+            analytics.track("error", error_type=type(e).__name__, context="http_bind", fatal=True)
         raise SystemExit(1)
     log.info(f"Storage path: {storage_path()}")
     log.info(f"Dashboard at http://localhost:{STATUS_PORT}/")
@@ -574,6 +596,32 @@ async def main(demo_mode: bool = False):
 
     async with server:
         await server.serve_forever()
+
+
+async def _analytics_heartbeat_loop():
+    """Background task: fires a heartbeat every analytics.HEARTBEAT_INTERVAL_S
+    for as long as the process is alive — the only signal that distinguishes
+    "launched once and still running" from "launched once, long gone" (every
+    other event is one-shot). Lives here rather than in analytics.py so it
+    can read state/active_sessions/_listener_started_at without a circular
+    import (session.manager, which owns those, already imports analytics for
+    session_saved)."""
+    import analytics
+    while True:
+        await asyncio.sleep(analytics.HEARTBEAT_INTERVAL_S)
+        analytics.track(
+            "heartbeat",
+            # Persistent — "has this install EVER captured a packet", not
+            # just this process's uptime. Distinguishes "nothing arriving"
+            # (wrong Data Out IP, closed firewall, wrong port) from "arriving
+            # and rejected" (right machine, wrong packet format) — two
+            # failures that look identical from outside and have completely
+            # different fixes.
+            capture_ok=bool(config.get("analytics_first_packet_sent")),
+            udp_rejected=any(state["udp_rejected"].values()),
+            session_active=bool(active_sessions),
+            uptime_s=int(time.time() - _listener_started_at) if _listener_started_at else 0,
+        )
 
 
 def _maybe_open_browser_on_launch():

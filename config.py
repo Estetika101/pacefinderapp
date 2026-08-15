@@ -56,8 +56,16 @@ DEFAULTS: dict = {
     # Anonymous, opt-out usage analytics (app launches, sessions saved,
     # feature usage, error rates) — never track/car/lap-time data or
     # anything else that describes what someone actually did on track.
-    # See docs/specs/usage-analytics.md.
+    # See docs/specs/usage-analytics.md and usage-analytics-v2.md.
     "analytics_enabled": True,
+    # Cumulative counters, self-healing against fire-and-forget's silent
+    # drops — see the comment at their increment site in listener.py.
+    "analytics_launches_total": 0,
+    # Set once, ever, the first time any parser decodes a valid packet —
+    # gates the one-shot first_packet event (session/protocol.py) and can't
+    # re-fire. On upgrade, an install with prior local sessions gets this
+    # seeded True (see main()) rather than firing first_packet years late.
+    "analytics_first_packet_sent": False,
 }
 
 
@@ -101,6 +109,9 @@ if not config.get("analytics_id"):
 _LOCAL_FALLBACK = Path(user_data_dir("Pacefinder", appauthor=False))
 
 
+_storage_fallback_reported = False  # module-level, so this fires at most once per process
+
+
 def resolve_storage_path(candidate: str) -> Path:
     """Resolve a candidate storage path, creating it if needed and falling back
     to the per-user data dir if it can't be created/used (e.g. the Pi-only
@@ -117,7 +128,23 @@ def resolve_storage_path(candidate: str) -> Path:
     try:
         p.mkdir(parents=True, exist_ok=True)
         return p
-    except OSError:
+    except OSError as e:
+        global _storage_fallback_reported
+        if not _storage_fallback_reported:
+            # storage_path() is called on essentially every request/DB
+            # operation, and this branch re-fires on every one of them for
+            # as long as the configured candidate stays unusable — a
+            # process-lifetime flag keeps this to one event instead of
+            # hundreds. An install silently writing to the per-user dir
+            # instead of the configured path was previously undetectable
+            # both in the field and in the logs (bare except, no logging at
+            # all) — this is the one new signal for it.
+            _storage_fallback_reported = True
+            try:
+                import analytics
+                analytics.track("error", error_type=type(e).__name__, context="storage_fallback", fatal=False)
+            except Exception:
+                pass
         _LOCAL_FALLBACK.mkdir(parents=True, exist_ok=True)
         return _LOCAL_FALLBACK
 

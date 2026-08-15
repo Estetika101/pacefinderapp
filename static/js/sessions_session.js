@@ -750,7 +750,7 @@ function editSelTyre(el){
 
 async function saveEdit(){
   if(!_id) return;
-  const body = {id: _id};
+  const body = {id: _id, source: 'session_edit'};
   const track = document.getElementById('edit-track').value.trim();
   if(track) body.track = track;
   if(_editRaceType) body.race_type = _editRaceType;

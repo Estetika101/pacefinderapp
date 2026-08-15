@@ -3,6 +3,7 @@ import logging
 import time
 from datetime import datetime
 
+from config import config, save_config
 from parsers.forza import FM_PACKET_SIZE, FM_PACKET_SIZE_FH
 from parsers.f1 import F1_HEADER_SIZE
 from session.manager import Session, _is_driving, active_sessions, state, update_state
@@ -49,6 +50,16 @@ class TelemetryProtocol(asyncio.DatagramProtocol):
                     f"Check Data Out settings."
                 )
             return
+
+        if not config.get("analytics_first_packet_sent"):
+            # Once, ever, per install — the activation marker: did telemetry
+            # ever actually reach this install at all. Persisted immediately
+            # so it can't re-fire (config field, not in-memory — this must
+            # survive restarts).
+            config["analytics_first_packet_sent"] = True
+            save_config(config)
+            import analytics
+            analytics.track("first_packet", game=self.game)
 
         if parsed.get("_packet_type") == "race_over":
             # Forza's cross-the-final-line packet (is_race_on=0) carries the

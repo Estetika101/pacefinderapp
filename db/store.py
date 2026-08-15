@@ -51,6 +51,22 @@ def _db_connect() -> sqlite3.Connection:
 
 # ─── Schema Init & Migration ──────────────────────────────────────────────────
 
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, col: str, defn: str):
+    """ALTER TABLE ADD COLUMN, tolerating the expected failure (column
+    already exists — SQLite has no ADD COLUMN IF NOT EXISTS, so this is the
+    normal shape of every startup after the first one a column was added on)
+    without swallowing a genuinely unexpected one (locked DB, disk full,
+    corrupted file) silently. Only the latter is worth an analytics event —
+    tracking the routine case would fire on every single ordinary launch."""
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {defn}")
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        if "duplicate column" not in str(e).lower():
+            import analytics
+            analytics.track("error", error_type=type(e).__name__, context="db_migration", fatal=False)
+
+
 def _db_init():
     with _db_lock:
         conn = _db_connect()
@@ -169,11 +185,7 @@ def _db_init():
                 ("drivetrain_type", "INTEGER"),
                 ("num_cylinders", "INTEGER"),
             ]:
-                try:
-                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {defn}")
-                    conn.commit()
-                except Exception:
-                    pass
+                _add_column_if_missing(conn, "sessions", col, defn)
             # Per-lap precomputed aggregates so /sessions/session/data can be
             # served by a single SQL query instead of re-reading <sid>_laps.json
             # from disk and iterating every sample on each request.
@@ -192,16 +204,8 @@ def _db_init():
                 ("s2_time_s",      "REAL"),
                 ("s3_time_s",      "REAL"),
             ]:
-                try:
-                    conn.execute(f"ALTER TABLE laps ADD COLUMN {col} {defn}")
-                    conn.commit()
-                except Exception:
-                    pass
-            try:
-                conn.execute("ALTER TABLE lap_samples ADD COLUMN outline_json BLOB")
-                conn.commit()
-            except Exception:
-                pass
+                _add_column_if_missing(conn, "laps", col, defn)
+            _add_column_if_missing(conn, "lap_samples", "outline_json", "BLOB")
         finally:
             conn.close()
     _db_migrate()

@@ -1,6 +1,7 @@
 import asyncio
 import gzip
 import json
+import re
 import socket
 import time
 import urllib.parse
@@ -572,9 +573,11 @@ def make_handler(ctx: dict):
                 # Idle landing — moved from DASHBOARD_HTML to HOME_HTML.
                 # Live dashboard now lives at /dashboard (below). Bookmarks
                 # of / will land here; the top nav links to /dashboard.
+                analytics.track("page_viewed", page="home")
                 writer.write(_http_response("200 OK", "text/html", HOME_HTML.encode()))
 
             elif path == "/dashboard":
+                analytics.track("page_viewed", page="dashboard")
                 writer.write(_http_response("200 OK", "text/html", DASHBOARD_HTML.encode()))
 
             elif path == "/home/data":
@@ -851,6 +854,7 @@ def make_handler(ctx: dict):
                                             json.dumps(_home_tips()).encode()))
 
             elif path == "/setup":
+                analytics.track("page_viewed", page="setup")
                 writer.write(_http_response("200 OK", "text/html", SETUP_HTML.encode()))
 
             elif path == "/setup/ips":
@@ -1016,6 +1020,7 @@ def make_handler(ctx: dict):
             elif path in ("/sessions", "/sessions/"):
                 # Sessions is the core content surface — a filter mechanism
                 # over every recorded session. See docs/specs/ia.md.
+                analytics.track("page_viewed", page="sessions")
                 writer.write(_http_response("200 OK", "text/html", SESSIONS_HTML.encode()))
 
             elif path == "/sessions/game":
@@ -1037,9 +1042,11 @@ def make_handler(ctx: dict):
                     ))
 
             elif path == "/sessions/track":
+                analytics.track("page_viewed", page="circuit_detail")
                 writer.write(_http_response("200 OK", "text/html", TRACK_DETAIL_HTML.encode()))
 
             elif path == "/sessions/session":
+                analytics.track("page_viewed", page="session_detail")
                 writer.write(_http_response("200 OK", "text/html", SESSION_DETAIL_HTML.encode()))
 
             elif path == "/sessions/session/events":
@@ -1050,6 +1057,7 @@ def make_handler(ctx: dict):
                       for pair in query_string.split("&") if "=" in pair
                       for k, v in [pair.split("=", 1)]}
                 if qs.get("embed") == "1":
+                    analytics.track("feature_used", feature="mistakes")
                     writer.write(_http_response("200 OK", "text/html", SESSION_EVENTS_HTML.encode()))
                 else:
                     loc = "/sessions/telemetry?id=" + urllib.parse.quote(qs.get("id", "")) + "&events=1"
@@ -1057,7 +1065,7 @@ def make_handler(ctx: dict):
                                                 "Location: " + loc + "\r\n"))
 
             elif path == "/sessions/telemetry":
-                analytics.track("telemetry_viewed")
+                analytics.track("page_viewed", page="telemetry")
                 writer.write(_http_response("200 OK", "text/html", TELEMETRY_HTML.encode()))
 
             elif path == "/sessions/data":
@@ -1121,9 +1129,11 @@ def make_handler(ctx: dict):
                                             json.dumps(result).encode()))
 
             elif path == "/cars":
+                analytics.track("page_viewed", page="cars")
                 writer.write(_http_response("200 OK", "text/html", CAR_INDEX_HTML.encode()))
 
             elif path == "/circuits":
+                analytics.track("page_viewed", page="circuits")
                 writer.write(_http_response("200 OK", "text/html", CIRCUIT_INDEX_HTML.encode()))
 
             elif path == "/cars/data":
@@ -1202,6 +1212,7 @@ def make_handler(ctx: dict):
                 else:
                     nick = body.get("nickname")
                     db_set_car_nickname(ordinal, nick if nick else None)
+                    analytics.track("feature_used", feature="car_nickname")
                     writer.write(_http_response("200 OK", "application/json",
                                                 json.dumps({"ok": True, "ordinal": ordinal,
                                                             "nickname": nick or None}).encode()))
@@ -1966,6 +1977,7 @@ def make_handler(ctx: dict):
                 # Compute the Deep Dive tab payload from a session's stored
                 # lap_samples + the sessions/laps rows. Pure compute — no DB
                 # writes, no external calls. See docs/specs/deep-dive-tab.md.
+                analytics.track("feature_used", feature="deepdive")
                 qs = {k: urllib.parse.unquote_plus(v)
                       for pair in query_string.split("&") if "=" in pair
                       for k, v in [pair.split("=", 1)]}
@@ -2017,6 +2029,20 @@ def make_handler(ctx: dict):
                                                 json.dumps({"error": str(exc)}).encode()))
                 else:
                     sid = body_data.get("id", "")
+                    # source distinguishes the finish-race modal's confirm/skip
+                    # from a later re-edit from the session-detail page — both
+                    # POST here. ia.md treats deferral (skip) as lossless and
+                    # reclaimable; this is the only way to see whether deferred
+                    # sessions actually get reclaimed later or just abandoned.
+                    # Missing/unrecognized source (an old cached client mid-
+                    # deploy) just doesn't track anything, rather than guessing.
+                    _feature = {
+                        "finish_modal": "session_confirm",
+                        "skip":         "session_skip",
+                        "session_edit": "session_edit",
+                    }.get(body_data.get("source"))
+                    if _feature:
+                        analytics.track("feature_used", feature=_feature)
                     if not _safe_sid(sid):
                         writer.write(_http_response("400 Bad Request", "application/json",
                                                     b'{"error":"bad id"}'))
@@ -2132,6 +2158,7 @@ def make_handler(ctx: dict):
                 # files on disk. Used by the Edit modal's Delete button and
                 # by the bulk-cleanup script. No undo — caller is expected
                 # to confirm before posting.
+                analytics.track("feature_used", feature="session_delete")
                 try:
                     body_data = json.loads(raw_body)
                 except (json.JSONDecodeError, ValueError) as exc:
@@ -2232,8 +2259,24 @@ def make_handler(ctx: dict):
                                                         json.dumps({"error": str(exc)}).encode()))
                         except Exception as exc:
                             log.error(f"Claude API error: {exc}")
+                            analytics.track("error", error_type=type(exc).__name__, context="spotter_call", fatal=False)
                             writer.write(_http_response("502 Bad Gateway", "application/json",
                                                         json.dumps({"error": f"API error: {exc}"}).encode()))
+
+            elif path == "/feature-used" and method == "POST":
+                # Generic tracking ping for feature signals that are purely
+                # client-driven — a reference-type dropdown change or a lap
+                # added to a comparison overlay has no server-side mutation
+                # to piggyback on, so this exists rather than forcing one
+                # onto an unrelated data-fetch endpoint that also fires on
+                # every ordinary page load. analytics.track() enforces the
+                # allow-list; this route is just the transport.
+                try:
+                    body_data = json.loads(raw_body)
+                except (json.JSONDecodeError, ValueError):
+                    body_data = {}
+                analytics.track("feature_used", feature=body_data.get("feature"))
+                writer.write(_http_response("200 OK", "application/json", b'{"ok":true}'))
 
             elif path == "/reset" and method == "POST":
                 for game in PORTS:
@@ -2423,7 +2466,8 @@ def make_handler(ctx: dict):
                                             json.dumps(info).encode()))
 
             elif path == "/update/apply" and method == "POST":
-                from net.updater import perform_update
+                from net.updater import perform_update, get_latest_release_info
+                from_version = ctx.get("app_version", "unknown")
                 try:
                     body = raw_body.decode('utf-8')
                     data = json.loads(body) if body.strip() else {}
@@ -2432,9 +2476,17 @@ def make_handler(ctx: dict):
                     # here — perform_update branches by deployment and validates.
                     download_url = data.get('download_url', '')
                     result = perform_update(download_url)
+                    latest = get_latest_release_info()
+                    analytics.track(
+                        "update_applied", from_version=from_version,
+                        to_version=(latest or {}).get("tag_name", "unknown"),
+                        ok=bool(result.get("success")),
+                    )
                     writer.write(_http_response("200 OK", "application/json",
                                                 json.dumps(result).encode()))
                 except Exception as e:
+                    analytics.track("update_applied", from_version=from_version,
+                                     to_version="unknown", ok=False)
                     writer.write(_http_response("500 Internal Server Error", "application/json",
                                                 json.dumps({'success': False, 'error': str(e)}).encode()))
 
@@ -2442,8 +2494,20 @@ def make_handler(ctx: dict):
                 writer.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nNot Found")
 
             await writer.drain()
-        except Exception:
-            pass
+        except Exception as e:
+            # Every unhandled exception in the entire HTTP layer used to be
+            # silently swallowed here — the largest source of invisible
+            # breakage in the app (docs/specs/usage-analytics-v2.md). `path`
+            # is safe to send as-is: every route in this app is a fixed
+            # literal string (`elif path == "..."`) with IDs carried in the
+            # query string, never the path itself, so it can never contain
+            # anything except one of this app's own route strings or a
+            # malformed/probing request — bounded either way. Still run
+            # through a shape check rather than trusting it blindly, since
+            # unlike `page`/`feature` there's no practical fixed enum to
+            # validate a growing route list against.
+            safe_route = _perf_path if len(_perf_path) <= 100 and re.fullmatch(r"[A-Za-z0-9/_.-]*", _perf_path) else "unrecognized"
+            analytics.track("error", error_type=type(e).__name__, context="http_request", route=safe_route, fatal=False)
         finally:
             try:
                 total_ms = (time.perf_counter() - _perf_started) * 1000

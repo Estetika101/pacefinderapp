@@ -251,7 +251,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
     </div>
     <div class="fo-foot">
-      <button class="fo-skip" onclick="closeFinish()">Skip</button>
+      <button class="fo-skip" onclick="skipFinish()">Skip</button>
       <button class="fo-save" onclick="saveFinish()">Save</button>
     </div>
   </div>

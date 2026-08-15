@@ -10,6 +10,7 @@ import logging
 from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, MIN_VALID_LAP_S
 from db.store import (
     _classify_race_type,
+    _db_career_kpis,
     _db_write_session,
     _store_session_lap_samples,
     _update_track_references_bg,
@@ -883,12 +884,23 @@ class Session:
         _db_write_session(session_data)
 
         import analytics
-        duration_s = (datetime.now() - self.started_at).total_seconds()
+        duration_min = round((datetime.now() - self.started_at).total_seconds() / 60)
+        # Cumulative, same reasoning as launches_total (listener.py): sends
+        # are fire-and-forget with no retry, so a single count is silently a
+        # lower bound with no way to know by how much. One extra query at
+        # close (already-indexed columns) makes every count self-healing —
+        # nine dropped sends out of ten and the tenth still carries the true
+        # total. Whole minutes, not 0.1s duration_s: sub-second precision
+        # alongside lap_count/game/a timestamp is a usable fingerprint at low
+        # install counts, and no dashboard question needs better than minutes.
+        kpis = _db_career_kpis()
         analytics.track(
             "session_saved",
             game=self.game,
             lap_count=len(self.completed_laps),
-            duration_s=round(duration_s, 1),
+            duration_min=duration_min,
+            sessions_total=kpis.get("total_sessions", 0),
+            laps_total=kpis.get("total_laps", 0),
         )
 
         # Background: per-sample compression (gzip + INSERT per lap), JSON
@@ -920,11 +932,15 @@ def _close_finalize_async(session_id: str, completed_laps: list,
     (gzipped), JSON file mirrors, then track-references rebuild."""
     import analytics
 
+    # None of these three are fatal — the session row itself already saved
+    # synchronously before this background tail even started (see close()
+    # above), so losing any one of these degrades the record, it doesn't
+    # lose it.
     try:
         _store_session_lap_samples(session_id, completed_laps)
     except Exception as e:
         _log.error(f"close_finalize: lap_samples write failed for {session_id}: {e}")
-        analytics.track("error", error_type=type(e).__name__, context="lap_samples_write")
+        analytics.track("error", error_type=type(e).__name__, context="lap_samples_write", fatal=False)
 
     try:
         sp = storage_path()
@@ -936,13 +952,13 @@ def _close_finalize_async(session_id: str, completed_laps: list,
             json.dump([lap.to_dict() for lap in completed_laps], f, indent=2)
     except OSError as e:
         _log.error(f"close_finalize: JSON file write failed for {session_id}: {e}")
-        analytics.track("error", error_type=type(e).__name__, context="session_json_write")
+        analytics.track("error", error_type=type(e).__name__, context="session_json_write", fatal=False)
 
     try:
         _update_track_references_bg(track, game)
     except Exception as e:
         _log.error(f"close_finalize: track_references update failed for {session_id}: {e}")
-        analytics.track("error", error_type=type(e).__name__, context="track_reference_update")
+        analytics.track("error", error_type=type(e).__name__, context="track_reference_update", fatal=False)
 
     _log.info(f"Session finalised (async): {session_id}")
 

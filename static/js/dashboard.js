@@ -507,7 +507,7 @@ function toggleDropLast(){
 
 async function saveFinish(){
   if(!_foSid) return;
-  const body={id:_foSid};
+  const body={id:_foSid, source:'finish_modal'};
   if(_foRaceType) body.race_type=_foRaceType;
   if(_foDropLast) body.drop_last_lap=true;
   const selTrack=$('fo-track').value;
@@ -528,4 +528,12 @@ async function saveFinish(){
 function closeFinish(){
   $('fo').classList.remove('open');
   if(_foAutoTimer){clearTimeout(_foAutoTimer);_foAutoTimer=null;}
+}
+
+function skipFinish(){
+  // Deferral is lossless and reclaimable (ia.md) — pings the server purely
+  // so analytics can see whether deferred sessions actually get reclaimed
+  // later or just abandoned. No fields, no DB write, just the signal.
+  if(_foSid) fetch('/sessions/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:_foSid, source:'skip'})});
+  closeFinish();
 }
