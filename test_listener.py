@@ -302,6 +302,46 @@ def test_session_creation():
     check("state speed > 0",      L.state["speed_mph"] > 0)
 
 
+def test_long_lap_not_discarded():
+    from datetime import datetime
+    from session.manager import Session, LapRecord
+    from config import MAX_VALID_LAP_S
+    print("\n[long lap — nurburgring 24h course regression]")
+
+    _ensure_temp_store()
+
+    # A single completed lap on the longest circuit (Nürburgring GP +
+    # Nordschleife combined) can genuinely exceed 10 minutes in a slower
+    # car. Before MAX_VALID_LAP_S existed, the hardcoded "< 600" ceiling
+    # in close() made a real 700s lap fail has_valid_lap, and with only
+    # one lap has_enough_laps (>=2) also failed — the whole session got
+    # silently discarded as "insufficient data".
+    session = Session("forza_motorsport", datetime.now())
+    lap = LapRecord(lap_number=0)
+    lap.samples = [{"t": 700.0, "speed_mph": 90}]
+    lap.close(700.0)
+    session.completed_laps = [lap]
+    session.current_lap = None
+    session.track = "Nürburgring 24h Course"
+    session.car = "2020 Honda Civic Type R TCR"
+
+    result = session.close()
+    check("700s single lap is not discarded", result != {}, str(result))
+    check("best_lap_time_s carries through", result.get("best_lap_time_s") == 700.0)
+
+    # A lap so long it's obviously corrupted telemetry (not a real drive)
+    # should still be rejected — the ceiling was raised, not removed.
+    session2 = Session("forza_motorsport", datetime.now())
+    lap2 = LapRecord(lap_number=0)
+    lap2.samples = [{"t": MAX_VALID_LAP_S + 1, "speed_mph": 90}]
+    lap2.close(MAX_VALID_LAP_S + 1)
+    session2.completed_laps = [lap2]
+    session2.current_lap = None
+
+    result2 = session2.close()
+    check("lap past MAX_VALID_LAP_S is still discarded", result2 == {}, str(result2))
+
+
 def test_acc_pipeline():
     import listener as L
     _reset_state()
@@ -1213,6 +1253,7 @@ def main():
     # Pipeline tests — no server needed, call datagram_received directly
     test_parsers()
     test_session_creation()
+    test_long_lap_not_discarded()
     test_acc_pipeline()
     test_f1_pipeline()
     test_f1_slip_via_motionex()

@@ -165,6 +165,14 @@ LOG_LEVEL         = logging.INFO
 # than any real circuit lap, so anything under it is structurally suspect.
 MIN_VALID_LAP_S = 20.0
 
+# Ceiling above which a lap_time_s is treated as corrupted telemetry rather
+# than a genuine slow lap. Nürburgring GP+Nordschleife combined ("24h
+# Course", ~25.4km, the longest circuit in the game) can take a slower car
+# well past 10 minutes — a single completed lap over the old 600s cap used
+# to make has_valid_lap False and the whole session get discarded as
+# "insufficient data" even though the lap was real.
+MAX_VALID_LAP_S = 1200.0
+
 # Max fractional deviation of a lap's sector time from the track's per-sector
 # median before the lap is treated as rotated (distance_norm anchored to a
 # mid-track first sample instead of the start/finish line) and excluded from

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 import logging
 
-from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, MIN_VALID_LAP_S
+from config import storage_path, SESSION_TIMEOUT_S, IDLE_TIMEOUT_S, MIN_VALID_LAP_S, MAX_VALID_LAP_S
 from db.store import (
     _classify_race_type,
     _db_career_kpis,
@@ -420,7 +420,7 @@ class Session:
             self._race_positions.append(rp)
 
         llt = parsed.get("last_lap_time")
-        if llt and 0 < llt < 600:
+        if llt and 0 < llt < MAX_VALID_LAP_S:
             if self._last_seen_lap_time != llt:
                 # last_lap_time CHANGED → a new lap just completed at the
                 # line. Stamp wall-clock for the race-end heuristic.
@@ -659,7 +659,7 @@ class Session:
                 f"lap_number={parsed.get('lap_number')} "
                 f"completed_laps={len(self.completed_laps)}"
             )
-        if not (llt and 0 < llt < 600):
+        if not (llt and 0 < llt < MAX_VALID_LAP_S):
             return
         if self._last_seen_lap_time == llt:
             return
@@ -732,7 +732,7 @@ class Session:
                 self._last_lap_completed_at is not None
                 and self._last_lap_completed_at >= self.current_lap.started_at
             )
-            if llt and 0 < llt < 600 and crossed_line:
+            if llt and 0 < llt < MAX_VALID_LAP_S and crossed_line:
                 inferred_time = llt
 
             # Forza Motorsport zeroes last_lap_time the instant the race
@@ -749,7 +749,7 @@ class Session:
                         and final_dist >= _FINAL_LAP_COMPLETE_FRAC * ref_dist):
                     cand = max((s.get("t", 0) for s in self.current_lap.samples),
                                default=0)
-                    if MIN_VALID_LAP_S <= cand < 600:
+                    if MIN_VALID_LAP_S <= cand < MAX_VALID_LAP_S:
                         inferred_time = cand
                         recovery_source = "telemetry+distance"
                     else:
@@ -840,7 +840,7 @@ class Session:
         self.race_type = _classify_race_type(self._race_positions, valid_laps)
 
         has_enough_laps = len(self.completed_laps) >= 2
-        has_valid_lap   = bool(self.best_lap_time_s and 0 < self.best_lap_time_s < 600)
+        has_valid_lap   = bool(self.best_lap_time_s and 0 < self.best_lap_time_s < MAX_VALID_LAP_S)
         if not (has_enough_laps or has_valid_lap):
             _log.info(
                 f"Session discarded — insufficient data "
