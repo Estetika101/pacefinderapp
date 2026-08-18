@@ -1198,6 +1198,37 @@ def _db_get_lap_samples(session_id: str, lap_number: int) -> Optional[dict]:
             conn.close()
 
 
+def get_track_reference_distance(track: str) -> Optional[float]:
+    """Metres covered by this track's persisted best_lap reference (built
+    from any earlier completed session on this track, any car). Used as the
+    final-lap-completion yardstick when a session has no completed lap of
+    its own to compare against — the case for every 1-lap AI race, since
+    the only lap IS the final lap and there's never an in-session "previous
+    lap". Returns None for a track with no reference yet (its first-ever
+    session, still cold)."""
+    if not track or track == "unknown":
+        return None
+    with _db_lock:
+        conn = _db_connect()
+        try:
+            row = conn.execute(
+                "SELECT samples_json FROM track_references "
+                "WHERE track=? AND reference_type='best_lap'",
+                (track,),
+            ).fetchone()
+        finally:
+            conn.close()
+    if not row:
+        return None
+    samples = _decode_samples(row["samples_json"])
+    dists = [s["distance_traveled_m"] for s in samples
+             if s.get("distance_traveled_m") is not None]
+    if not dists:
+        return None
+    span = max(dists) - min(dists)
+    return span if span > 0 else None
+
+
 def _db_get_lap_outline(session_id: str, lap_number: int) -> Optional[list]:
     """Return the precomputed slim outline for one lap, or None if no row.
 

@@ -15,6 +15,7 @@ from db.store import (
     _store_session_lap_samples,
     _update_track_references_bg,
     compute_lap_aggregates,
+    get_track_reference_distance,
 )
 from reference.loader import FORZA_CARS
 
@@ -197,6 +198,14 @@ class Session:
         # the journal shows what Forza actually transmits at race end
         # without spamming (these packets stream at ~60Hz post-race).
         self._race_over_diag_last: Optional[float] = -1.0
+        # Did Forza ever explicitly report is_race_on=0 (note_race_over
+        # fired)? race_over packets are intercepted in protocol.py before
+        # ingest()/_update_race_state ever see them, so _last_is_race_on
+        # never reflects this — it stays whatever it was during active
+        # driving. This is the real "Forza told us the race/pause ended,
+        # this wasn't just silent UDP loss" signal, used by the cold-start
+        # final-lap fallback in close().
+        self._saw_race_over = False
 
         self._motion_cache: dict = {}
         self._lap_cache: dict = {}
@@ -646,6 +655,7 @@ class Session:
         backfill) so close()'s final-lap recovery has a real time to work
         with. Deliberately does NOT bump self.last_packet: race-end timing
         stays owned by the UDP-stop watchdog exactly as before."""
+        self._saw_race_over = True
         llt = parsed.get("last_lap_time")
         # Diagnostic — log the first race_over packet and any time its
         # last_lap_time changes. This pins down, from the journal alone,
@@ -679,15 +689,26 @@ class Session:
     def _reference_lap_distance(self) -> Optional[float]:
         """Median travelled distance across completed laps — the yardstick
         for deciding whether the in-flight final lap actually finished.
-        Median (not mean) so one short/long lap doesn't skew it."""
+        Median (not mean) so one short/long lap doesn't skew it.
+
+        Falls back to this track's persisted best_lap reference (built from
+        any earlier session) when this session has no completed lap of its
+        own — a 1-lap race can never have one: the only lap IS the final
+        lap, so there's never an in-session "previous lap" to compare
+        against, and without this fallback every 1-lap race gets treated as
+        an abandon regardless of track. Still None on a track's first-ever
+        session (nothing recorded yet to fall back to)."""
         dists = sorted(
             d for d in (_lap_distance(l) for l in self.completed_laps)
             if d is not None
         )
-        if not dists:
+        if dists:
+            n = len(dists)
+            return dists[n // 2] if n % 2 else (dists[n // 2 - 1] + dists[n // 2]) / 2
+        try:
+            return get_track_reference_distance(self.track)
+        except Exception:
             return None
-        n = len(dists)
-        return dists[n // 2] if n % 2 else (dists[n // 2 - 1] + dists[n // 2]) / 2
 
     def close(self) -> dict:
         if self.closed_reason is None:
@@ -759,6 +780,25 @@ class Session:
                             f"ref {ref_dist:.0f}m) but lap clock implausible "
                             f"({cand:.1f}s) — not recovering"
                         )
+                elif ref_dist is None and self._saw_race_over:
+                    # True cold start: nothing to distance-check against —
+                    # neither an in-session lap nor a persisted track
+                    # reference (this track's very first recorded attempt).
+                    # Distance validation can never run here, so fall back
+                    # to the lap's own elapsed clock, gated on Forza having
+                    # explicitly sent a race_over packet (is_race_on=0 at
+                    # the line, or a pause) rather than just going silent —
+                    # is_timed_out() closing a session that never saw one
+                    # (e.g. alt-F4 mid-drive) leaves _saw_race_over False
+                    # and skips this. Narrower than trusting the clock
+                    # unconditionally (the partial-lap regression #146),
+                    # but a track with zero history has no other way to
+                    # ever bootstrap one.
+                    cand = max((s.get("t", 0) for s in self.current_lap.samples),
+                               default=0)
+                    if MIN_VALID_LAP_S <= cand < MAX_VALID_LAP_S:
+                        inferred_time = cand
+                        recovery_source = "telemetry+cold_start"
 
             self.current_lap.close(inferred_time)
             if inferred_time:

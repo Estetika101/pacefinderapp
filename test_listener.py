@@ -590,6 +590,146 @@ def test_final_lap_abandoned_not_recovered():
           f"db lap_count={stored}")
 
 
+def test_one_lap_race_recovered_via_track_reference():
+    """A 1-lap AI race can never have an in-session 'previous lap' to
+    distance-validate its final (and only) lap against — that's what a real
+    Nürburgring 24h Course 1-lap AI race hit: last_lap_time never updates,
+    lap_number never transitions, and the old _reference_lap_distance()
+    returned None unconditionally, so the lap was always dropped as an
+    abandon regardless of track. Fix: fall back to the track's persisted
+    best_lap reference (built from any earlier session) when there's no
+    in-session lap to compare against."""
+    import listener as L
+    from db import store
+    print("\n[1-lap race recovered via persisted track reference]")
+
+    track = "Nürburgring 24h Course"
+
+    # Seed a track reference the way a real prior multi-lap session would.
+    # Can't reuse _drive_forza_race here — it closes the session internally,
+    # and .track (FM2023 telemetry never broadcasts it) must be set BEFORE
+    # close() for _db_write_session to persist it. So the 3-lap drive is
+    # inlined, matching _drive_forza_race's own packet shape.
+    _ensure_temp_store()
+    _reset_state()
+    proto = L.TelemetryProtocol("forza_motorsport", L.parse_forza)
+    prev_lap_time = 0.0
+    for k in range(3):
+        dist0 = k * _LAP_LEN_M
+        for i in range(1, _STEPS + 1):
+            f = i / _STEPS
+            _inject(proto, build_forza_packet(
+                speed_mph=100, lap=k,
+                distance_traveled=dist0 + _LAP_LEN_M * f,
+                current_lap_time=_LAP_T_S * f,
+                last_lap=prev_lap_time))
+        prev_lap_time = _LAP_T_S + 0.001 * k
+    seed = L.active_sessions.get("forza_motorsport")
+    seed.track = track
+    _inject(proto, build_forza_packet(
+        speed_mph=0, lap=0, is_race_on=0,
+        distance_traveled=2 * _LAP_LEN_M + _LAP_LEN_M,
+        current_lap_time=0.0, last_lap=0.0))
+    seed.close()
+    # close()'s background finalisation (lap_samples write + track_references
+    # rebuild) runs on a daemon thread — inline the same two calls here so
+    # the seed reference exists before the assertions below run.
+    store._store_session_lap_samples(seed.session_id, seed.completed_laps)
+    store.update_track_references(track, seed.game)
+    check("seed session's laps stored", len(seed.completed_laps) == 3,
+          f"got {len(seed.completed_laps)}")
+
+    # Now the actual bug scenario: a lone 1-lap race on the same track.
+    # _drive_forza_race can't set .track (FM2023 telemetry never broadcasts
+    # it), so it's set directly here — same as how real telemetry sets
+    # session.track from a track_ordinal lookup before the race ends.
+    _reset_state()
+    proto = L.TelemetryProtocol("forza_motorsport", L.parse_forza)
+    for i in range(1, _STEPS + 1):
+        f = i / _STEPS
+        _inject(proto, build_forza_packet(
+            speed_mph=100, lap=0,
+            distance_traveled=_LAP_LEN_M * f,
+            current_lap_time=_LAP_T_S * f,
+            last_lap=0.0))
+    lone = L.active_sessions.get("forza_motorsport")
+    lone.track = track
+    _inject(proto, build_forza_packet(
+        speed_mph=0, lap=0, is_race_on=0,
+        distance_traveled=_LAP_LEN_M, current_lap_time=0.0, last_lap=0.0))
+
+    result = lone.close()
+    check("1-lap race is not discarded", result != {}, str(result))
+    check("the only lap is recovered", len(lone.completed_laps) == 1,
+          f"got {len(lone.completed_laps)}")
+
+
+def test_cold_start_one_lap_race_recovered():
+    """A 1-lap AI race on a track that has NEVER been recorded before —
+    no in-session lap, no persisted track_references row either. Distance
+    validation has nothing to check against at all. Forza DOES send an
+    explicit race_over packet (is_race_on=0) at the line even though its
+    last_lap_time is 0.0, so close() should fall back to the lap's own
+    elapsed clock rather than discard a genuinely-driven lap just because
+    this track has zero history."""
+    import listener as L
+    print("\n[cold start — 1-lap race, no track history at all]")
+
+    _ensure_temp_store()
+    _reset_state()
+    proto = L.TelemetryProtocol("forza_motorsport", L.parse_forza)
+    for i in range(1, _STEPS + 1):
+        f = i / _STEPS
+        _inject(proto, build_forza_packet(
+            speed_mph=100, lap=0,
+            distance_traveled=_LAP_LEN_M * f,
+            current_lap_time=_LAP_T_S * f,
+            last_lap=0.0))
+    lone = L.active_sessions.get("forza_motorsport")
+    lone.track = "Brand New Track Nobody Has Raced"
+    # The race_over packet — is_race_on=0, last_lap_time still 0.0 (Forza's
+    # documented behaviour at the final crossing). Routed through the real
+    # protocol dispatch so note_race_over() actually sets _saw_race_over,
+    # not asserted directly.
+    _inject(proto, build_forza_packet(
+        speed_mph=0, lap=0, is_race_on=0,
+        distance_traveled=_LAP_LEN_M, current_lap_time=0.0, last_lap=0.0))
+
+    result = lone.close()
+    check("cold-start 1-lap race is not discarded", result != {}, str(result))
+    check("the only lap is recovered", len(lone.completed_laps) == 1,
+          f"got {len(lone.completed_laps)}")
+
+
+def test_cold_start_silent_disconnect_not_recovered():
+    """The flip side, protecting regression #146: on the same cold-start
+    track (no reference to distance-check against), if the driver just
+    quits mid-lap — UDP goes silent, Forza never sends a race_over packet
+    at all — the lap must still be dropped. Without the _saw_race_over
+    gate this would resurrect #146: a 35s partial lap saved as if it were
+    a real lap time."""
+    import listener as L
+    print("\n[cold start — silent disconnect, no race_over packet]")
+
+    _ensure_temp_store()
+    _reset_state()
+    proto = L.TelemetryProtocol("forza_motorsport", L.parse_forza)
+    # Only 35% of a lap's distance, and — critically — no final is_race_on=0
+    # packet at all. is_race_on stays 1 right up until UDP just stops.
+    for i in range(1, _STEPS + 1):
+        f = (i / _STEPS) * 0.35
+        _inject(proto, build_forza_packet(
+            speed_mph=100, lap=0,
+            distance_traveled=_LAP_LEN_M * f,
+            current_lap_time=_LAP_T_S * f,
+            last_lap=0.0, is_race_on=1))
+    lone = L.active_sessions.get("forza_motorsport")
+    lone.track = "Another Brand New Track"
+
+    result = lone.close()
+    check("silent mid-lap disconnect still discarded", result == {}, str(result))
+
+
 def test_game_switching():
     """Switching game source: state should reflect the new game, old session must not clobber."""
     import listener as L
@@ -1254,6 +1394,9 @@ def main():
     test_parsers()
     test_session_creation()
     test_long_lap_not_discarded()
+    test_one_lap_race_recovered_via_track_reference()
+    test_cold_start_one_lap_race_recovered()
+    test_cold_start_silent_disconnect_not_recovered()
     test_acc_pipeline()
     test_f1_pipeline()
     test_f1_slip_via_motionex()
